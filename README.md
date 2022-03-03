@@ -70,3 +70,11 @@ In looking around at existing message passing libraries, I found that almost all
  - Optimized for in-process use
  - Support interprocess use transparently 
  - Minimal dependencies
+
+## Design Choices
+
+
+## Undecided Design Choices
+
+
+
