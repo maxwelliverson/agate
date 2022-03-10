@@ -14,66 +14,66 @@
 #include <processthreadsapi.h>
 
 
-using namespace Agt;
+using namespace agt;
 
 namespace {
 
   /** ========================= [ Thread Data ] =============================== */
 
-  struct LocalBlockingThreadDataHeader {
-    LocalBlockingThread*             threadHandle;
-    LocalMpScChannel*                channel;
-    PFN_agtBlockingThreadMessageProc msgProc;
+  struct local_blocking_thread_data_header {
+    local_blocking_thread*               threadHandle;
+    local_mpsc_channel*                  channel;
+    agt_blocking_thread_message_proc_t msgProc;
   };
 
-  struct LocalBlockingThreadInlineData : LocalBlockingThreadDataHeader {
-    AgtSize                          structSize;
+  struct local_blocking_thread_inline_data : local_blocking_thread_data_header {
+    size_t                           structSize;
     std::byte                        userData[];
   };
 
-  struct LocalBlockingThreadOutOfLineData  : LocalBlockingThreadDataHeader {
-    PFN_agtUserDataDtor              userDataDtor;
-    void*                            userData;
+  struct local_blocking_thread_out_of_line_data : local_blocking_thread_data_header {
+    agt_user_data_dtor_t userDataDtor;
+    void*                userData;
   };
 
-  struct SharedBlockingThreadInlineData {
-    SharedBlockingThread*      threadHandle;
-    SharedMpScChannelReceiver* channel;
-    PFN_agtBlockingThreadMessageProc msgProc;
-    AgtSize                    structSize;
-    std::byte                  userData[];
+  struct shared_blocking_thread_inline_data {
+    shared_blocking_thread*            threadHandle;
+    shared_mpsc_channel_receiver*      channel;
+    agt_blocking_thread_message_proc_t msgProc;
+    size_t                             structSize;
+    std::byte                          userData[];
   };
 
 
 
-  struct SharedBlockingThreadOutOfLineData {
-    SharedBlockingThread*            threadHandle;
-    SharedMpScChannelReceiver*       channel;
-    PFN_agtBlockingThreadMessageProc msgProc;
-    PFN_agtUserDataDtor              userDataDtor;
-    void*                            userData;
+  struct shared_blocking_thread_out_of_line_data {
+    shared_blocking_thread*            threadHandle;
+    shared_mpsc_channel_receiver*      channel;
+    agt_blocking_thread_message_proc_t msgProc;
+    agt_user_data_dtor_t               userDataDtor;
+    void*                              userData;
   };
 
 
 
   /** ========================= [ Thread Cleanup ] =============================== */
 
-  struct ThreadCleanupCallback {
-    ThreadCleanupCallback* pNext;
+  struct thread_cleanup_callback {
+    thread_cleanup_callback* pNext;
     void (* pfnCleanupFunction )(void* pUserData);
     void* pUserData;
   };
 
-  class ThreadCleanupCallbackStack {
-    ThreadCleanupCallback* listHead = nullptr;
+  class thread_cleanup_callback_stack {
+    thread_cleanup_callback* listHead = nullptr;
 
   public:
 
-    constexpr ThreadCleanupCallbackStack() = default;
+    constexpr thread_cleanup_callback_stack() = default;
 
-    ~ThreadCleanupCallbackStack() {
-      ThreadCleanupCallback* currentCallback = listHead;
-      ThreadCleanupCallback* nextCallback    = nullptr;
+    ~thread_cleanup_callback_stack() {
+      thread_cleanup_callback* currentCallback = listHead;
+      thread_cleanup_callback* nextCallback    = nullptr;
       while (currentCallback) {
         nextCallback = currentCallback->pNext;
         currentCallback->pfnCleanupFunction(currentCallback->pUserData);
@@ -83,7 +83,7 @@ namespace {
     }
 
     void pushCallback(void(*pfnFunc)(void*), void* pUserData) noexcept {
-      auto callbackFrame = new ThreadCleanupCallback{
+      auto callbackFrame = new thread_cleanup_callback{
         .pNext              = listHead,
         .pfnCleanupFunction = pfnFunc,
         .pUserData          = pUserData
@@ -92,7 +92,7 @@ namespace {
     }
   };
 
-  constinit thread_local ThreadCleanupCallbackStack ThreadCleanupCallbacks{};
+  constinit thread_local thread_cleanup_callback_stack ThreadCleanupCallbacks{};
 
 
   inline void callOnThreadExit(void(* pfnFunc)(void*), void* pUserData) noexcept {
@@ -105,33 +105,33 @@ namespace {
 
 
   template <>
-  void threadDataDestructor<LocalBlockingThreadInlineData>(void* pData) {
-    const auto data = static_cast<LocalBlockingThreadInlineData*>(pData);
-    AgtContext context = data->threadHandle->context;
+  void threadDataDestructor<local_blocking_thread_inline_data>(void* pData) {
+    const auto data = static_cast<local_blocking_thread_inline_data*>(pData);
+    agt_ctx_t context = data->threadHandle->context;
 
-    handleSetErrorState(data->channel, ErrorState::noReceivers);
+    handleSetErrorState(data->channel, error_state::noReceivers);
     handleReleaseRef(data->channel);
     handleReleaseRef(data->threadHandle);
 
-    ctxLocalFree(context, data, data->structSize, alignof(LocalBlockingThreadInlineData));
+    ctxLocalFree(context, data, data->structSize, alignof(local_blocking_thread_inline_data));
   }
   template <>
-  void threadDataDestructor<SharedBlockingThreadInlineData>(void* pData) {
-    const auto data = static_cast<SharedBlockingThreadInlineData*>(pData);
-    AgtContext context = data->threadHandle->context;
+  void threadDataDestructor<shared_blocking_thread_inline_data>(void* pData) {
+    const auto data = static_cast<shared_blocking_thread_inline_data*>(pData);
+    agt_ctx_t context = data->threadHandle->context;
 
-    handleSetErrorState(data->channel, ErrorState::noReceivers);
+    handleSetErrorState(data->channel, error_state::noReceivers);
     handleReleaseRef(data->channel);
     handleReleaseRef(data->threadHandle);
 
-    ctxLocalFree(context, data, data->structSize, alignof(SharedBlockingThreadInlineData));
+    ctxLocalFree(context, data, data->structSize, alignof(shared_blocking_thread_inline_data));
   }
   template <>
-  void threadDataDestructor<LocalBlockingThreadOutOfLineData>(void* pData) {
-    const auto data = static_cast<LocalBlockingThreadOutOfLineData*>(pData);
-    AgtContext context = data->threadHandle->context;
+  void threadDataDestructor<local_blocking_thread_out_of_line_data>(void* pData) {
+    const auto data = static_cast<local_blocking_thread_out_of_line_data*>(pData);
+    agt_ctx_t context = data->threadHandle->context;
 
-    handleSetErrorState(data->channel, ErrorState::noReceivers);
+    handleSetErrorState(data->channel, error_state::noReceivers);
     handleReleaseRef(data->channel);
     handleReleaseRef(data->threadHandle);
 
@@ -139,15 +139,15 @@ namespace {
       data->userDataDtor(data->userData);
 
     ctxLocalFree(context, data,
-                 sizeof(LocalBlockingThreadOutOfLineData),
-                 alignof(LocalBlockingThreadOutOfLineData));
+                 sizeof(local_blocking_thread_out_of_line_data),
+                 alignof(local_blocking_thread_out_of_line_data));
   }
   template <>
-  void threadDataDestructor<SharedBlockingThreadOutOfLineData>(void* pData) {
-    const auto data = static_cast<SharedBlockingThreadOutOfLineData*>(pData);
-    AgtContext context = data->threadHandle->context;
+  void threadDataDestructor<shared_blocking_thread_out_of_line_data>(void* pData) {
+    const auto data = static_cast<shared_blocking_thread_out_of_line_data*>(pData);
+    agt_ctx_t context = data->threadHandle->context;
 
-    handleSetErrorState(data->channel, ErrorState::noReceivers);
+    handleSetErrorState(data->channel, error_state::noReceivers);
     handleReleaseRef(data->channel);
     handleReleaseRef(data->threadHandle);
 
@@ -155,8 +155,8 @@ namespace {
       data->userDataDtor(data->userData);
 
     ctxLocalFree(context, data,
-                 sizeof(SharedBlockingThreadOutOfLineData),
-                 alignof(SharedBlockingThreadOutOfLineData));
+                 sizeof(shared_blocking_thread_out_of_line_data),
+                 alignof(shared_blocking_thread_out_of_line_data));
   }
 
 
@@ -169,20 +169,20 @@ namespace {
 
 
   DWORD __stdcall localBlockingThreadInlineStartRoutine(LPVOID threadParam) {
-    const auto threadData = static_cast<LocalBlockingThreadInlineData*>(threadParam);
+    const auto threadData = static_cast<local_blocking_thread_inline_data*>(threadParam);
     const auto threadHandle = threadData->threadHandle;
     const auto channel = threadData->channel;
     const auto msgProc = threadData->msgProc;
     void* const pUserData = threadData->userData;
 
 
-    callOnThreadExit(threadDataDestructor<LocalBlockingThreadInlineData>, threadParam);
+    callOnThreadExit(threadDataDestructor<local_blocking_thread_inline_data>, threadParam);
 
-    AgtMessageInfo messageInfo;
-    AgtStatus status;
+    agt_message_info_t messageInfo;
+    agt_status_t status;
 
     do {
-      status = Agt::handlePopQueue(channel, &messageInfo, AGT_WAIT);
+      status = agt::handlePopQueue(channel, &messageInfo, AGT_WAIT);
       if ( status == AGT_SUCCESS ) {
         msgProc(threadHandle, &messageInfo, pUserData);
       }
@@ -193,19 +193,19 @@ namespace {
     return NO_ERROR;
   }
   DWORD __stdcall sharedBlockingThreadInlineStartRoutine(LPVOID threadParam) {
-    const auto threadData = static_cast<SharedBlockingThreadInlineData*>(threadParam);
+    const auto threadData = static_cast<shared_blocking_thread_inline_data*>(threadParam);
     const auto threadHandle = threadData->threadHandle;
     const auto channel = threadData->channel;
     const auto msgProc = threadData->msgProc;
     void* const pUserData = threadData->userData;
 
-    callOnThreadExit(threadDataDestructor<SharedBlockingThreadInlineData>, threadParam);
+    callOnThreadExit(threadDataDestructor<shared_blocking_thread_inline_data>, threadParam);
 
-    AgtMessageInfo messageInfo;
-    AgtStatus status;
+    agt_message_info_t messageInfo;
+    agt_status_t status;
 
     do {
-      status = Agt::handlePopQueue(channel, &messageInfo, AGT_WAIT);
+      status = agt::handlePopQueue(channel, &messageInfo, AGT_WAIT);
       if ( status == AGT_SUCCESS ) {
         msgProc(threadHandle, &messageInfo, pUserData);
       }
@@ -214,19 +214,19 @@ namespace {
     return NO_ERROR;
   }
   DWORD __stdcall localBlockingThreadOutOfLineStartRoutine(LPVOID threadParam) {
-    const auto threadData = static_cast<LocalBlockingThreadOutOfLineData*>(threadParam);
+    const auto threadData = static_cast<local_blocking_thread_out_of_line_data*>(threadParam);
     const auto threadHandle = threadData->threadHandle;
     const auto channel = threadData->channel;
     const auto msgProc = threadData->msgProc;
     void* const pUserData = threadData->userData;
 
-    callOnThreadExit(threadDataDestructor<LocalBlockingThreadOutOfLineData>, threadParam);
+    callOnThreadExit(threadDataDestructor<local_blocking_thread_out_of_line_data>, threadParam);
 
-    AgtMessageInfo messageInfo;
-    AgtStatus status;
+    agt_message_info_t messageInfo;
+    agt_status_t status;
 
     do {
-      status = Agt::handlePopQueue(channel, &messageInfo, AGT_WAIT);
+      status = agt::handlePopQueue(channel, &messageInfo, AGT_WAIT);
       if ( status == AGT_SUCCESS ) {
         msgProc(threadHandle, &messageInfo, pUserData);
       }
@@ -235,19 +235,19 @@ namespace {
     return NO_ERROR;
   }
   DWORD __stdcall sharedBlockingThreadOutOfLineStartRoutine(LPVOID threadParam) {
-    const auto threadData = static_cast<SharedBlockingThreadOutOfLineData*>(threadParam);
+    const auto threadData = static_cast<shared_blocking_thread_out_of_line_data*>(threadParam);
     const auto threadHandle = threadData->threadHandle;
     const auto channel = threadData->channel;
     const auto msgProc = threadData->msgProc;
     void* const pUserData = threadData->userData;
 
-    callOnThreadExit(threadDataDestructor<SharedBlockingThreadOutOfLineData>, threadParam);
+    callOnThreadExit(threadDataDestructor<shared_blocking_thread_out_of_line_data>, threadParam);
 
-    AgtMessageInfo messageInfo;
-    AgtStatus status;
+    agt_message_info_t messageInfo;
+    agt_status_t status;
 
     do {
-      status = Agt::handlePopQueue(channel, &messageInfo, AGT_WAIT);
+      status = agt::handlePopQueue(channel, &messageInfo, AGT_WAIT);
       if ( status == AGT_SUCCESS ) {
         msgProc(threadHandle, &messageInfo, pUserData);
       }
@@ -257,7 +257,7 @@ namespace {
   }
 
 
-  AgtStatus createSystemThread(PFN_threadStartRoutine startRoutine, void* data, Impl::SystemThread& sysThread) noexcept {
+  agt_status_t createSystemThread(PFN_threadStartRoutine startRoutine, void* data, impl::system_thread& sysThread) noexcept {
     SECURITY_ATTRIBUTES securityAttributes;
     securityAttributes.bInheritHandle = false;
     securityAttributes.lpSecurityDescriptor = nullptr;
@@ -282,7 +282,7 @@ namespace {
   using PFN_threadStartRoutine = void*(*)(void*);
 
 
-  AgtStatus createSystemThread(PFN_threadStartRoutine startRoutine, void* data, Impl::SystemThread& sysThread) noexcept {
+  agt_status_t createSystemThread(PFN_threadStartRoutine startRoutine, void* data, Impl::SystemThread& sysThread) noexcept {
 
     return AGT_ERROR_NOT_YET_IMPLEMENTED;
   }
@@ -291,18 +291,18 @@ namespace {
 }
 
 
-AgtStatus Agt::createInstance(LocalBlockingThread*& handle, AgtContext ctx, const AgtBlockingThreadCreateInfo& createInfo) noexcept {
+agt_status_t Agt::createInstance(local_blocking_thread*& handle, agt_ctx_t ctx, const agt_blocking_thread_create_info_t& createInfo) noexcept {
 
-  LocalBlockingThreadDataHeader* header;
-  LocalMpScChannel*              channel;
-  LocalBlockingThread*           threadHandle;
+  local_blocking_thread_data_header* header;
+  local_mpsc_channel*                channel;
+  local_blocking_thread*             threadHandle;
 
-  AgtChannelCreateInfo           channelCreateInfo;
+  agt_channel_create_info_t           channelCreateInfo;
   PFN_threadStartRoutine         startRoutine;
-  NameToken                      nameToken;
-  AgtStatus                      status;
-  AgtSize                        structSize;
-  AgtSize                        structAlign;
+  name_token                      nameToken;
+  agt_status_t                      status;
+  size_t                        structSize;
+  size_t                        structAlign;
 
   if ((status = ctxClaimLocalName(ctx, createInfo.name, createInfo.nameLength, nameToken)) != AGT_SUCCESS)
     return status;
@@ -312,12 +312,12 @@ AgtStatus Agt::createInstance(LocalBlockingThread*& handle, AgtContext ctx, cons
   threadHandle = nullptr;
 
   if (createInfo.flags & AGT_BLOCKING_THREAD_COPY_USER_DATA) {
-    AgtSize dataLength = (createInfo.flags & AGT_BLOCKING_THREAD_USER_DATA_STRING)
+    size_t dataLength = (createInfo.flags & AGT_BLOCKING_THREAD_USER_DATA_STRING)
                            ? (strlen((const char*)createInfo.pUserData) + 1)
                            : createInfo.dataSize;
-    structSize = dataLength + sizeof(LocalBlockingThreadInlineData);
-    structAlign = alignof(LocalBlockingThreadInlineData);
-    if (auto data = (LocalBlockingThreadInlineData*)ctxLocalAlloc(ctx, structSize, structAlign)) {
+    structSize = dataLength + sizeof(local_blocking_thread_inline_data);
+    structAlign = alignof(local_blocking_thread_inline_data);
+    if (auto data = (local_blocking_thread_inline_data*)ctxLocalAlloc(ctx, structSize, structAlign)) {
       data->structSize = structSize;
       std::memcpy(data->userData, createInfo.pUserData, dataLength);
       header = data;
@@ -325,9 +325,9 @@ AgtStatus Agt::createInstance(LocalBlockingThread*& handle, AgtContext ctx, cons
     }
   }
   else {
-    structSize = sizeof(LocalBlockingThreadOutOfLineData);
-    structAlign = alignof(LocalBlockingThreadInlineData);
-    if (auto data = (LocalBlockingThreadOutOfLineData*)ctxLocalAlloc(ctx, structSize, structAlign)) {
+    structSize = sizeof(local_blocking_thread_out_of_line_data);
+    structAlign = alignof(local_blocking_thread_out_of_line_data);
+    if (auto data = (local_blocking_thread_out_of_line_data*)ctxLocalAlloc(ctx, structSize, structAlign)) {
       data->userData = createInfo.pUserData;
       data->userDataDtor = createInfo.pfnUserDataDtor;
       header = data;
@@ -340,7 +340,7 @@ AgtStatus Agt::createInstance(LocalBlockingThread*& handle, AgtContext ctx, cons
   }
 
 
-  if (!(threadHandle = allocHandle<LocalBlockingThread>(ctx)))
+  if (!(threadHandle = allocHandle<local_blocking_thread>(ctx)))
     goto error;
 
 
@@ -379,6 +379,9 @@ error:
   return status;
 }
 
-AgtStatus Agt::createInstance(SharedBlockingThread*& handle, AgtContext ctx, const AgtBlockingThreadCreateInfo& createInfo) noexcept {
+
+
+
+agt_status_t Agt::createInstance(SharedBlockingThread*& handle, agt_ctx_t ctx, const agt_blocking_thread_create_info_t& createInfo) noexcept {
   return AGT_ERROR_NOT_YET_IMPLEMENTED;
 }

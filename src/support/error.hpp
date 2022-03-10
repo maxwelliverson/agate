@@ -9,7 +9,7 @@
 
 namespace Agt {
 
-  enum class ErrorState : AgtUInt32 {
+  enum class ErrorState : agt_u32_t {
     noReceivers,
     noSenders
   };

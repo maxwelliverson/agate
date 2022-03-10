@@ -19,10 +19,10 @@ function(add_agate_library target_)
     cmake_parse_arguments(AGATE_LIB "${optionalArgs}" "${singleValueArgs}" "${multiValueArgs}" ${ARGN})
     list(TRANSFORM AGATE_LIB_SOURCES PREPEND src/${target_}/)
     if(AGATE_LIB_PRIVATE)
-        add_library(${target_} STATIC ${AGATE_LIB_SOURCES})
-        target_include_directories(${target_} PRIVATE include src)
+        add_library(agate.${target_} OBJECT ${AGATE_LIB_SOURCES})
+        target_include_directories(agate.${target_} PRIVATE include src)
         if(DEFINED AGATE_LIB_DEPENDENCIES)
-            target_link_libraries(${target_} PRIVATE ${AGATE_LIB_DEPENDENCIES})
+            target_link_libraries(agate.${target_} PRIVATE ${AGATE_LIB_DEPENDENCIES})
         endif()
     else()
         list(APPEND AGATE_LIBRARIES ${target_})
@@ -40,8 +40,8 @@ function(add_agate_library target_)
                     list(APPEND AGATE_LIB_STATIC_DEPENDENCIES ${dep}_static)
                     list(APPEND AGATE_LIB_SHARED_DEPENDENCIES ${dep}_shared)
                 else()
-                    list(APPEND AGATE_LIB_STATIC_DEPENDENCIES ${dep})
-                    list(APPEND AGATE_LIB_SHARED_DEPENDENCIES ${dep})
+                    list(APPEND AGATE_LIB_STATIC_DEPENDENCIES $<TARGET_OBJECTS:agate.${dep}>)
+                    list(APPEND AGATE_LIB_SHARED_DEPENDENCIES $<TARGET_OBJECTS:agate.${dep}>)
                 endif()
             endforeach()
 
@@ -126,6 +126,8 @@ add_agate_library(
             PRIVATE
             SOURCES
                 context.cpp
+                segment.cpp
+                random.cpp
 )
 
 add_agate_library(
@@ -174,3 +176,7 @@ add_agate_library(
                 support
                 threads
 )
+
+
+add_library(DUMMY src/dummy.cpp)
+target_include_directories(DUMMY PRIVATE include src)

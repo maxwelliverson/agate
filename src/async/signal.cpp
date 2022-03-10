@@ -8,30 +8,30 @@
 
 extern "C" {
 
-struct AgtSignal_st {
-  AgtContext   context;
-  AgtAsyncData asyncData;
-  AgtUInt32    dataKey;
+struct agt_signal_st {
+  agt_ctx_t        context;
+  agt_async_data_t asyncData;
+  agt_u32_t        dataKey;
 };
 
 
 }
 
 
-AgtAsyncData Agt::signalGetAttachment(const AgtSignal_st* signal) noexcept {
+agt_async_data_t Agt::signalGetAttachment(const agt_signal_st* signal) noexcept {
   return signal->asyncData;
 }
 
-void Agt::signalAttach(AgtSignal signal, AgtAsync async) noexcept {
+void Agt::signalAttach(agt_signal_t signal, agt_async_t async) noexcept {
   // TODO: Implement Agt::signalAttach
 }
 
-void Agt::signalDetach(AgtSignal signal) noexcept {
+void Agt::signalDetach(agt_signal_t signal) noexcept {
   // TODO: Implement Agt::signalDetach
 }
-void Agt::signalRaise(AgtSignal signal) noexcept {
+void Agt::signalRaise(agt_signal_t signal) noexcept {
   // TODO: Implement Agt::signalRaise
 }
-void Agt::signalClose(AgtSignal signal) noexcept {
+void Agt::signalClose(agt_signal_t signal) noexcept {
   // TODO: Implement Agt::signalClose
 }

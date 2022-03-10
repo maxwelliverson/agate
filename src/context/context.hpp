@@ -8,11 +8,11 @@
 #include "fwd.hpp"
 
 
-namespace Agt {
+namespace agt {
 
-  enum class NameToken : AgtUInt64;
+  enum class name_token : agt_u64_t;
 
-  enum class BuiltinValue : AgtUInt32 {
+  enum class builtin_value : agt_u32_t {
     processName,
     defaultPrivateChannelMessageSize,
     defaultLocalChannelMessageSize,
@@ -23,51 +23,51 @@ namespace Agt {
   };
 
 
-  void*         ctxLocalAlloc(AgtContext ctx, AgtSize size, AgtSize alignment) noexcept;
-  void          ctxLocalFree(AgtContext ctx, void* memory, AgtSize size, AgtSize alignment) noexcept;
+  void*         ctxLocalAlloc(agt_ctx_t ctx, size_t size, size_t alignment) noexcept;
+  void          ctxLocalFree(agt_ctx_t ctx, void* memory, size_t size, size_t alignment) noexcept;
 
-  void*         ctxSharedAlloc(AgtContext ctx, AgtSize size, AgtSize alignment, SharedAllocationId& allocationId) noexcept;
-  void          ctxSharedFree(AgtContext ctx, SharedAllocationId allocId) noexcept;
-  void          ctxSharedFree(AgtContext ctx, void* memory, AgtSize size, AgtSize alignment) noexcept;
+  void*         ctxSharedAlloc(agt_ctx_t ctx, size_t size, size_t alignment, SharedAllocationId& allocationId) noexcept;
+  void          ctxSharedFree(agt_ctx_t ctx, SharedAllocationId allocId) noexcept;
+  void          ctxSharedFree(agt_ctx_t ctx, void* memory, size_t size, size_t alignment) noexcept;
 
-  HandleHeader* ctxAllocHandle(AgtContext ctx, AgtSize size, AgtSize alignment) noexcept;
-  void          ctxFreeHandle(AgtContext ctx, HandleHeader* handle, AgtSize size, AgtSize alignment) noexcept;
+  HandleHeader* ctxAllocHandle(agt_ctx_t ctx, size_t size, size_t alignment) noexcept;
+  void          ctxFreeHandle(agt_ctx_t ctx, HandleHeader* handle, size_t size, size_t alignment) noexcept;
 
-  SharedObjectHeader* ctxAllocSharedObject(AgtContext context, AgtSize size, AgtSize alignment) noexcept;
-  void                ctxFreeSharedObject(AgtContext ctx, SharedObjectHeader* object, AgtSize size, AgtSize alignment) noexcept;
+  SharedObjectHeader* ctxAllocSharedObject(agt_ctx_t context, size_t size, size_t alignment) noexcept;
+  void                ctxFreeSharedObject(agt_ctx_t ctx, SharedObjectHeader* object, size_t size, size_t alignment) noexcept;
 
-  // void*         ctxAllocAsyncData(AgtContext context, AgtObjectId& id) noexcept;
-  // void          ctxFreeAsyncData(AgtContext context, void* memory) noexcept;
-
-
-
-
-  void*         ctxGetLocalAddress(SharedAllocationId allocId) noexcept;
-
-  AgtStatus     ctxOpenHandleById(AgtContext ctx, AgtObjectId id, HandleHeader*& handle) noexcept;
-  AgtStatus     ctxOpenHandleByName(AgtContext ctx, const char* name, HandleHeader*& handle) noexcept;
+  // void*         ctxAllocAsyncData(agt_ctx_t context, agt_object_id_t& id) noexcept;
+  // void          ctxFreeAsyncData(agt_ctx_t context, void* memory) noexcept;
 
 
 
 
-  AgtStatus     ctxClaimLocalName(AgtContext ctx, const char* pName, AgtSize nameLength, NameToken& token) noexcept;
-  void          ctxReleaseLocalName(AgtContext ctx, NameToken nameToken) noexcept;
-  AgtStatus     ctxClaimSharedName(AgtContext ctx, const char* pName, AgtSize nameLength, NameToken& token) noexcept;
-  void          ctxReleaseSharedName(AgtContext ctx, NameToken nameToken) noexcept;
-  void          ctxBindName(AgtContext ctx, NameToken nameToken, HandleHeader* handle) noexcept;
+  void*        ctxGetLocalAddress(SharedAllocationId allocId) noexcept;
 
-  AgtStatus     ctxEnumerateNamedObjects(AgtContext ctx, AgtSize& count, const char** pNames) noexcept;
-  AgtStatus     ctxEnumerateSharedObjects(AgtContext ctx, AgtSize& count, const char** pNames) noexcept;
+  agt_status_t ctxOpenHandleById(agt_ctx_t ctx, agt_object_id_t id, HandleHeader*& handle) noexcept;
+  agt_status_t ctxOpenHandleByName(agt_ctx_t ctx, const char* name, HandleHeader*& handle) noexcept;
 
 
 
-  VPointer      ctxLookupVTable(AgtContext ctx, AgtTypeId typeId) noexcept;
 
-  bool          ctxSetBuiltinValue(AgtContext ctx, BuiltinValue value, const void* data, AgtSize dataSize) noexcept;
-  bool          ctxGetBuiltinValue(AgtContext ctx, BuiltinValue value, void* data, AgtSize& outSize) noexcept;
+  agt_status_t ctxClaimLocalName(agt_ctx_t ctx, const char* pName, size_t nameLength, name_token& token) noexcept;
+  void         ctxReleaseLocalName(agt_ctx_t ctx, name_token nameToken) noexcept;
+  agt_status_t ctxClaimSharedName(agt_ctx_t ctx, const char* pName, size_t nameLength, name_token& token) noexcept;
+  void         ctxReleaseSharedName(agt_ctx_t ctx, name_token nameToken) noexcept;
+  void         ctxBindName(agt_ctx_t ctx, name_token nameToken, HandleHeader* handle) noexcept;
 
-  AgtStatus     createCtx(AgtContext& pCtx) noexcept;
-  void          destroyCtx(AgtContext ctx) noexcept;
+  agt_status_t ctxEnumerateNamedObjects(agt_ctx_t ctx, size_t& count, const char** pNames) noexcept;
+  agt_status_t ctxEnumerateSharedObjects(agt_ctx_t ctx, size_t& count, const char** pNames) noexcept;
+
+
+
+  VPointer      ctxLookupVTable(agt_ctx_t ctx, agt_type_id_t typeId) noexcept;
+
+  bool          ctxSetBuiltinValue(agt_ctx_t ctx, BuiltinValue value, const void* data, size_t dataSize) noexcept;
+  bool          ctxGetBuiltinValue(agt_ctx_t ctx, BuiltinValue value, void* data, size_t& outSize) noexcept;
+
+  agt_status_t     createCtx(agt_ctx_t& pCtx) noexcept;
+  void          destroyCtx(agt_ctx_t ctx) noexcept;
 
 
 

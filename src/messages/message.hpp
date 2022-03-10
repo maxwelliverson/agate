@@ -8,25 +8,21 @@
 #include "fwd.hpp"
 #include "support/flags.hpp"
 
-namespace Agt {
+namespace agt {
 
-  struct LocalChannelHeader;
-  struct SharedChannelHeader;
-  struct SharedHandleHeader;
+  struct AGT_cache_aligned inline_buffer {};
 
-  struct AGT_cache_aligned InlineBuffer {};
-
-  struct StagedMessage {
+  /*struct StagedMessage {
     HandleHeader* receiver;
     void*         message;
     void*         reserved[2];
     HandleHeader* returnHandle;
-    AgtSize       messageSize;
-    AgtMessageId  id;
+    size_t       messageSize;
+    agt_message_id_t  id;
     void*         payload;
-  };
+  };*/
 
-  AGT_BITFLAG_ENUM(MessageFlags, AgtUInt32) {
+  AGT_BITFLAG_ENUM(message_flags, agt_u32_t) {
     isShared            = 0x01,
     isOutOfLine         = 0x02,
     isMultiFrame        = 0x04,
@@ -35,59 +31,59 @@ namespace Agt {
     externalOwnership   = 0x20
   };
 
-  AGT_BITFLAG_ENUM(MessageState, AgtUInt32) {
+  AGT_BITFLAG_ENUM(message_state, agt_u32_t) {
     isQueued    = 0x1,
     isOnHold    = 0x2,
     isCondemned = 0x4
   };
 
-  inline constexpr static MessageState DefaultMessageState = {};
+  inline constexpr static message_state default_message_state = {};
 
   /**
    * @returns true if successful, false if there was an allocation error
    * */
-  bool  initMessageArray(LocalChannelHeader* owner) noexcept;
+  bool  initMessageArray(local_channel_header* owner) noexcept;
 
   /**
    * @returns the address of the message array if successful, or a null point on allocation error
    * */
-  void* initMessageArray(SharedHandleHeader* owner, SharedChannelHeader* channel) noexcept;
+  void* initMessageArray(shared_handle_header* owner, shared_channel_header* channel) noexcept;
 
-  AgtStatus getMultiFrameMessage(InlineBuffer* inlineBuffer, AgtMultiFrameMessageInfo& messageInfo) noexcept;
-  bool      getNextFrame(AgtMessageFrame& frame, AgtMultiFrameMessageInfo& messageInfo) noexcept;
+  agt_status_t getMultiFrameMessage(inline_buffer* inlineBuffer, agt_multi_frame_message_info_t& messageInfo) noexcept;
+  bool      getNextFrame(agt_message_frame_t& frame, agt_multi_frame_message_info_t& messageInfo) noexcept;
 
 
-  void initMessage(AgtMessage message) noexcept;
+  void initMessage(agt_message_t message) noexcept;
 
-  void setMessageId(AgtMessage message, AgtMessageId id) noexcept;
-  void setMessageReturnHandle(AgtMessage message, Handle* returnHandle) noexcept;
-  void setMessageAsyncHandle(AgtMessage message, AgtAsync async) noexcept;
+  void setMessageId(agt_message_t message, agt_message_id_t id) noexcept;
+  void setMessageReturnHandle(agt_message_t message, Handle* returnHandle) noexcept;
+  void setMessageAsyncHandle(agt_message_t message, agt_async_t async) noexcept;
 
-  void cleanupMessage(AgtMessage message) noexcept;
+  void cleanupMessage(agt_message_t message) noexcept;
 
 }
 
-struct AgtMessage_st {
+struct agt_message_st {
   union {
-    AgtMessage              next;
-    AgtSize                 nextOffset;
+    agt_message_t             next;
+    size_t                    nextOffset;
   };
-  AgtHandle                 owner;
+  agt_handle_t                owner;
   union {
-    AgtHandle               returnHandle;
-    AgtObjectId             returnHandleId;
+    agt_handle_t              returnHandle;
+    agt_object_id_t           returnHandleId;
   };
   union {
-    AgtAsyncData            asyncData;
-    Agt::SharedAllocationId asyncDataAllocId;
+    agt_async_data_t          asyncData;
+    agt::shared_allocation_id asyncDataAllocId;
   };
-  AgtUInt32                 asyncDataKey;
-  Agt::MessageFlags         flags;
-  Agt::MessageState         state;
-  AgtUInt32                 refCount;
-  AgtMessageId              id;
-  AgtSize                   payloadSize;
-  Agt::InlineBuffer         inlineBuffer[];
+  agt::async_key              asyncDataKey;
+  agt::message_flags          flags;
+  agt::message_state          state;
+  agt_u32_t                   refCount;
+  agt_message_id_t            id;
+  size_t                      payloadSize;
+  agt::inline_buffer          inlineBuffer[];
 };
 
 

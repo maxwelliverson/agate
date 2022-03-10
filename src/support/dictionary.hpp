@@ -26,15 +26,15 @@ namespace jem {
   namespace impl{
     
     template <typename T>
-    inline constexpr static jem_size_t ptr_free_low_bits = std::countr_zero(alignof(T));
+    inline constexpr static agt_size_t ptr_free_low_bits = std::countr_zero(alignof(T));
     
     class dictionary_entry_base {
-      jem_u64_t keyLength;
+      agt_u64_t keyLength;
 
     public:
-      explicit dictionary_entry_base(jem_u64_t keyLength) : keyLength(keyLength) {}
+      explicit dictionary_entry_base(agt_u64_t keyLength) : keyLength(keyLength) {}
 
-      AGT_nodiscard jem_u64_t get_key_length() const { return keyLength; }
+      AGT_nodiscard agt_u64_t get_key_length() const { return keyLength; }
     };
 
     template <typename Val>
@@ -77,10 +77,10 @@ namespace jem {
       // TheTable[NumBuckets] contains a sentinel value for easy iteration. Followed
       // by an array of the actual hash values as unsigned integers.
       dictionary_entry_base** TheTable      = nullptr;
-      jem_u32_t               NumBuckets    = 0;
-      jem_u32_t               NumItems      = 0;
-      jem_u32_t               NumTombstones = 0;
-      jem_u32_t               ItemSize;
+      agt_u32_t               NumBuckets    = 0;
+      agt_u32_t               NumItems      = 0;
+      agt_u32_t               NumTombstones = 0;
+      agt_u32_t               ItemSize;
 
     protected:
       explicit dictionary(unsigned itemSize) noexcept : ItemSize(itemSize) {}
@@ -98,22 +98,22 @@ namespace jem {
 
       /// Allocate the table with the specified number of buckets and otherwise
       /// setup the map as empty.
-      void init(jem_u32_t Size) noexcept;
-      void explicit_init(jem_u32_t size) noexcept;
+      void init(agt_u32_t Size) noexcept;
+      void explicit_init(agt_u32_t size) noexcept;
 
-      jem_u32_t  rehash_table(jem_u32_t BucketNo) noexcept;
+      agt_u32_t  rehash_table(agt_u32_t BucketNo) noexcept;
 
       /// lookup_bucket_for - Look up the bucket that the specified string should end
       /// up in.  If it already exists as a key in the map, the Item pointer for the
       /// specified bucket will be non-null.  Otherwise, it will be null.  In either
       /// case, the FullHashValue field of the bucket will be set to the hash value
       /// of the string.
-      jem_u32_t lookup_bucket_for(std::string_view Key) noexcept;
+      agt_u32_t lookup_bucket_for(std::string_view Key) noexcept;
 
       /// find_key - Look up the bucket that contains the specified key. If it exists
       /// in the map, return the bucket number of the key.  Otherwise return -1.
       /// This does not modify the map.
-      AGT_nodiscard jem_i32_t find_key(std::string_view Key) const noexcept;
+      AGT_nodiscard agt_i32_t find_key(std::string_view Key) const noexcept;
 
       /// remove_key - Remove the specified dictionary_entry from the table, but do not
       /// delete it.  This aborts if the value isn't in the table.
@@ -129,17 +129,17 @@ namespace jem {
 
     public:
       inline static dictionary_entry_base* get_tombstone_val() noexcept {
-        constexpr static jem_u32_t free_low_bits = ptr_free_low_bits<dictionary_entry_base*>;
+        constexpr static agt_u32_t free_low_bits = ptr_free_low_bits<dictionary_entry_base*>;
         auto Val = static_cast<uintptr_t>(-1);
         Val <<= free_low_bits;
         return reinterpret_cast<dictionary_entry_base *>(Val);
       }
 
-      AGT_nodiscard jem_u32_t  get_num_buckets() const noexcept { return NumBuckets; }
-      AGT_nodiscard jem_u32_t  get_num_items() const noexcept { return NumItems; }
+      AGT_nodiscard agt_u32_t  get_num_buckets() const noexcept { return NumBuckets; }
+      AGT_nodiscard agt_u32_t  get_num_items() const noexcept { return NumItems; }
 
       AGT_nodiscard bool empty() const noexcept { return NumItems == 0; }
-      AGT_nodiscard jem_u32_t  size() const noexcept { return NumItems; }
+      AGT_nodiscard agt_u32_t  size() const noexcept { return NumItems; }
 
       void swap(dictionary& other) noexcept {
         std::swap(TheTable, other.TheTable);
@@ -287,17 +287,17 @@ namespace jem {
     using entry_type = dictionary_entry<T>;
 
     dictionary() noexcept
-        : impl::dictionary(static_cast<jem_u32_t>(sizeof(entry_type))),
+        : impl::dictionary(static_cast<agt_u32_t>(sizeof(entry_type))),
           entry_allocator_t() {}
 
-    explicit dictionary(jem_u32_t InitialSize)
-        : impl::dictionary(static_cast<jem_u32_t>(sizeof(entry_type))),
+    explicit dictionary(agt_u32_t InitialSize)
+        : impl::dictionary(static_cast<agt_u32_t>(sizeof(entry_type))),
           entry_allocator_t()  {
       explicit_init(InitialSize);
     }
 
     dictionary(std::initializer_list<std::pair<std::string_view, T>> List)
-        : impl::dictionary(static_cast<jem_u32_t>(sizeof(entry_type))),
+        : impl::dictionary(static_cast<agt_u32_t>(sizeof(entry_type))),
           entry_allocator_t()  {
       explicit_init(List.size());
       for (const auto &P : List) {
@@ -310,7 +310,7 @@ namespace jem {
           entry_allocator_t(std::move(RHS.get_allocator()))  {}
 
     dictionary(const dictionary &RHS)
-        : impl::dictionary(static_cast<jem_u32_t>(sizeof(entry_type))),
+        : impl::dictionary(static_cast<agt_u32_t>(sizeof(entry_type))),
           entry_allocator_t(RHS.get_allocator()) {
       if (RHS.empty())
         return;
@@ -318,13 +318,13 @@ namespace jem {
       // Allocate TheTable of the same size as RHS's TheTable, and set the
       // sentinel appropriately (and NumBuckets).
       init(RHS.NumBuckets);
-      auto* HashTable    = (jem_u32_t*)(TheTable + NumBuckets + 1);
-      auto* RHSHashTable = (jem_u32_t*)(RHS.TheTable + NumBuckets + 1);
+      auto* HashTable    = (agt_u32_t*)(TheTable + NumBuckets + 1);
+      auto* RHSHashTable = (agt_u32_t*)(RHS.TheTable + NumBuckets + 1);
 
       NumItems = RHS.NumItems;
       NumTombstones = RHS.NumTombstones;
 
-      for (jem_u32_t I = 0, E = NumBuckets; I != E; ++I) {
+      for (agt_u32_t I = 0, E = NumBuckets; I != E; ++I) {
         impl::dictionary_entry_base *Bucket = RHS.TheTable[I];
         if (!Bucket || Bucket == get_tombstone_val()) {
           TheTable[I] = Bucket;

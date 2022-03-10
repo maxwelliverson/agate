@@ -61,33 +61,33 @@ case 0:                                           \
   }                                               \
   ++backoff
 
-namespace Agt {
+namespace agt {
 
-  class Deadline {
-
-
-    inline constexpr static AgtUInt64 Nanoseconds  = 1;
-    inline constexpr static AgtUInt64 NativePeriod = 100;
-    inline constexpr static AgtUInt64 Microseconds = 1'000;
-    inline constexpr static AgtUInt64 Milliseconds = 1'000'000;
+  class deadline {
 
 
+    inline constexpr static agt_u64_t Nanoseconds  = 1;
+    inline constexpr static agt_u64_t NativePeriod = 100;
+    inline constexpr static agt_u64_t Microseconds = 1'000;
+    inline constexpr static agt_u64_t Milliseconds = 1'000'000;
 
-    Deadline(AgtUInt64 timestamp) noexcept : timestamp(timestamp) { }
+
+
+    deadline(agt_u64_t timestamp) noexcept : timestamp(timestamp) { }
 
   public:
 
 
 
-    AGT_forceinline static Deadline fromTimeout(AgtTimeout timeoutUs) noexcept {
+    AGT_forceinline static deadline fromTimeout(agt_timeout_t timeoutUs) noexcept {
       return { getCurrentTimestamp() + (timeoutUs * (Microseconds / NativePeriod)) };
     }
 
-    AGT_forceinline AgtUInt32 toTimeoutMs() const noexcept {
+    AGT_forceinline agt_u32_t toTimeoutMs() const noexcept {
       return getTimeoutNative() / (Milliseconds / NativePeriod);
     }
 
-    AGT_forceinline AgtTimeout toTimeoutUs() const noexcept {
+    AGT_forceinline agt_timeout_t toTimeoutUs() const noexcept {
       return getTimeoutNative() / (Microseconds / NativePeriod);
     }
 
@@ -104,75 +104,81 @@ namespace Agt {
 
   private:
 
-    AGT_forceinline AgtUInt64 getTimeoutNative() const noexcept {
+    AGT_forceinline agt_u64_t getTimeoutNative() const noexcept {
       return timestamp - getCurrentTimestamp();
     }
 
-    static AgtUInt64 getCurrentTimestamp() noexcept;
+    static agt_u64_t getCurrentTimestamp() noexcept;
 
-    AgtUInt64 timestamp;
+    agt_u64_t timestamp;
   };
   
-  namespace Impl {
+  namespace impl {
 
-    void      atomicStore(AgtUInt8& value,  AgtUInt8 newValue) noexcept;
-    void      atomicStore(AgtUInt16& value, AgtUInt16 newValue) noexcept;
-    void      atomicStore(AgtUInt32& value, AgtUInt32 newValue) noexcept;
-    void      atomicStore(AgtUInt64& value, AgtUInt64 newValue) noexcept;
-    AgtUInt8  atomicLoad(const AgtUInt8& value) noexcept;
-    AgtUInt16 atomicLoad(const AgtUInt16& value) noexcept;
-    AgtUInt32 atomicLoad(const AgtUInt32& value) noexcept;
-    AgtUInt64 atomicLoad(const AgtUInt64& value) noexcept;
+    void      atomicStore(agt_u8_t& value,  agt_u8_t newValue) noexcept;
+    void      atomicStore(agt_u16_t& value, agt_u16_t newValue) noexcept;
+    void      atomicStore(agt_u32_t& value, agt_u32_t newValue) noexcept;
+    void      atomicStore(agt_u64_t& value, agt_u64_t newValue) noexcept;
+    agt_u8_t  atomicLoad(const agt_u8_t& value) noexcept;
+    agt_u16_t atomicLoad(const agt_u16_t& value) noexcept;
+    agt_u32_t atomicLoad(const agt_u32_t& value) noexcept;
+    agt_u64_t atomicLoad(const agt_u64_t& value) noexcept;
 
-    void      atomicRelaxedStore(AgtUInt8& value,  AgtUInt8 newValue) noexcept;
-    void      atomicRelaxedStore(AgtUInt16& value, AgtUInt16 newValue) noexcept;
-    void      atomicRelaxedStore(AgtUInt32& value, AgtUInt32 newValue) noexcept;
-    void      atomicRelaxedStore(AgtUInt64& value, AgtUInt64 newValue) noexcept;
-    AgtUInt8  atomicRelaxedLoad(const AgtUInt8& value) noexcept;
-    AgtUInt16 atomicRelaxedLoad(const AgtUInt16& value) noexcept;
-    AgtUInt32 atomicRelaxedLoad(const AgtUInt32& value) noexcept;
-    AgtUInt64 atomicRelaxedLoad(const AgtUInt64& value) noexcept;
+    void      atomicRelaxedStore(agt_u8_t& value,  agt_u8_t newValue) noexcept;
+    void      atomicRelaxedStore(agt_u16_t& value, agt_u16_t newValue) noexcept;
+    void      atomicRelaxedStore(agt_u32_t& value, agt_u32_t newValue) noexcept;
+    void      atomicRelaxedStore(agt_u64_t& value, agt_u64_t newValue) noexcept;
+    agt_u8_t  atomicRelaxedLoad(const agt_u8_t& value) noexcept;
+    agt_u16_t atomicRelaxedLoad(const agt_u16_t& value) noexcept;
+    agt_u32_t atomicRelaxedLoad(const agt_u32_t& value) noexcept;
+    agt_u64_t atomicRelaxedLoad(const agt_u64_t& value) noexcept;
 
-    AgtUInt8  atomicExchange(AgtUInt8& value,  AgtUInt8 newValue) noexcept;
-    AgtUInt16 atomicExchange(AgtUInt16& value, AgtUInt16 newValue) noexcept;
-    AgtUInt32 atomicExchange(AgtUInt32& value, AgtUInt32 newValue) noexcept;
-    AgtUInt64 atomicExchange(AgtUInt64& value, AgtUInt64 newValue) noexcept;
-    bool      atomicCompareExchange(AgtUInt8& value,  AgtUInt8&  compare, AgtUInt8 newValue) noexcept;
-    bool      atomicCompareExchange(AgtUInt16& value, AgtUInt16& compare, AgtUInt16 newValue) noexcept;
-    bool      atomicCompareExchange(AgtUInt32& value, AgtUInt32& compare, AgtUInt32 newValue) noexcept;
-    bool      atomicCompareExchange(AgtUInt64& value, AgtUInt64& compare, AgtUInt64 newValue) noexcept;
-    bool      atomicCompareExchangeWeak(AgtUInt8& value,  AgtUInt8&  compare, AgtUInt8 newValue) noexcept;
-    bool      atomicCompareExchangeWeak(AgtUInt16& value, AgtUInt16& compare, AgtUInt16 newValue) noexcept;
-    bool      atomicCompareExchangeWeak(AgtUInt32& value, AgtUInt32& compare, AgtUInt32 newValue) noexcept;
-    bool      atomicCompareExchangeWeak(AgtUInt64& value, AgtUInt64& compare, AgtUInt64 newValue) noexcept;
-    AgtUInt8  atomicIncrement(AgtUInt8& value) noexcept;
-    AgtUInt16 atomicIncrement(AgtUInt16& value) noexcept;
-    AgtUInt32 atomicIncrement(AgtUInt32& value) noexcept;
-    AgtUInt64 atomicIncrement(AgtUInt64& value) noexcept;
-    AgtUInt8  atomicRelaxedIncrement(AgtUInt8& value) noexcept;
-    AgtUInt16 atomicRelaxedIncrement(AgtUInt16& value) noexcept;
-    AgtUInt32 atomicRelaxedIncrement(AgtUInt32& value) noexcept;
-    AgtUInt64 atomicRelaxedIncrement(AgtUInt64& value) noexcept;
-    AgtUInt8  atomicDecrement(AgtUInt8& value) noexcept;
-    AgtUInt16 atomicDecrement(AgtUInt16& value) noexcept;
-    AgtUInt32 atomicDecrement(AgtUInt32& value) noexcept;
-    AgtUInt64 atomicDecrement(AgtUInt64& value) noexcept;
-    AgtUInt8  atomicExchangeAdd(AgtUInt8&  value, AgtUInt8  newValue) noexcept;
-    AgtUInt16 atomicExchangeAdd(AgtUInt16& value, AgtUInt16 newValue) noexcept;
-    AgtUInt32 atomicExchangeAdd(AgtUInt32& value, AgtUInt32 newValue) noexcept;
-    AgtUInt64 atomicExchangeAdd(AgtUInt64& value, AgtUInt64 newValue) noexcept;
-    AgtUInt8  atomicExchangeAnd(AgtUInt8&  value, AgtUInt8  newValue) noexcept;
-    AgtUInt16 atomicExchangeAnd(AgtUInt16& value, AgtUInt16 newValue) noexcept;
-    AgtUInt32 atomicExchangeAnd(AgtUInt32& value, AgtUInt32 newValue) noexcept;
-    AgtUInt64 atomicExchangeAnd(AgtUInt64& value, AgtUInt64 newValue) noexcept;
-    AgtUInt8  atomicExchangeOr(AgtUInt8&  value, AgtUInt8 newValue) noexcept;
-    AgtUInt16 atomicExchangeOr(AgtUInt16& value, AgtUInt16 newValue) noexcept;
-    AgtUInt32 atomicExchangeOr(AgtUInt32& value, AgtUInt32 newValue) noexcept;
-    AgtUInt64 atomicExchangeOr(AgtUInt64& value, AgtUInt64 newValue) noexcept;
-    AgtUInt8  atomicExchangeXor(AgtUInt8&  value, AgtUInt8 newValue) noexcept;
-    AgtUInt16 atomicExchangeXor(AgtUInt16& value, AgtUInt16 newValue) noexcept;
-    AgtUInt32 atomicExchangeXor(AgtUInt32& value, AgtUInt32 newValue) noexcept;
-    AgtUInt64 atomicExchangeXor(AgtUInt64& value, AgtUInt64 newValue) noexcept;
+    agt_u8_t  atomicExchange(agt_u8_t& value,  agt_u8_t newValue) noexcept;
+    agt_u16_t atomicExchange(agt_u16_t& value, agt_u16_t newValue) noexcept;
+    agt_u32_t atomicExchange(agt_u32_t& value, agt_u32_t newValue) noexcept;
+    agt_u64_t atomicExchange(agt_u64_t& value, agt_u64_t newValue) noexcept;
+
+    bool      atomicCompareExchange(agt_u8_t& value,  agt_u8_t&  compare, agt_u8_t newValue) noexcept;
+    bool      atomicCompareExchange(agt_u16_t& value, agt_u16_t& compare, agt_u16_t newValue) noexcept;
+    bool      atomicCompareExchange(agt_u32_t& value, agt_u32_t& compare, agt_u32_t newValue) noexcept;
+    bool      atomicCompareExchange(agt_u64_t& value, agt_u64_t& compare, agt_u64_t newValue) noexcept;
+    bool      atomicCompareExchangeWeak(agt_u8_t& value,  agt_u8_t&  compare, agt_u8_t newValue) noexcept;
+    bool      atomicCompareExchangeWeak(agt_u16_t& value, agt_u16_t& compare, agt_u16_t newValue) noexcept;
+    bool      atomicCompareExchangeWeak(agt_u32_t& value, agt_u32_t& compare, agt_u32_t newValue) noexcept;
+    bool      atomicCompareExchangeWeak(agt_u64_t& value, agt_u64_t& compare, agt_u64_t newValue) noexcept;
+
+    agt_u8_t  atomicIncrement(agt_u8_t& value) noexcept;
+    agt_u16_t atomicIncrement(agt_u16_t& value) noexcept;
+    agt_u32_t atomicIncrement(agt_u32_t& value) noexcept;
+    agt_u64_t atomicIncrement(agt_u64_t& value) noexcept;
+    agt_u8_t  atomicRelaxedIncrement(agt_u8_t& value) noexcept;
+    agt_u16_t atomicRelaxedIncrement(agt_u16_t& value) noexcept;
+    agt_u32_t atomicRelaxedIncrement(agt_u32_t& value) noexcept;
+    agt_u64_t atomicRelaxedIncrement(agt_u64_t& value) noexcept;
+
+    agt_u8_t  atomicDecrement(agt_u8_t& value) noexcept;
+    agt_u16_t atomicDecrement(agt_u16_t& value) noexcept;
+    agt_u32_t atomicDecrement(agt_u32_t& value) noexcept;
+    agt_u64_t atomicDecrement(agt_u64_t& value) noexcept;
+
+    agt_u8_t  atomicExchangeAdd(agt_u8_t&  value, agt_u8_t  newValue) noexcept;
+    agt_u16_t atomicExchangeAdd(agt_u16_t& value, agt_u16_t newValue) noexcept;
+    agt_u32_t atomicExchangeAdd(agt_u32_t& value, agt_u32_t newValue) noexcept;
+    agt_u64_t atomicExchangeAdd(agt_u64_t& value, agt_u64_t newValue) noexcept;
+    agt_u8_t  atomicExchangeAnd(agt_u8_t&  value, agt_u8_t  newValue) noexcept;
+    agt_u16_t atomicExchangeAnd(agt_u16_t& value, agt_u16_t newValue) noexcept;
+    agt_u32_t atomicExchangeAnd(agt_u32_t& value, agt_u32_t newValue) noexcept;
+    agt_u64_t atomicExchangeAnd(agt_u64_t& value, agt_u64_t newValue) noexcept;
+
+    agt_u8_t  atomicExchangeOr(agt_u8_t&  value, agt_u8_t newValue) noexcept;
+    agt_u16_t atomicExchangeOr(agt_u16_t& value, agt_u16_t newValue) noexcept;
+    agt_u32_t atomicExchangeOr(agt_u32_t& value, agt_u32_t newValue) noexcept;
+    agt_u64_t atomicExchangeOr(agt_u64_t& value, agt_u64_t newValue) noexcept;
+
+    agt_u8_t  atomicExchangeXor(agt_u8_t&  value, agt_u8_t newValue) noexcept;
+    agt_u16_t atomicExchangeXor(agt_u16_t& value, agt_u16_t newValue) noexcept;
+    agt_u32_t atomicExchangeXor(agt_u32_t& value, agt_u32_t newValue) noexcept;
+    agt_u64_t atomicExchangeXor(agt_u64_t& value, agt_u64_t newValue) noexcept;
 
     void      atomicNotifyOne(void* value) noexcept;
     void      atomicNotifyAll(void* value) noexcept;
@@ -181,27 +187,27 @@ namespace Agt {
     void      atomicNotifyOneShared(void* value) noexcept;
     void      atomicNotifyAllShared(void* value) noexcept;
 
-    template <std::integral T>
+    template <typename T> requires (std::integral<T>)
     inline void      atomicNotifyOne(T& value) noexcept {
       atomicNotifyOne(std::addressof(value));
     }
-    template <std::integral T>
+    template <typename T> requires (std::integral<T>)
     inline void      atomicNotifyOneLocal(T& value) noexcept {
       atomicNotifyOneLocal(std::addressof(value));
     }
-    template <std::integral T>
+    template <typename T> requires (std::integral<T>)
     inline void      atomicNotifyOneShared(T& value) noexcept {
       atomicNotifyOneShared(std::addressof(value));
     }
-    template <std::integral T>
+    template <typename T> requires (std::integral<T>)
     inline void      atomicNotifyAll(T& value) noexcept {
       atomicNotifyAll(std::addressof(value));
     }
-    template <std::integral T>
+    template <typename T> requires (std::integral<T>)
     inline void      atomicNotifyAllLocal(T& value) noexcept {
       atomicNotifyAllLocal(std::addressof(value));
     }
-    template <std::integral T>
+    template <typename T> requires (std::integral<T>)
     inline void      atomicNotifyAllShared(T& value) noexcept {
       atomicNotifyAllShared(std::addressof(value));
     }
@@ -209,8 +215,8 @@ namespace Agt {
 
     // Deep Wait
 
-    void      atomicDeepWaitRaw(const void* atomicAddress, void* compareAddress, AgtSize addressSize) noexcept;
-    bool      atomicDeepWaitRaw(const void* atomicAddress, void* compareAddress, AgtSize addressSize, AgtUInt32 timeout) noexcept;
+    void      atomicDeepWaitRaw(const void* atomicAddress, void* compareAddress, size_t addressSize) noexcept;
+    bool      atomicDeepWaitRaw(const void* atomicAddress, void* compareAddress, size_t addressSize, agt_u32_t timeout) noexcept;
 
     template <typename T>
     inline void atomicDeepWait(const T& value, std::type_identity_t<T> waitValue) noexcept {
@@ -253,7 +259,7 @@ namespace Agt {
     }
 
     template <typename T>
-    inline bool atomicDeepWaitUntil(const T& value, Deadline deadline, std::type_identity_t<T> waitValue) noexcept {
+    inline bool atomicDeepWaitUntil(const T& value, deadline deadline, std::type_identity_t<T> waitValue) noexcept {
       while ( atomicLoad(value) == waitValue ) {
         if (deadline.hasPassed())
           return false;
@@ -263,7 +269,7 @@ namespace Agt {
     }
 
     template <typename T>
-    inline bool atomicDeepWaitUntil(const T& value, T& capturedValue, Deadline deadline, std::type_identity_t<T> waitValue) noexcept {
+    inline bool atomicDeepWaitUntil(const T& value, T& capturedValue, deadline deadline, std::type_identity_t<T> waitValue) noexcept {
 
       T tmpValue;
 
@@ -278,7 +284,7 @@ namespace Agt {
     }
 
     template <typename T, std::predicate<const T&> Fn>
-    inline bool atomicDeepWaitUntil(const T& value, Deadline deadline, Fn&& functor) noexcept {
+    inline bool atomicDeepWaitUntil(const T& value, deadline deadline, Fn&& functor) noexcept {
 
       T capturedValue;
 
@@ -291,7 +297,7 @@ namespace Agt {
     }
 
     template <typename T, std::predicate<const T&> Fn>
-    inline bool atomicDeepWaitUntil(const T& value, T& capturedValue, Deadline deadline, Fn&& functor) noexcept {
+    inline bool atomicDeepWaitUntil(const T& value, T& capturedValue, deadline deadline, Fn&& functor) noexcept {
 
       T tmpValue;
 
@@ -311,7 +317,7 @@ namespace Agt {
 
     template <typename T>
     inline void atomicWait(const T& value, std::type_identity_t<T> waitValue) noexcept {
-      AgtUInt32 backoff = 0;
+      agt_u32_t backoff = 0;
 
       while ( atomicLoad(value) == waitValue ) {
         DUFFS_MACHINE_EX(backoff, atomicDeepWaitRaw(std::addressof(value), std::addressof(waitValue), sizeof(T)); );
@@ -321,7 +327,7 @@ namespace Agt {
     template <typename T>
     inline void atomicWait(const T& value, T& capturedValue, std::type_identity_t<T> waitValue) noexcept {
       T tmpValue;
-      AgtUInt32 backoff = 0;
+      agt_u32_t backoff = 0;
 
       while ( (tmpValue = atomicLoad(value)) == waitValue ) {
         DUFFS_MACHINE_EX(backoff, atomicDeepWaitRaw(std::addressof(value), std::addressof(waitValue), sizeof(T)); );
@@ -333,7 +339,7 @@ namespace Agt {
     template <typename T, std::predicate<const T&> Fn>
     inline void atomicWait(const T& value, Fn&& functor) noexcept {
       T capturedValue;
-      AgtUInt32 backoff = 0;
+      agt_u32_t backoff = 0;
 
       while ( !functor((capturedValue = atomicLoad(value))) ) {
         DUFFS_MACHINE_EX(backoff, atomicDeepWaitRaw(std::addressof(value), std::addressof(capturedValue), sizeof(T)); );
@@ -343,7 +349,7 @@ namespace Agt {
     template <typename T, std::predicate<const T&> Fn>
     inline void atomicWait(const T& value, T& capturedValue, Fn&& functor) noexcept {
       T tmpValue;
-      AgtUInt32 backoff = 0;
+      agt_u32_t backoff = 0;
 
       while ( !functor((tmpValue = atomicLoad(value))) ) {
         DUFFS_MACHINE_EX(backoff, atomicDeepWaitRaw(std::addressof(value), std::addressof(tmpValue), sizeof(T)); );
@@ -353,8 +359,8 @@ namespace Agt {
     }
 
     template <typename T>
-    inline bool atomicWaitUntil(const T& value, Deadline deadline, std::type_identity_t<T> waitValue) noexcept {
-      AgtUInt32 backoff = 0;
+    inline bool atomicWaitUntil(const T& value, deadline deadline, std::type_identity_t<T> waitValue) noexcept {
+      agt_u32_t backoff = 0;
 
       while ( atomicLoad(value) == waitValue ) {
         if ( deadline.hasPassed() )
@@ -368,9 +374,9 @@ namespace Agt {
     }
 
     template <typename T>
-    inline bool atomicWaitUntil(const T& value, T& capturedValue, Deadline deadline, std::type_identity_t<T> waitValue) noexcept {
+    inline bool atomicWaitUntil(const T& value, T& capturedValue, deadline deadline, std::type_identity_t<T> waitValue) noexcept {
       T tmpValue;
-      AgtUInt32 backoff = 0;
+      agt_u32_t backoff = 0;
 
       while ( (tmpValue = atomicLoad(value)) == waitValue ) {
         if ( deadline.hasPassed() )
@@ -385,9 +391,9 @@ namespace Agt {
     }
 
     template <typename T, std::predicate<const T&> Fn>
-    inline bool atomicWaitUntil(const T& value, Deadline deadline, Fn&& functor) noexcept {
+    inline bool atomicWaitUntil(const T& value, deadline deadline, Fn&& functor) noexcept {
       T capturedValue;
-      AgtUInt32 backoff = 0;
+      agt_u32_t backoff = 0;
 
       while ( !functor((capturedValue = atomicLoad(value))) ) {
         if ( deadline.hasPassed() )
@@ -401,9 +407,9 @@ namespace Agt {
     }
 
     template <typename T, std::predicate<const T&> Fn>
-    inline bool atomicWaitUntil(const T& value, T& capturedValue, Deadline deadline, Fn&& functor) noexcept {
+    inline bool atomicWaitUntil(const T& value, T& capturedValue, deadline deadline, Fn&& functor) noexcept {
       T tmpValue;
-      AgtUInt32 backoff = 0;
+      agt_u32_t backoff = 0;
 
       while ( !functor((tmpValue = atomicLoad(value))) ) {
         if ( deadline.hasPassed() )
@@ -417,7 +423,7 @@ namespace Agt {
     }
 
     template <typename T>
-    inline bool atomicWaitFor(const T& value, AgtTimeout timeout, std::type_identity_t<T> waitValue) noexcept {
+    inline bool atomicWaitFor(const T& value, agt_timeout_t timeout, std::type_identity_t<T> waitValue) noexcept {
       switch (timeout) {
         case AGT_WAIT:
           atomicWait(value, waitValue);
@@ -425,12 +431,12 @@ namespace Agt {
         case AGT_DO_NOT_WAIT:
           return atomicLoad(value) != waitValue;
         default:
-          return atomicWaitUntil(value, Deadline::fromTimeout(timeout), waitValue);
+          return atomicWaitUntil(value, deadline::fromTimeout(timeout), waitValue);
       }
     }
 
     template <typename T>
-    inline bool atomicWaitFor(const T& value, T& capturedValue, AgtTimeout timeout, std::type_identity_t<T> waitValue) noexcept {
+    inline bool atomicWaitFor(const T& value, T& capturedValue, agt_timeout_t timeout, std::type_identity_t<T> waitValue) noexcept {
       switch (timeout) {
         case AGT_WAIT:
           atomicWait(value, capturedValue, waitValue);
@@ -445,12 +451,12 @@ namespace Agt {
         }
           return atomicLoad(value) != waitValue;
         default:
-          return atomicWaitUntil(value, capturedValue, Deadline::fromTimeout(timeout), waitValue);
+          return atomicWaitUntil(value, capturedValue, deadline::fromTimeout(timeout), waitValue);
       }
     }
 
     template <typename T, std::predicate<const T&> Fn>
-    inline bool atomicWaitFor(const T& value, AgtTimeout timeout, Fn&& functor) noexcept {
+    inline bool atomicWaitFor(const T& value, agt_timeout_t timeout, Fn&& functor) noexcept {
       switch (timeout) {
         case AGT_WAIT:
           atomicWait(value, std::forward<Fn>(functor));
@@ -458,12 +464,12 @@ namespace Agt {
         case AGT_DO_NOT_WAIT:
           return functor(atomicLoad(value));
         default:
-          return atomicWaitUntil(value, Deadline::fromTimeout(timeout), std::forward<Fn>(functor));
+          return atomicWaitUntil(value, deadline::fromTimeout(timeout), std::forward<Fn>(functor));
       }
     }
 
     template <typename T, std::predicate<const T&> Fn>
-    inline bool atomicWaitFor(const T& value, T& capturedValue, AgtTimeout timeout, Fn&& functor) noexcept {
+    inline bool atomicWaitFor(const T& value, T& capturedValue, agt_timeout_t timeout, Fn&& functor) noexcept {
       switch (timeout) {
         case AGT_WAIT:
           atomicWait(value, capturedValue, std::forward<Fn>(functor));
@@ -471,7 +477,7 @@ namespace Agt {
         case AGT_DO_NOT_WAIT:
           return functor((capturedValue = atomicLoad(value)));
         default:
-          return atomicWaitUntil(value, capturedValue, Deadline::fromTimeout(timeout), std::forward<Fn>(functor));
+          return atomicWaitUntil(value, capturedValue, deadline::fromTimeout(timeout), std::forward<Fn>(functor));
       }
     }
 
@@ -479,14 +485,14 @@ namespace Agt {
 
 
     template <typename IntType_>
-    class GenericAtomicFlags {
+    class generic_atomic_flags {
     public:
       
       using IntType = IntType_;
     protected:
 
-      GenericAtomicFlags() = default;
-      GenericAtomicFlags(IntType flags) noexcept : bits(flags){}
+      generic_atomic_flags() = default;
+      generic_atomic_flags(IntType flags) noexcept : bits(flags){}
 
 
       AGT_nodiscard AGT_forceinline bool test(IntType flags) const noexcept {
@@ -601,13 +607,13 @@ namespace Agt {
         }
       }
 
-      AGT_forceinline bool waitExactUntil(IntType flags, Deadline deadline) const noexcept {
+      AGT_forceinline bool waitExactUntil(IntType flags, deadline deadline) const noexcept {
         return atomicWaitUntil(bits, deadline, [flags](IntType a) noexcept { return a == flags; });
       }
-      AGT_forceinline bool waitAnyUntil(IntType flags, Deadline deadline) const noexcept {
+      AGT_forceinline bool waitAnyUntil(IntType flags, deadline deadline) const noexcept {
         return atomicWaitUntil(bits, deadline, [flags](IntType a) noexcept { return (a & flags) != 0; });
       }
-      AGT_forceinline bool waitAllUntil(IntType flags, Deadline deadline) const noexcept {
+      AGT_forceinline bool waitAllUntil(IntType flags, deadline deadline) const noexcept {
         return atomicWaitUntil(bits, deadline, [flags](IntType a) noexcept { return (a & flags) == flags; });
       }
 
@@ -623,70 +629,421 @@ namespace Agt {
   }
 
 
-  class LocalBinarySemaphore {
-    AgtInt32 val_;
+  class local_binary_semaphore {
+    agt_u32_t val_;
   public:
 
-    explicit LocalBinarySemaphore(AgtInt32 val) : val_(val) { }
+    explicit local_binary_semaphore(agt_u32_t val) : val_(val) { }
 
     void acquire() noexcept;
     bool tryAcquire() noexcept;
-    bool tryAcquireFor(AgtTimeout timeout) noexcept;
-    bool tryAcquireUntil(Deadline deadline) noexcept;
+    bool tryAcquireFor(agt_timeout_t timeout) noexcept;
+    bool tryAcquireUntil(deadline deadline) noexcept;
+    void release() noexcept {
+      impl::atomicRelaxedStore(val_, 1);
+      impl::atomicNotifyOne(val_);
+    }
+
+  };
+
+  class shared_binary_semaphore {
+    agt_i32_t val_;
+  public:
+
+    explicit shared_binary_semaphore(agt_i32_t val) : val_(val) { }
+
+    void acquire() noexcept;
+    bool tryAcquire() noexcept;
+    bool tryAcquireFor(agt_timeout_t timeout) noexcept;
+    bool tryAcquireUntil(deadline deadline) noexcept;
     void release() noexcept;
 
   };
 
-  class SharedBinarySemaphore {
-    AgtInt32 val_;
+  class local_semaphore {
+    agt_u32_t val_;
   public:
 
-    explicit SharedBinarySemaphore(AgtInt32 val) : val_(val) { }
+    constexpr explicit local_semaphore(agt_u32_t val) : val_(val) { }
+
+    void acquire() noexcept {
+      auto current = impl::atomicRelaxedLoad(val_);
+      for (;;) {
+        while ( current == 0 ) {
+          impl::atomicWait(val_, 0);
+          current = impl::atomicRelaxedLoad(val_);
+        }
+
+        if ( impl::atomicCompareExchangeWeak(val_, current, current - 1) )
+          return;
+      }
+    }
+    bool tryAcquire() noexcept {
+      if ( auto current = impl::atomicRelaxedLoad(val_) )
+        return impl::atomicCompareExchange(val_, current, current - 1);
+      return false;
+    }
+    bool try_acquire_for(agt_timeout_t timeout) noexcept {
+      return try_acquire_until(deadline::fromTimeout(timeout));
+    }
+    bool try_acquire_until(deadline deadline) noexcept {
+      auto current  = impl::atomicRelaxedLoad(val_);
+      for (;;) {
+        while ( current == 0 ) {
+          if ( !priv_wait_until(deadline) )
+            return false;
+          current = impl::atomicRelaxedLoad(val_);
+        }
+
+        if ( impl::atomicCompareExchangeWeak(val_, current, current - 1) )
+          return true;
+      }
+    }
+    void release() noexcept {
+      impl::atomicIncrement(val_);
+      impl::atomicNotifyOne(val_);
+    }
+
+  private:
+
+    void priv_wait() const noexcept {
+
+    }
+    bool priv_wait_until(deadline deadline) const noexcept {
+      if (auto current = impl::atomicLoad(val_))
+        return true;
+      return impl::atomicWaitUntil(val_, deadline, 0);
+    }
+  };
+
+  class shared_semaphore {
+    agt_u32_t  val_;
+  public:
+
+    explicit shared_semaphore(agt_u32_t val) : val_(val) { }
 
     void acquire() noexcept;
     bool tryAcquire() noexcept;
-    bool tryAcquireFor(AgtTimeout timeout) noexcept;
-    bool tryAcquireUntil(Deadline deadline) noexcept;
+    bool tryAcquireFor(agt_timeout_t timeout) noexcept;
+    bool tryAcquireUntil(deadline deadline) noexcept;
     void release() noexcept;
 
   };
 
-  class LocalSemaphore {
-    AgtInt32 val_;
+  class local_multi_semaphore {
   public:
-
-    explicit LocalSemaphore(AgtInt32 val) : val_(val) { }
-
-    void acquire() noexcept;
-    bool tryAcquire() noexcept;
-    bool tryAcquireFor(AgtTimeout timeout) noexcept;
-    bool tryAcquireUntil(Deadline deadline) noexcept;
-    void release() noexcept;
-
+    void acquire(agt_u32_t n) noexcept;
+    bool tryAcquire(agt_u32_t n) noexcept;
+    bool tryAcquireFor(agt_u32_t n, agt_timeout_t timeout) noexcept;
+    bool tryAcquireUntil(agt_u32_t n, deadline deadline) noexcept;
+    void release(agt_u32_t n) noexcept;
   };
 
-  class SharedSemaphore {
-    AgtInt32  val_;
+  class shared_multi_semaphore {
   public:
+    void acquire(agt_u32_t n) noexcept;
+    bool tryAcquire(agt_u32_t n) noexcept;
+    bool tryAcquireFor(agt_u32_t n, agt_timeout_t timeout) noexcept;
+    bool tryAcquireUntil(agt_u32_t n, deadline deadline) noexcept;
+    void release(agt_u32_t n) noexcept;
+  };
 
-    explicit SharedSemaphore(AgtInt32 val) : val_(val) { }
 
-    void acquire() noexcept;
-    bool tryAcquire() noexcept;
-    bool tryAcquireFor(AgtTimeout timeout) noexcept;
-    bool tryAcquireUntil(Deadline deadline) noexcept;
-    void release() noexcept;
+  class semaphore {
+    inline constexpr static agt_ptrdiff_t LeastMaxValue = (std::numeric_limits<agt_ptrdiff_t>::max)();
+  public:
+    AGT_nodiscard static constexpr agt_ptrdiff_t(max)() noexcept {
+      return LeastMaxValue;
+    }
 
+    constexpr explicit semaphore(const agt_ptrdiff_t desired) noexcept
+        : value(desired) { }
+
+    semaphore(const semaphore&) = delete;
+    semaphore& operator=(const semaphore&) = delete;
+
+    void release(agt_ptrdiff_t update = 1) noexcept {
+      if (update == 0) {
+        return;
+      }
+
+      value.fetch_add(update);
+      value.notify_one();
+    }
+
+
+
+    void acquire() noexcept {
+      ptrdiff_t current = value.load(std::memory_order_relaxed);
+      for (;;) {
+        while ( current == 0 ) {
+          priv_wait();
+          current = value.load(std::memory_order_relaxed);
+        }
+        assert(current > 0 && current <= LeastMaxValue);
+
+        if ( value.compare_exchange_weak(current, current - 1) )
+          return;
+      }
+    }
+    void acquire(agt_ptrdiff_t n) noexcept {
+      for (agt_ptrdiff_t acquired = 0; acquired < n; ++acquired )
+        acquire();
+    }
+
+    AGT_nodiscard bool try_acquire() noexcept {
+      agt_ptrdiff_t current = value.load();
+      if (current == 0)
+        return false;
+
+      assert(current > 0 && current <= LeastMaxValue);
+
+      return value.compare_exchange_weak(current, current - 1);
+    }
+    AGT_nodiscard bool try_acquire(agt_ptrdiff_t n) noexcept {
+      for (agt_ptrdiff_t acquired = 0; acquired < n; ++acquired ) {
+        if ( !try_acquire() ) {
+          release(acquired);
+          return false;
+        }
+      }
+      return true;
+    }
+
+    AGT_nodiscard bool try_acquire_for(agt_u64_t timeout_us) noexcept {
+      return try_acquire_until(deadline_t::from_timeout_us(timeout_us));
+    }
+    AGT_nodiscard bool try_acquire_for(agt_ptrdiff_t n, agt_u64_t timeout_us) noexcept {
+      return try_acquire_until(n, deadline_t::from_timeout_us(timeout_us));
+    }
+    AGT_nodiscard bool try_acquire_until(deadline_t deadline) noexcept {
+      agt_ptrdiff_t current  = value.load(std::memory_order_relaxed);
+      for (;;) {
+        while ( current == 0 ) {
+          if ( !priv_wait_until(deadline) )
+            return false;
+          current = value.load(std::memory_order_relaxed);
+        }
+        assert(current > 0 && current <= LeastMaxValue);
+        if ( value.compare_exchange_weak(current, current - 1) )
+          return true;
+      }
+    }
+    AGT_nodiscard bool try_acquire_until(agt_ptrdiff_t n, deadline_t deadline) noexcept {
+      for (agt_ptrdiff_t acquired = 0; acquired < n; ++acquired ) {
+        if ( !try_acquire_until(deadline) ) {
+          release(acquired);
+          return false;
+        }
+      }
+      return true;
+    }
+
+  private:
+
+    bool priv_wait_until(deadline_t deadline) noexcept {
+      agt_ptrdiff_t current = value.load();
+      if ( current == 0 )
+        return atomic_wait(value, 0, deadline);
+      return true;
+    }
+    void priv_wait() noexcept {
+      /*agt_ptrdiff_t current = value.load();
+      if ( current == 0 )
+        WaitOnAddress(&value, &current, sizeof(current), INFINITE);*/
+      value.wait(0);
+    }
+
+    std::atomic<agt_ptrdiff_t> value;
+  };
+  class shared_semaphore {
+
+    inline constexpr static agt_ptrdiff_t LeastMaxValue = (std::numeric_limits<agt_ptrdiff_t>::max)();
+  public:
+    AGT_nodiscard static constexpr agt_ptrdiff_t(max)() noexcept {
+      return LeastMaxValue;
+    }
+
+    constexpr explicit shared_semaphore(const agt_ptrdiff_t desired) noexcept
+        : value(desired) { }
+
+    shared_semaphore(const shared_semaphore&) = delete;
+    shared_semaphore& operator=(const shared_semaphore&) = delete;
+
+    void release(agt_ptrdiff_t update = 1) noexcept {
+      if (update == 0)
+        return;
+
+      value.fetch_add(update);
+
+      const agt_ptrdiff_t waitersUpperBound = waiters.load();
+
+      if ( waitersUpperBound == 0 ) {
+
+      }
+      else if ( waitersUpperBound <= update ) {
+        value.notify_all();
+      }
+      else {
+        for (; update != 0; --update)
+          value.notify_one();
+      }
+    }
+
+    void acquire() noexcept {
+      ptrdiff_t current = value.load(std::memory_order_relaxed);
+      for (;;) {
+        while ( current == 0 ) {
+          priv_wait();
+          current = value.load(std::memory_order_relaxed);
+        }
+        assert(current > 0 && current <= LeastMaxValue);
+
+        if ( value.compare_exchange_weak(current, current - 1) )
+          return;
+      }
+    }
+    void acquire(agt_ptrdiff_t n) noexcept {
+      for (agt_ptrdiff_t acquired = 0; acquired < n; ++acquired )
+        acquire();
+    }
+
+    AGT_nodiscard bool try_acquire() noexcept {
+      agt_ptrdiff_t current = value.load();
+      if (current == 0)
+        return false;
+
+      assert(current > 0 && current <= LeastMaxValue);
+
+      return value.compare_exchange_weak(current, current - 1);
+    }
+    AGT_nodiscard bool try_acquire(agt_ptrdiff_t n) noexcept {
+      for (agt_ptrdiff_t acquired = 0; acquired < n; ++acquired ) {
+        if ( !try_acquire() ) {
+          release(acquired);
+          return false;
+        }
+      }
+      return true;
+    }
+
+    AGT_nodiscard bool try_acquire_for(agt_u64_t timeout_us) noexcept {
+      return try_acquire_until(deadline_t::from_timeout_us(timeout_us));
+    }
+    AGT_nodiscard bool try_acquire_for(agt_ptrdiff_t n, agt_u64_t timeout_us) noexcept {
+      return try_acquire_until(n, deadline_t::from_timeout_us(timeout_us));
+    }
+    AGT_nodiscard bool try_acquire_until(deadline_t deadline) noexcept {
+      agt_ptrdiff_t current  = value.load(std::memory_order_relaxed);
+      for (;;) {
+        while ( current == 0 ) {
+          if ( !priv_wait_until(deadline) )
+            return false;
+          current = value.load(std::memory_order_relaxed);
+        }
+        assert(current > 0 && current <= LeastMaxValue);
+        if ( value.compare_exchange_weak(current, current - 1) )
+          return true;
+      }
+    }
+    AGT_nodiscard bool try_acquire_until(agt_ptrdiff_t n, deadline_t deadline) noexcept {
+      for (agt_ptrdiff_t acquired = 0; acquired < n; ++acquired ) {
+        if ( !try_acquire_until(deadline) ) {
+          release(acquired);
+          return false;
+        }
+      }
+      return true;
+    }
+
+  private:
+
+    bool priv_wait_until(deadline_t deadline) noexcept {
+      waiters.fetch_add(1);
+      agt_ptrdiff_t current = value.load();
+      bool retVal = true;
+      if ( current == 0 )
+        retVal = atomic_wait(value, 0, deadline);
+      waiters.fetch_sub(1, std::memory_order_relaxed);
+      return retVal;
+    }
+    void priv_wait() noexcept {
+      waiters.fetch_add(1);
+      agt_ptrdiff_t current = value.load();
+      if ( current == 0 )
+        WaitOnAddress(&value, &current, sizeof(current), INFINITE);
+      waiters.fetch_sub(1, std::memory_order_relaxed);
+    }
+
+    std::atomic<agt_ptrdiff_t> value;
+    std::atomic<agt_ptrdiff_t> waiters;
+  };
+  class binary_semaphore {
+    inline constexpr static agt_ptrdiff_t LeastMaxValue = 1;
+  public:
+    AGT_nodiscard static constexpr agt_ptrdiff_t(max)() noexcept {
+      return 1;
+    }
+
+    constexpr explicit binary_semaphore(const agt_ptrdiff_t desired) noexcept
+        : value(desired) { }
+
+    binary_semaphore(const binary_semaphore&) = delete;
+    binary_semaphore& operator=(const binary_semaphore&) = delete;
+
+    void release(const agt_ptrdiff_t update = 1) noexcept {
+      if (update == 0)
+        return;
+      assert(update == 1);
+      // TRANSITION, GH-1133: should be memory_order_release
+      value.store(1, std::memory_order_release);
+      value.notify_one();
+    }
+
+    void acquire() noexcept {
+      for (;;) {
+        agt_u8_t previous = value.exchange(0, std::memory_order_acquire);
+        if (previous == 1)
+          break;
+        assert(previous == 0);
+        value.wait(0, std::memory_order_relaxed);
+      }
+    }
+
+    AGT_nodiscard bool try_acquire() noexcept {
+      // TRANSITION, GH-1133: should be memory_order_acquire
+      agt_u8_t previous = value.exchange(0);
+      assert((previous & ~1) == 0);
+      return reinterpret_cast<const bool&>(previous);
+    }
+
+    AGT_nodiscard bool try_acquire_for(agt_u64_t timeout_us) {
+      return try_acquire_until(deadline_t::from_timeout_us(timeout_us));
+    }
+
+    AGT_nodiscard bool try_acquire_until(deadline_t deadline) {
+      for (;;) {
+        agt_u8_t previous = value.exchange(0, std::memory_order_acquire);
+        if (previous == 1)
+          return true;
+        assert(previous == 0);
+        if ( !atomic_wait(value, 0, deadline) )
+          return false;
+      }
+    }
+
+  private:
+    std::atomic<agt_u8_t> value;
   };
 
 
 
 
   template <typename E>
-  class AtomicFlags : public Impl::GenericAtomicFlags<std::underlying_type_t<E>> {
+  class atomic_flags : public impl::generic_atomic_flags<std::underlying_type_t<E>> {
 
     using UnderlyingType = std::underlying_type_t<E>;
-    using Base = Impl::GenericAtomicFlags<std::underlying_type_t<E>>;
+    using Base = impl::generic_atomic_flags<std::underlying_type_t<E>>;
     using EnumType = E;
     using IntType = std::underlying_type_t<EnumType>;
 
@@ -701,8 +1058,8 @@ namespace Agt {
 
   public:
 
-    AtomicFlags() = default;
-    AtomicFlags(EnumType value) noexcept : Base() {}
+    atomic_flags() = default;
+    atomic_flags(EnumType value) noexcept : Base() {}
 
 
     AGT_nodiscard AGT_forceinline bool test(EnumType flags) const noexcept {
@@ -710,13 +1067,13 @@ namespace Agt {
     }
 
     AGT_nodiscard AGT_forceinline bool testAny(EnumType flags) const noexcept {
-      return static_cast<bool>(Impl::atomicLoad(this->bits) & toInt(flags));
+      return static_cast<bool>(impl::atomicLoad(this->bits) & toInt(flags));
     }
     AGT_nodiscard AGT_forceinline bool testAll(EnumType flags) const noexcept {
-      return (Impl::atomicLoad(this->bits) & toInt(flags)) == toInt(flags);
+      return (impl::atomicLoad(this->bits) & toInt(flags)) == toInt(flags);
     }
     AGT_nodiscard AGT_forceinline bool testAny() const noexcept {
-      return static_cast<bool>(Impl::atomicLoad(this->bits));
+      return static_cast<bool>(impl::atomicLoad(this->bits));
     }
 
     AGT_nodiscard AGT_forceinline bool testAndSet(EnumType flags) noexcept {
@@ -756,10 +1113,10 @@ namespace Agt {
     }
 
     AGT_nodiscard AGT_forceinline EnumType fetch() const noexcept {
-      return toEnum(Impl::atomicLoad(this->bits));
+      return toEnum(impl::atomicLoad(this->bits));
     }
     AGT_nodiscard AGT_forceinline EnumType fetch(EnumType flags) const noexcept {
-      return toEnum(Impl::atomicLoad(this->bits) & toInt(flags));
+      return toEnum(impl::atomicLoad(this->bits) & toInt(flags));
     }
 
     AGT_nodiscard AGT_forceinline EnumType fetchAndSet(EnumType flags) noexcept {
@@ -774,7 +1131,7 @@ namespace Agt {
     }
 
     AGT_nodiscard AGT_forceinline EnumType fetchAndClear() noexcept {
-      return toEnum(Impl::atomicExchange(this->bits, static_cast<IntType>(0)));
+      return toEnum(impl::atomicExchange(this->bits, static_cast<IntType>(0)));
     }
 
     AGT_forceinline void set(EnumType flags) noexcept {
@@ -791,7 +1148,7 @@ namespace Agt {
       reset();
     }
     AGT_forceinline void clearAndSet(EnumType flags) noexcept {
-      Impl::atomicStore(this->bits, toInt(flags));
+      impl::atomicStore(this->bits, toInt(flags));
     }
 
     AGT_forceinline void reset() noexcept {
@@ -809,13 +1166,13 @@ namespace Agt {
       this->waitAll(toInt(flags));
     }
 
-    AGT_forceinline bool waitExactUntil(EnumType flags, Deadline deadline) const noexcept {
+    AGT_forceinline bool waitExactUntil(EnumType flags, deadline deadline) const noexcept {
       return this->waitExactUntil(toInt(flags), deadline);
     }
-    AGT_forceinline bool waitAnyUntil(EnumType flags, Deadline deadline) const noexcept {
+    AGT_forceinline bool waitAnyUntil(EnumType flags, deadline deadline) const noexcept {
       return this->waitAnyUntil(toInt(flags), deadline);
     }
-    AGT_forceinline bool waitAllUntil(EnumType flags, Deadline deadline) const noexcept {
+    AGT_forceinline bool waitAllUntil(EnumType flags, deadline deadline) const noexcept {
       return this->waitAllUntil(toInt(flags), deadline);
     }
 
@@ -829,81 +1186,79 @@ namespace Agt {
   };
 
 
-  class ReferenceCount {
+  class ref_count {
   public:
+    ref_count() = default;
+    explicit ref_count(agt_u32_t initialCount) noexcept : value_(initialCount) { }
 
-    ReferenceCount() = default;
-    explicit ReferenceCount(AgtUInt32 initialCount) noexcept : value_(initialCount) { }
 
-
-    AGT_nodiscard AgtUInt32 get() const noexcept {
-      return Impl::atomicRelaxedLoad(value_);
+    AGT_nodiscard agt_u32_t get() const noexcept {
+      return impl::atomicRelaxedLoad(value_);
     }
 
 
-    AgtUInt32 acquire() noexcept {
-      return Impl::atomicIncrement(value_);
+    agt_u32_t acquire() noexcept {
+      return impl::atomicIncrement(value_);
     }
-    AgtUInt32 acquire(AgtUInt32 n) noexcept {
-      return Impl::atomicExchangeAdd(value_, n) + n;
-    }
-
-    AgtUInt32 release() noexcept {
-      return Impl::atomicDecrement(value_);
-    }
-    AgtUInt32 release(AgtUInt32 n) noexcept {
-      return Impl::atomicExchangeAdd(value_, 0 - n) - n;
+    agt_u32_t acquire(agt_u32_t n) noexcept {
+      return impl::atomicExchangeAdd(value_, n) + n;
     }
 
-    AgtUInt32 operator++()    noexcept {
+    agt_u32_t release() noexcept {
+      return impl::atomicDecrement(value_);
+    }
+    agt_u32_t release(agt_u32_t n) noexcept {
+      return impl::atomicExchangeAdd(value_, 0 - n) - n;
+    }
+
+    agt_u32_t operator++()    noexcept {
       return this->acquire();
     }
-    AgtUInt32 operator++(int) noexcept {
-      return Impl::atomicExchangeAdd(value_, 1);
+    agt_u32_t operator++(int) noexcept {
+      return impl::atomicExchangeAdd(value_, 1);
     }
 
-    AgtUInt32 operator--()    noexcept {
+    agt_u32_t operator--()    noexcept {
       return this->release();
     }
-    AgtUInt32 operator--(int) noexcept {
-      return Impl::atomicExchangeAdd(value_, -1);
+    agt_u32_t operator--(int) noexcept {
+      return impl::atomicExchangeAdd(value_, -1);
     }
 
   private:
 
-    AgtUInt32 value_ = 0;
+    agt_u32_t value_ = 0;
   };
 
-  class AtomicMonotonicCounter {
+  class atomic_monotonic_counter {
   public:
+    atomic_monotonic_counter() = default;
 
-    AtomicMonotonicCounter() = default;
 
-
-    AgtUInt32 getValue() const noexcept {
-      return Impl::atomicRelaxedLoad(value_);
+    agt_u32_t getValue() const noexcept {
+      return impl::atomicRelaxedLoad(value_);
       // return __iso_volatile_load32(&reinterpret_cast<const int&>(value_));
     }
 
     void reset() noexcept {
-      Impl::atomicStore(value_, 0);
+      impl::atomicStore(value_, 0);
     }
 
 
 
-    AgtUInt32 operator++()    noexcept {
-      AgtUInt32 result = Impl::atomicIncrement(value_);
+    agt_u32_t operator++()    noexcept {
+      agt_u32_t result = impl::atomicIncrement(value_);
       notifyWaiters();
       return result;
     }
-    AgtUInt32 operator++(int) noexcept {
-      AgtUInt32 result = _InterlockedExchangeAdd(&value_, 1) + 1;
+    agt_u32_t operator++(int) noexcept {
+      agt_u32_t result = _InterlockedExchangeAdd(&value_, 1) + 1;
       notifyWaiters();
       return result;
     }
 
 
-    bool      waitFor(AgtUInt32 expectedValue, AgtTimeout timeout) const noexcept {
+    bool      waitFor(agt_u32_t expectedValue, agt_timeout_t timeout) const noexcept {
       switch (timeout) {
         case AGT_WAIT:
           deepWait(expectedValue);
@@ -911,7 +1266,7 @@ namespace Agt {
         case AGT_DO_NOT_WAIT:
           return isAtLeast(expectedValue);
         default:
-          return deepWaitUntil(expectedValue, Deadline::fromTimeout(timeout));
+          return deepWaitUntil(expectedValue, deadline::fromTimeout(timeout));
       }
     }
 
@@ -919,52 +1274,52 @@ namespace Agt {
   private:
 
     void notifyWaiters() noexcept {
-      const AgtUInt32 waiters = Impl::atomicRelaxedLoad(deepSleepers_);
+      const agt_u32_t waiters = impl::atomicRelaxedLoad(deepSleepers_);
 
       if ( waiters == 0 ) [[likely]] {
 
       } else if ( waiters == 1 ) {
-        Impl::atomicNotifyOne(value_);
+        impl::atomicNotifyOne(value_);
       } else {
-        Impl::atomicNotifyAll(value_);
+        impl::atomicNotifyAll(value_);
       }
     }
 
-    AGT_forceinline AgtUInt32 orderedLoad() const noexcept {
-      return Impl::atomicLoad(value_);
+    AGT_forceinline agt_u32_t orderedLoad() const noexcept {
+      return impl::atomicLoad(value_);
     }
 
-    AGT_forceinline bool isAtLeast(AgtUInt32 value) const noexcept {
+    AGT_forceinline bool isAtLeast(agt_u32_t value) const noexcept {
       return orderedLoad() >= value;
     }
 
-    AGT_forceinline bool      tryWaitOnce(AgtUInt32 expectedValue) const noexcept {
+    AGT_forceinline bool      tryWaitOnce(agt_u32_t expectedValue) const noexcept {
       return orderedLoad() >= expectedValue;
     }
 
-    AGT_noinline    void      deepWait(AgtUInt32 expectedValue) const noexcept {
-      AgtUInt32 capturedValue;
-      AgtUInt32 backoff = 0;
+    AGT_noinline    void      deepWait(agt_u32_t expectedValue) const noexcept {
+      agt_u32_t capturedValue;
+      agt_u32_t backoff = 0;
       while ( (capturedValue = orderedLoad()) < expectedValue ) {
         DUFFS_MACHINE_EX(backoff,
-                         Impl::atomicIncrement(deepSleepers_);
-                         Impl::atomicDeepWaitRaw(&value_, &capturedValue, sizeof(AgtUInt32));
-                         Impl::atomicDecrement(deepSleepers_);
+                         impl::atomicIncrement(deepSleepers_);
+                         impl::atomicDeepWaitRaw(&value_, &capturedValue, sizeof(agt_u32_t));
+                         impl::atomicDecrement(deepSleepers_);
                          );
       }
     }
 
-    AGT_noinline    bool      deepWaitUntil(AgtUInt32 expectedValue, Deadline deadline) const noexcept {
-      AgtUInt32 capturedValue;
-      AgtUInt32 backoff = 0;
+    AGT_noinline    bool      deepWaitUntil(agt_u32_t expectedValue, deadline deadline) const noexcept {
+      agt_u32_t capturedValue;
+      agt_u32_t backoff = 0;
 
-      while ( (capturedValue = Impl::atomicLoad(value_)) < expectedValue ) {
+      while ( (capturedValue = impl::atomicLoad(value_)) < expectedValue ) {
         if ( deadline.hasPassed() )
           return false;
         DUFFS_MACHINE_EX(backoff,
-          Impl::atomicIncrement(deepSleepers_);
-          bool result = Impl::atomicDeepWaitRaw(&value_, &capturedValue, sizeof(AgtUInt32), deadline.toTimeoutMs());
-          Impl::atomicDecrement(deepSleepers_);
+          impl::atomicIncrement(deepSleepers_);
+          bool result = impl::atomicDeepWaitRaw(&value_, &capturedValue, sizeof(agt_u32_t), deadline.toTimeoutMs());
+          impl::atomicDecrement(deepSleepers_);
           if (!result) return false;
           );
       }
@@ -973,10 +1328,12 @@ namespace Agt {
     }
 
 
-    AgtUInt32 value_ = 0;
-    mutable AgtUInt32 deepSleepers_ = 0;
+    agt_u32_t value_ = 0;
+    mutable agt_u32_t deepSleepers_ = 0;
   };
 
 }
+
+
 
 #endif//JEMSYS_AGATE2_ATOMIC_HPP

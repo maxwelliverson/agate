@@ -13,136 +13,136 @@
 
 
 #define AGT_declare_vtable(type_)  \
-  template <> AgtStatus ObjectInfo<type_>::acquireMessage(HandleHeader* object, AgtStagedMessage* pStagedMessage, AgtTimeout timeout) noexcept; \
-  template <> void      ObjectInfo<type_>::pushQueue(HandleHeader* object, AgtMessage message, AgtSendFlags flags) noexcept;                    \
-  template <> AgtStatus ObjectInfo<type_>::popQueue(HandleHeader* object, AgtMessageInfo* pMessageInfo, AgtTimeout timeout) noexcept;           \
-  template <> void      ObjectInfo<type_>::releaseMessage(HandleHeader* object, AgtMessage message) noexcept;                                   \
-  template <> AgtStatus ObjectInfo<type_>::connect(HandleHeader* object, HandleHeader* handle, ConnectAction action) noexcept;                  \
-  template <> AgtStatus ObjectInfo<type_>::acquireRef(HandleHeader* object) noexcept;                                                           \
-  template <> void      ObjectInfo<type_>::releaseRef(HandleHeader* object) noexcept;                                                           \
+  template <> agt_status_t object_info<type_>::acquireMessage(handle_header* object, agt_staged_message_t* pStagedMessage, agt_timeout_t timeout) noexcept; \
+  template <> void      object_info<type_>::pushQueue(handle_header* object, agt_message_t message, agt_send_flags_t flags) noexcept;                    \
+  template <> agt_status_t object_info<type_>::popQueue(handle_header* object, agt_message_info_t* pMessageInfo, agt_timeout_t timeout) noexcept;           \
+  template <> void      object_info<type_>::releaseMessage(handle_header* object, agt_message_t message) noexcept;                                   \
+  template <> agt_status_t object_info<type_>::connect(handle_header* object, handle_header* handle, connect_action action) noexcept;                  \
+  template <> agt_status_t object_info<type_>::acquireRef(handle_header* object) noexcept;                                                           \
+  template <> void      object_info<type_>::releaseRef(handle_header* object) noexcept;                                                           \
                                    \
-  extern template struct ObjectInfo<type_>
+  extern template struct object_info<type_>
 
 
-namespace Agt {
+namespace agt {
 
-  namespace Impl {
+  namespace impl {
     template <typename T, auto N = 2>
-    struct GetHandleType : GetHandleType<T, N-1>{};
+    struct get_handle_type : get_handle_type<T, N-1>{};
     template <typename T, auto N = 2>
-    struct GetObjectType : GetObjectType<T, N-1>{};
+    struct get_object_type : get_object_type<T, N-1>{};
 
     template <typename T>
-    struct GetHandleType<T, 0>;
+    struct get_handle_type<T, 0>;
 
     template <typename T>
-    struct GetObjectType<T, 0>;
+    struct get_object_type<T, 0>;
 
-    template <std::derived_from<HandleHeader> T>
-    struct GetHandleType<T, 1> {
-      using HandleType = T;
+    template <std::derived_from<handle_header> T>
+    struct get_handle_type<T, 1> {
+      using handle_type = T;
     };
-    template <typename T> requires ( requires { typename T::HandleType; })
-    struct GetHandleType<T> {
-      using HandleType = typename T::HandleType;
+    template <typename T> requires ( requires { typename T::handle_type; })
+    struct get_handle_type<T> {
+      using handle_type = typename T::handle_type;
     };
 
-    template <std::derived_from<HandleHeader> T>
-    struct GetObjectType<T, 1> {
-      using ObjectType = T;
+    template <std::derived_from<handle_header> T>
+    struct get_object_type<T, 1> {
+      using object_type = T;
     };
-    template <typename T> requires ( requires { typename T::ObjectType; } )
-    struct GetObjectType<T> {
-      using ObjectType = typename T::ObjectType;
+    template <typename T> requires ( requires { typename T::object_type; } )
+    struct get_object_type<T> {
+      using object_type = typename T::object_type;
     };
   }
 
-  struct VTable {
-    AgtStatus (* const pfnAcquireMessage )(HandleHeader* object, AgtStagedMessage* pStagedMessage, AgtTimeout timeout) noexcept;
-    void      (* const pfnPushQueue )(HandleHeader* object, AgtMessage message, AgtSendFlags flags) noexcept;
-    AgtStatus (* const pfnPopQueue )(HandleHeader* object, AgtMessageInfo* pMessageInfo, AgtTimeout timeout) noexcept;
-    void      (* const pfnReleaseMessage )(HandleHeader* object, AgtMessage message) noexcept;
-    AgtStatus (* const pfnConnect )(HandleHeader* object, HandleHeader* handle, ConnectAction action) noexcept;
-    AgtStatus (* const pfnAcquireRef )(HandleHeader* object) noexcept;
-    void      (* const pfnReleaseRef )(HandleHeader* object) noexcept;
-    void      (* const pfnSetErrorState )(HandleHeader* object, ErrorState errorState) noexcept;
+  struct vtable {
+    agt_status_t (* const pfnAcquireMessage )(handle_header* object, agt_staged_message_t* pStagedMessage, agt_timeout_t timeout) noexcept;
+    void         (* const pfnPushQueue )(handle_header* object, agt_message_t message, agt_send_flags_t flags) noexcept;
+    agt_status_t (* const pfnPopQueue )(handle_header* object, agt_message_info_t* pMessageInfo, agt_timeout_t timeout) noexcept;
+    void         (* const pfnReleaseMessage )(handle_header* object, agt_message_t message) noexcept;
+    agt_status_t (* const pfnConnect )(handle_header* object, handle_header* handle, connect_action action) noexcept;
+    agt_status_t (* const pfnAcquireRef )(handle_header* object) noexcept;
+    void         (* const pfnReleaseRef )(handle_header* object) noexcept;
+    void         (* const pfnSetErrorState )(handle_header* object, error_state errorState) noexcept;
   };
 
   template <typename T>
-  struct ObjectInfo{
+  struct object_info{
 
-    inline constexpr static ObjectType TypeValue = T::TypeValue;
+    inline constexpr static object_type type_value = T::type_value;
 
-    using HandleType = typename Impl::GetHandleType<T>::HandleType;
-    using ObjectType = typename Impl::GetObjectType<T>::ObjectType;
+    using handle_type = typename impl::get_handle_type<T>::handle_type;
+    using object_type = typename impl::get_object_type<T>::object_type;
 
 
-    static AgtStatus acquireMessage(HandleHeader* object, AgtStagedMessage* pStagedMessage, AgtTimeout timeout) noexcept;
-    static void      pushQueue(HandleHeader* object, AgtMessage message, AgtSendFlags flags) noexcept;
-    static AgtStatus popQueue(HandleHeader* object, AgtMessageInfo* pMessageInfo, AgtTimeout timeout) noexcept;
-    static void      releaseMessage(HandleHeader* object, AgtMessage message) noexcept;
-    static AgtStatus connect(HandleHeader* object, HandleHeader* handle, ConnectAction action) noexcept;
-    static AgtStatus acquireRef(HandleHeader* object) noexcept;
-    static void      releaseRef(HandleHeader* object) noexcept;
+    static agt_status_t acquireMessage(handle_header* object, agt_staged_message_t* pStagedMessage, agt_timeout_t timeout) noexcept;
+    static void         pushQueue(handle_header* object, agt_message_t message, agt_send_flags_t flags) noexcept;
+    static agt_status_t popQueue(handle_header* object, agt_message_info_t* pMessageInfo, agt_timeout_t timeout) noexcept;
+    static void         releaseMessage(handle_header* object, agt_message_t message) noexcept;
+    static agt_status_t connect(handle_header* object, handle_header* handle, connect_action action) noexcept;
+    static agt_status_t acquireRef(handle_header* object) noexcept;
+    static void         releaseRef(handle_header* object) noexcept;
 
-    static void      setErrorState(HandleHeader* object, ErrorState errorState) noexcept;
+    static void         setErrorState(handle_header* object, error_state errorState) noexcept;
   };
 
 
   template <typename Hdl>
-  inline AgtStatus handleAcquireMessage(Hdl* handle, AgtStagedMessage* pStagedMessage, AgtTimeout timeout) noexcept {
-    return ObjectInfo<Hdl>::acquireMessage(handle, pStagedMessage, timeout);
+  inline agt_status_t handleAcquireMessage(Hdl* handle, agt_staged_message_t* pStagedMessage, agt_timeout_t timeout) noexcept {
+    return object_info<Hdl>::acquireMessage(handle, pStagedMessage, timeout);
   }
   template <typename Hdl>
-  inline void      handlePushQueue(Hdl* handle, AgtMessage message, AgtSendFlags flags) noexcept {
-    ObjectInfo<Hdl>::pushQueue(handle, message, flags);
+  inline void         handlePushQueue(Hdl* handle, agt_message_t message, agt_send_flags_t flags) noexcept {
+    object_info<Hdl>::pushQueue(handle, message, flags);
   }
   template <typename Hdl>
-  inline AgtStatus handlePopQueue(Hdl* handle, AgtMessageInfo* pMessageInfo, AgtTimeout timeout) noexcept {
-    return ObjectInfo<Hdl>::popQueue(handle, pMessageInfo, timeout);
+  inline agt_status_t handlePopQueue(Hdl* handle, agt_message_info_t* pMessageInfo, agt_timeout_t timeout) noexcept {
+    return object_info<Hdl>::popQueue(handle, pMessageInfo, timeout);
   }
   template <typename Hdl>
-  inline void      handleReleaseMessage(Hdl* handle, AgtMessage message) noexcept {
-    ObjectInfo<Hdl>::releaseMessage(handle, message);
+  inline void         handleReleaseMessage(Hdl* handle, agt_message_t message) noexcept {
+    object_info<Hdl>::releaseMessage(handle, message);
   }
   template <typename Hdl>
-  inline AgtStatus handleConnect(Hdl* handle, HandleHeader* otherHandle, ConnectAction connectAction) noexcept {
-    return ObjectInfo<Hdl>::connect(handle, otherHandle, connectAction);
+  inline agt_status_t handleConnect(Hdl* handle, handle_header* otherHandle, connect_action connectAction) noexcept {
+    return object_info<Hdl>::connect(handle, otherHandle, connectAction);
   }
   template <typename Hdl>
-  inline AgtStatus handleAcquireRef(Hdl* handle) noexcept {
-    return ObjectInfo<Hdl>::acquireRef(handle);
+  inline agt_status_t handleAcquireRef(Hdl* handle) noexcept {
+    return object_info<Hdl>::acquireRef(handle);
   }
   template <typename Hdl>
-  inline void      handleReleaseRef(Hdl* handle) noexcept {
-    ObjectInfo<Hdl>::releaseRef(handle);
+  inline void         handleReleaseRef(Hdl* handle) noexcept {
+    object_info<Hdl>::releaseRef(handle);
   }
   template <typename Hdl>
-  inline void      handleSetErrorState(Hdl* handle, ErrorState errorState) noexcept {
-    ObjectInfo<Hdl>::setErrorState(handle, errorState);
+  inline void         handleSetErrorState(Hdl* handle, error_state errorState) noexcept {
+    object_info<Hdl>::setErrorState(handle, errorState);
   }
 
 
   template <typename T>
-  inline constexpr static VTable VTableInstance = {
-    .pfnAcquireMessage = &ObjectInfo<typename ObjectInfo<T>::HandleType>::acquireMessage,
-    .pfnPushQueue      = &ObjectInfo<typename ObjectInfo<T>::HandleType>::pushQueue,
-    .pfnPopQueue       = &ObjectInfo<typename ObjectInfo<T>::HandleType>::popQueue,
-    .pfnReleaseMessage = &ObjectInfo<typename ObjectInfo<T>::HandleType>::releaseMessage,
-    .pfnConnect        = &ObjectInfo<typename ObjectInfo<T>::HandleType>::connect,
-    .pfnAcquireRef     = &ObjectInfo<typename ObjectInfo<T>::HandleType>::acquireRef,
-    .pfnReleaseRef     = &ObjectInfo<typename ObjectInfo<T>::HandleType>::releaseRef
+  inline constexpr static vtable vtable_instance = {
+    .pfnAcquireMessage = &object_info<typename object_info<T>::handle_type>::acquireMessage,
+    .pfnPushQueue      = &object_info<typename object_info<T>::handle_type>::pushQueue,
+    .pfnPopQueue       = &object_info<typename object_info<T>::handle_type>::popQueue,
+    .pfnReleaseMessage = &object_info<typename object_info<T>::handle_type>::releaseMessage,
+    .pfnConnect        = &object_info<typename object_info<T>::handle_type>::connect,
+    .pfnAcquireRef     = &object_info<typename object_info<T>::handle_type>::acquireRef,
+    .pfnReleaseRef     = &object_info<typename object_info<T>::handle_type>::releaseRef
   };
 
 
   /*struct SharedVTable {
-    AgtStatus (* const acquireRef)(SharedObject* object, AgtContext ctx) noexcept;
-    AgtSize   (* const releaseRef)(SharedObject* object, AgtContext ctx) noexcept;
-    void      (* const destroy)(SharedObject* object, AgtContext ctx) noexcept;
-    AgtStatus (* const stage)(SharedObject* object, AgtContext ctx, AgtStagedMessage& pStagedMessage, AgtTimeout timeout) noexcept;
-    void      (* const send)(SharedObject* object, AgtContext ctx, AgtMessage message, AgtSendFlags flags) noexcept;
-    AgtStatus (* const receive)(SharedObject* object, AgtContext ctx, AgtMessageInfo& pMessageInfo, AgtTimeout timeout) noexcept;
-    AgtStatus (* const connect)(SharedObject* object, AgtContext ctx, Handle* handle, ConnectAction action) noexcept;
+    agt_status_t (* const acquireRef)(SharedObject* object, agt_ctx_t ctx) noexcept;
+    size_t   (* const releaseRef)(SharedObject* object, agt_ctx_t ctx) noexcept;
+    void      (* const destroy)(SharedObject* object, agt_ctx_t ctx) noexcept;
+    agt_status_t (* const stage)(SharedObject* object, agt_ctx_t ctx, agt_staged_message_t& pStagedMessage, agt_timeout_t timeout) noexcept;
+    void      (* const send)(SharedObject* object, agt_ctx_t ctx, agt_message_t message, agt_send_flags_t flags) noexcept;
+    agt_status_t (* const receive)(SharedObject* object, agt_ctx_t ctx, agt_message_info_t& pMessageInfo, agt_timeout_t timeout) noexcept;
+    agt_status_t (* const connect)(SharedObject* object, agt_ctx_t ctx, Handle* handle, ConnectAction action) noexcept;
   };*/
 
   // SharedVPtr lookupSharedVTable(ObjectType type) noexcept;

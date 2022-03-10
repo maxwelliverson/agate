@@ -6,9 +6,8 @@
 #define JEMSYS_AGATE2_ASYNC_HPP
 
 #include "fwd.hpp"
-#include "support/wrapper.hpp"
 
-namespace Agt {
+namespace agt {
 
   /*enum class AsyncType {
     eUnbound,
@@ -28,44 +27,45 @@ namespace Agt {
     eReadyAndRecyclable
   };*/
 
+  enum class async_key : agt_u32_t;
 
 
 
-  void         asyncDataAttach(AgtAsyncData asyncData, AgtContext ctx, AgtUInt32& key) noexcept;
-  void         asyncDataDrop(AgtAsyncData asyncData, AgtContext ctx, AgtUInt32 key) noexcept;
-  void         asyncDataArrive(AgtAsyncData asyncData, AgtContext ctx, AgtUInt32 key) noexcept;
-
-
-
-
-  /*AgtUInt32    asyncDataGetEpoch(const AgtAsyncData_st* asyncData) noexcept;
-
-  void         asyncDataAttach(AgtAsyncData data, AgtSignal signal) noexcept;
-  bool         asyncDataTryAttach(AgtAsyncData data, AgtSignal signal) noexcept;
-
-  void         asyncDataDetachSignal(AgtAsyncData data) noexcept;
-
-  AgtUInt32    asyncDataGetMaxExpectedCount(const AgtAsyncData_st* data) noexcept;*/
+  void         asyncDataAttach(agt_async_data_t asyncData, agt_ctx_t ctx, async_key& key) noexcept;
+  void         asyncDataDrop(agt_async_data_t asyncData,   agt_ctx_t ctx, async_key key) noexcept;
+  void         asyncDataArrive(agt_async_data_t asyncData, agt_ctx_t ctx, async_key key) noexcept;
 
 
 
 
+  /*agt_u32_t    asyncDataGetEpoch(const AgtAsyncData_st* asyncData) noexcept;
+
+  void         asyncDataAttach(agt_async_data_t data, agt_signal_t signal) noexcept;
+  bool         asyncDataTryAttach(agt_async_data_t data, agt_signal_t signal) noexcept;
+
+  void         asyncDataDetachSignal(agt_async_data_t data) noexcept;
+
+  agt_u32_t    asyncDataGetMaxExpectedCount(const AgtAsyncData_st* data) noexcept;*/
 
 
-  AgtContext   asyncGetContext(const AgtAsync_st* async) noexcept;
-  AgtAsyncData asyncGetData(const AgtAsync_st* async) noexcept;
 
-  void         asyncCopyTo(const AgtAsync_st* fromAsync, AgtAsync toAsync) noexcept;
-  void         asyncClear(AgtAsync async) noexcept;
-  void         asyncDestroy(AgtAsync async) noexcept;
 
-  AgtAsyncData asyncAttach(AgtAsync async, AgtSignal) noexcept;
 
-  void         asyncReset(AgtAsync async, AgtUInt32 targetExpectedCount, AgtUInt32 maxExpectedCount) noexcept;
 
-  AgtStatus    asyncWait(AgtAsync async, AgtTimeout timeout) noexcept;
+  agt_ctx_t   asyncGetContext(const agt_async_st* async) noexcept;
+  agt_async_data_t asyncGetData(const agt_async_st* async) noexcept;
 
-  AgtAsync     createAsync(AgtContext context) noexcept;
+  void         asyncCopyTo(const agt_async_st* fromAsync, agt_async_t toAsync) noexcept;
+  void         asyncClear(agt_async_t async) noexcept;
+  void         asyncDestroy(agt_async_t async) noexcept;
+
+  agt_async_data_t asyncAttach(agt_async_t async, agt_signal_t) noexcept;
+
+  void         asyncReset(agt_async_t async, agt_u32_t targetExpectedCount, agt_u32_t maxExpectedCount) noexcept;
+
+  agt_status_t    asyncWait(agt_async_t async, agt_timeout_t timeout) noexcept;
+
+  agt_async_t     createAsync(agt_ctx_t context) noexcept;
 
 }
 

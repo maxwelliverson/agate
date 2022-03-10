@@ -9,9 +9,9 @@ using namespace Agt;
 
 namespace {
 
-  AGT_noinline AgtStatus sharedHandleDuplicate(Handle* self_, Handle*& out) noexcept {
+  AGT_noinline agt_status_t sharedHandleDuplicate(Handle* self_, Handle*& out) noexcept {
     const auto self = static_cast<SharedHandle*>(self_);
-    if (AgtStatus result = self->sharedAcquire())
+    if (agt_status_t result = self->sharedAcquire())
       return result;
     if (SharedHandle* pNewShared = ctxNewSharedHandle(self->getContext(), self->getInstance()))
       out = pNewShared;
@@ -24,9 +24,9 @@ namespace {
 
 
 
-AgtStatus Handle::duplicate(Handle*& out) noexcept {
+agt_status_t Handle::duplicate(Handle*& out) noexcept {
   if (!isShared()) [[likely]] {
-    if (AgtStatus result = static_cast<LocalHandle*>(this)->localAcquire())
+    if (agt_status_t result = static_cast<LocalHandle*>(this)->localAcquire())
       return result;
     out = this;
     return AGT_SUCCESS;
@@ -42,26 +42,26 @@ void Handle::close() noexcept  {
     ctxDestroySharedHandle(context, static_cast<SharedHandle*>(this));
 }
 
-AgtStatus Handle::stage(AgtStagedMessage& stagedMessage, AgtTimeout timeout) noexcept {
+agt_status_t Handle::stage(agt_staged_message_t& stagedMessage, agt_timeout_t timeout) noexcept {
   if (!isShared()) [[likely]]
     return static_cast<LocalHandle*>(this)->localStage(stagedMessage, timeout);
   else
     return static_cast<SharedHandle*>(this)->sharedStage(stagedMessage, timeout);
 }
-void      Handle::send(AgtMessage message, AgtSendFlags flags) noexcept {
+void      Handle::send(agt_message_t message, agt_send_flags_t flags) noexcept {
   if (!isShared()) [[likely]]
     static_cast<LocalHandle*>(this)->localSend(message, flags);
   else
     static_cast<SharedHandle*>(this)->sharedSend(message, flags);
 }
-AgtStatus Handle::receive(AgtMessageInfo& messageInfo, AgtTimeout timeout) noexcept {
+agt_status_t Handle::receive(agt_message_info_t& messageInfo, agt_timeout_t timeout) noexcept {
   if (!isShared()) [[likely]]
     return static_cast<LocalHandle*>(this)->localReceive(messageInfo, timeout);
   else
     return static_cast<SharedHandle*>(this)->sharedReceive(messageInfo, timeout);
 }
 
-AgtStatus Handle::connect(Handle* otherHandle, ConnectAction action) noexcept {
+agt_status_t Handle::connect(Handle* otherHandle, ConnectAction action) noexcept {
   if (!isShared()) [[likely]]
     return static_cast<LocalHandle*>(this)->localConnect(otherHandle, action);
   else
@@ -69,7 +69,7 @@ AgtStatus Handle::connect(Handle* otherHandle, ConnectAction action) noexcept {
 }
 
 
-SharedHandle::SharedHandle(SharedObject* pInstance, AgtContext context, Id localId) noexcept
+SharedHandle::SharedHandle(SharedObject* pInstance, agt_ctx_t context, Id localId) noexcept
     : Handle(pInstance->getType(), pInstance->getFlags(), context, localId),
       vptr(lookupSharedVTable(pInstance->getType())),
       instance(pInstance)

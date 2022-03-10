@@ -5,21 +5,22 @@
 #ifndef JEMSYS_AGATE_IPC_BLOCK_HPP
 #define JEMSYS_AGATE_IPC_BLOCK_HPP
 
-#include <agate2.h>
+#include "fwd.hpp"
 
+namespace agt {
 
-namespace Agt {
+  class ipc_block {
 
-  class IpcBlock {
-
-    struct SharedBlock {
+    struct shared_block {
 
     };
 
   public:
 
+
+
   private:
-    SharedBlock* pSharedBlock;
+    shared_block* pSharedBlock;
   };
 
 }

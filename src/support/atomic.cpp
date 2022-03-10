@@ -12,149 +12,149 @@
 #endif
 
 
-using namespace Agt;
+using namespace agt;
 
 
 
-AgtUInt8  Impl::atomicLoad(const AgtUInt8& value) noexcept {
+agt_u8_t  impl::atomicLoad(const agt_u8_t& value) noexcept {
 #if AGT_system_windows
-  return (AgtUInt8)_InterlockedCompareExchange8((char*)&value, 0, 0);
+  return (agt_u8_t)_InterlockedCompareExchange8((char*)&value, 0, 0);
 #else
   return __atomic_load_n(&value, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt16 Impl::atomicLoad(const AgtUInt16& value) noexcept {
+agt_u16_t impl::atomicLoad(const agt_u16_t& value) noexcept {
 #if AGT_system_windows
-  return (AgtUInt16)_InterlockedCompareExchange16((AgtInt16*)&value, 0, 0);
+  return (agt_u16_t)_InterlockedCompareExchange16((agt_i16_t*)&value, 0, 0);
 #else
   return __atomic_load_n(&value, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt32 Impl::atomicLoad(const AgtUInt32& value) noexcept {
+agt_u32_t impl::atomicLoad(const agt_u32_t& value) noexcept {
 #if AGT_system_windows
-  return _InterlockedCompareExchange((AgtUInt32*)&value, 0, 0);
+  return _InterlockedCompareExchange((agt_u32_t*)&value, 0, 0);
 #else
   return __atomic_load_n(&value, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt64 Impl::atomicLoad(const AgtUInt64& value) noexcept {
+agt_u64_t impl::atomicLoad(const agt_u64_t& value) noexcept {
 #if AGT_system_windows
-  return _InterlockedCompareExchange((AgtUInt64*)&value, 0, 0);
+  return _InterlockedCompareExchange((agt_u64_t*)&value, 0, 0);
 #else
   return __atomic_load_n(&value, __ATOMIC_SEQ_CST);
 #endif
 }
 
-AgtUInt8 Impl::atomicRelaxedLoad(const AgtUInt8& value) noexcept {
+agt_u8_t impl::atomicRelaxedLoad(const agt_u8_t& value) noexcept {
 #if AGT_system_windows
   return __iso_volatile_load8((const char*)&value);
 #else
   return __atomic_load_n(&value, __ATOMIC_RELAXED);
 #endif
 }
-AgtUInt16 Impl::atomicRelaxedLoad(const AgtUInt16& value) noexcept {
+agt_u16_t impl::atomicRelaxedLoad(const agt_u16_t& value) noexcept {
 #if AGT_system_windows
-  return __iso_volatile_load16((const AgtInt16*)&value);
+  return __iso_volatile_load16((const agt_i16_t*)&value);
 #else
   return __atomic_load_n(&value, __ATOMIC_RELAXED);
 #endif
 }
-AgtUInt32 Impl::atomicRelaxedLoad(const AgtUInt32& value) noexcept {
+agt_u32_t impl::atomicRelaxedLoad(const agt_u32_t& value) noexcept {
 #if AGT_system_windows
-  return __iso_volatile_load32((const AgtInt32*)&value);
+  return __iso_volatile_load32((const agt_i32_t*)&value);
 #else
   return __atomic_load_n(&value, __ATOMIC_RELAXED);
 #endif
 }
-AgtUInt64 Impl::atomicRelaxedLoad(const AgtUInt64& value) noexcept {
+agt_u64_t impl::atomicRelaxedLoad(const agt_u64_t& value) noexcept {
 #if AGT_system_windows
-  return __iso_volatile_load64((const AgtInt64*)&value);
+  return __iso_volatile_load64((const agt_i64_t*)&value);
 #else
   return __atomic_load_n(&value, __ATOMIC_RELAXED);
 #endif
 }
 
-void Impl::atomicStore(AgtUInt8& value,  AgtUInt8 newValue) noexcept {
+void impl::atomicStore(agt_u8_t& value,  agt_u8_t newValue) noexcept {
 #if AGT_system_windows
-  Impl::atomicExchange(value, newValue);
+  impl::atomicExchange(value, newValue);
 #else
   __atomic_store_n(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
-void Impl::atomicStore(AgtUInt16& value, AgtUInt16 newValue) noexcept {
+void impl::atomicStore(agt_u16_t& value, agt_u16_t newValue) noexcept {
 #if AGT_system_windows
-  Impl::atomicExchange(value, newValue);
+  impl::atomicExchange(value, newValue);
 #else
   __atomic_store_n(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
-void Impl::atomicStore(AgtUInt32& value, AgtUInt32 newValue) noexcept {
+void impl::atomicStore(agt_u32_t& value, agt_u32_t newValue) noexcept {
 #if AGT_system_windows
-  Impl::atomicExchange(value, newValue);
+  impl::atomicExchange(value, newValue);
 #else
   __atomic_store_n(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
-void Impl::atomicStore(AgtUInt64& value, AgtUInt64 newValue) noexcept {
+void impl::atomicStore(agt_u64_t& value, agt_u64_t newValue) noexcept {
 #if AGT_system_windows
-  Impl::atomicExchange(value, newValue);
+  impl::atomicExchange(value, newValue);
 #else
   __atomic_store_n(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
 
-void Impl::atomicRelaxedStore(AgtUInt8& value, AgtUInt8 newValue) noexcept {
+void impl::atomicRelaxedStore(agt_u8_t& value, agt_u8_t newValue) noexcept {
 #if AGT_system_windows
   __iso_volatile_store8((char*)&value, (char)newValue);
 #else
   __atomic_store_n(&value, newValue, __ATOMIC_RELAXED);
 #endif
 }
-void Impl::atomicRelaxedStore(AgtUInt16& value, AgtUInt16 newValue) noexcept {
+void impl::atomicRelaxedStore(agt_u16_t& value, agt_u16_t newValue) noexcept {
 #if AGT_system_windows
-  __iso_volatile_store16((AgtInt16*)&value, (AgtInt16)newValue);
+  __iso_volatile_store16((agt_i16_t*)&value, (agt_i16_t)newValue);
 #else
   __atomic_store_n(&value, newValue, __ATOMIC_RELAXED);
 #endif
 }
-void Impl::atomicRelaxedStore(AgtUInt32& value, AgtUInt32 newValue) noexcept {
+void impl::atomicRelaxedStore(agt_u32_t& value, agt_u32_t newValue) noexcept {
 #if AGT_system_windows
-  __iso_volatile_store32((AgtInt32*)&value, (AgtInt32)newValue);
+  __iso_volatile_store32((agt_i32_t*)&value, (agt_i32_t)newValue);
 #else
   __atomic_store_n(&value, newValue, __ATOMIC_RELAXED);
 #endif
 }
-void Impl::atomicRelaxedStore(AgtUInt64& value, AgtUInt64 newValue) noexcept {
+void impl::atomicRelaxedStore(agt_u64_t& value, agt_u64_t newValue) noexcept {
 #if AGT_system_windows
-  __iso_volatile_store64((AgtInt64*)&value, (AgtInt64)newValue);
+  __iso_volatile_store64((agt_i64_t*)&value, (agt_i64_t)newValue);
 #else
   __atomic_store_n(&value, newValue, __ATOMIC_RELAXED);
 #endif
 }
 
 
-AgtUInt8  Impl::atomicExchange(AgtUInt8& value, AgtUInt8 newValue) noexcept {
+agt_u8_t  impl::atomicExchange(agt_u8_t& value, agt_u8_t newValue) noexcept {
 #if AGT_system_windows
-  return (AgtUInt8)_InterlockedExchange8((char*)&value, (char)newValue);
+  return (agt_u8_t)_InterlockedExchange8((char*)&value, (char)newValue);
 #else
   return __atomic_exchange_n(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt16 Impl::atomicExchange(AgtUInt16& value, AgtUInt16 newValue) noexcept {
+agt_u16_t impl::atomicExchange(agt_u16_t& value, agt_u16_t newValue) noexcept {
 #if AGT_system_windows
-  return (AgtUInt16)_InterlockedExchange16((AgtInt16*)&value, (AgtInt16)newValue);
+  return (agt_u16_t)_InterlockedExchange16((agt_i16_t*)&value, (agt_i16_t)newValue);
 #else
   return __atomic_exchange_n(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt32 Impl::atomicExchange(AgtUInt32& value, AgtUInt32 newValue) noexcept {
+agt_u32_t impl::atomicExchange(agt_u32_t& value, agt_u32_t newValue) noexcept {
 #if AGT_system_windows
   return _InterlockedExchange(&value, newValue);
 #else
   return __atomic_exchange_n(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt64 Impl::atomicExchange(AgtUInt64& value, AgtUInt64 newValue) noexcept {
+agt_u64_t impl::atomicExchange(agt_u64_t& value, agt_u64_t newValue) noexcept {
 #if AGT_system_windows
   return _InterlockedExchange(&value, newValue);
 #else
@@ -162,33 +162,33 @@ AgtUInt64 Impl::atomicExchange(AgtUInt64& value, AgtUInt64 newValue) noexcept {
 #endif
 }
 
-bool Impl::atomicCompareExchange(AgtUInt8& value,  AgtUInt8& compare, AgtUInt8 newValue)    noexcept {
+bool impl::atomicCompareExchange(agt_u8_t& value,  agt_u8_t& compare, agt_u8_t newValue)    noexcept {
 #if AGT_system_windows
-  AgtUInt8 oldComp = compare;
-  return (compare = (AgtUInt8)_InterlockedCompareExchange8((char*)&value, (char)newValue, (char)compare)) == oldComp;
+  agt_u8_t oldComp = compare;
+  return (compare = (agt_u8_t)_InterlockedCompareExchange8((char*)&value, (char)newValue, (char)compare)) == oldComp;
 #else
   return __atomic_compare_exchange_n((char*)&value, (char*)&compare, (char)newValue, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE);
 #endif
 }
-bool Impl::atomicCompareExchange(AgtUInt16& value, AgtUInt16& compare, AgtUInt16 newValue) noexcept {
+bool impl::atomicCompareExchange(agt_u16_t& value, agt_u16_t& compare, agt_u16_t newValue) noexcept {
 #if AGT_system_windows
-  AgtUInt16 oldComp = compare;
-  return (compare = (AgtUInt16)_InterlockedCompareExchange16((AgtInt16*)&value, (AgtInt16)newValue, (AgtInt16)compare)) == oldComp;
+  agt_u16_t oldComp = compare;
+  return (compare = (agt_u16_t)_InterlockedCompareExchange16((agt_i16_t*)&value, (agt_i16_t)newValue, (agt_i16_t)compare)) == oldComp;
 #else
   return __atomic_compare_exchange_n(&value, &compare, newValue, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE);
 #endif
 }
-bool Impl::atomicCompareExchange(AgtUInt32& value, AgtUInt32& compare, AgtUInt32 newValue) noexcept {
+bool impl::atomicCompareExchange(agt_u32_t& value, agt_u32_t& compare, agt_u32_t newValue) noexcept {
 #if AGT_system_windows
-  AgtUInt32 oldComp = compare;
+  agt_u32_t oldComp = compare;
   return (compare = _InterlockedCompareExchange(&value, newValue, compare)) == oldComp;
 #else
   return __atomic_compare_exchange_n(&value, &compare, newValue, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE);
 #endif
 }
-bool Impl::atomicCompareExchange(AgtUInt64& value, AgtUInt64& compare, AgtUInt64 newValue) noexcept {
+bool impl::atomicCompareExchange(agt_u64_t& value, agt_u64_t& compare, agt_u64_t newValue) noexcept {
 #if AGT_system_windows
-  AgtUInt64 oldComp = compare;
+  agt_u64_t oldComp = compare;
   return (compare = _InterlockedCompareExchange(&value, newValue, compare)) == oldComp;
 #else
   return __atomic_compare_exchange_n(&value, &compare, newValue, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE);
@@ -196,28 +196,28 @@ bool Impl::atomicCompareExchange(AgtUInt64& value, AgtUInt64& compare, AgtUInt64
 }
 
 
-AgtUInt8  Impl::atomicIncrement(AgtUInt8& value) noexcept {
+agt_u8_t  impl::atomicIncrement(agt_u8_t& value) noexcept {
 #if AGT_system_windows
-  return (AgtUInt8)_InterlockedExchangeAdd8((char*)&value, 1) + 1;
+  return (agt_u8_t)_InterlockedExchangeAdd8((char*)&value, 1) + 1;
 #else
   return __atomic_add_fetch(&value, 1, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt16 Impl::atomicIncrement(AgtUInt16& value) noexcept {
+agt_u16_t impl::atomicIncrement(agt_u16_t& value) noexcept {
 #if AGT_system_windows
-  return (AgtUInt16)InterlockedIncrement16(reinterpret_cast<AgtInt16*>(&value));
+  return (agt_u16_t)InterlockedIncrement16(reinterpret_cast<agt_i16_t*>(&value));
 #else
   return __atomic_add_fetch(&value, 1, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt32 Impl::atomicIncrement(AgtUInt32& value) noexcept {
+agt_u32_t impl::atomicIncrement(agt_u32_t& value) noexcept {
 #if AGT_system_windows
   return InterlockedIncrement(&value);
 #else
   return __atomic_add_fetch(&value, 1, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt64 Impl::atomicIncrement(AgtUInt64& value) noexcept {
+agt_u64_t impl::atomicIncrement(agt_u64_t& value) noexcept {
 #if AGT_system_windows
   return InterlockedIncrement(&value);
 #else
@@ -226,28 +226,28 @@ AgtUInt64 Impl::atomicIncrement(AgtUInt64& value) noexcept {
 }
 
 
-AgtUInt8  Impl::atomicDecrement(AgtUInt8& value) noexcept {
+agt_u8_t  impl::atomicDecrement(agt_u8_t& value) noexcept {
 #if AGT_system_windows
-  return (AgtUInt8)_InterlockedExchangeAdd8((char*)&value, (char)-1) - 1;
+  return (agt_u8_t)_InterlockedExchangeAdd8((char*)&value, (char)-1) - 1;
 #else
   return __atomic_sub_fetch(&value, 1, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt16 Impl::atomicDecrement(AgtUInt16& value) noexcept {
+agt_u16_t impl::atomicDecrement(agt_u16_t& value) noexcept {
 #if AGT_system_windows
-  return (AgtUInt16)_InterlockedDecrement16((AgtInt16*)&value);
+  return (agt_u16_t)_InterlockedDecrement16((agt_i16_t*)&value);
 #else
   return __atomic_sub_fetch(&value, 1, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt32 Impl::atomicDecrement(AgtUInt32& value) noexcept {
+agt_u32_t impl::atomicDecrement(agt_u32_t& value) noexcept {
 #if AGT_system_windows
   return _InterlockedDecrement(&value);
 #else
   return __atomic_sub_fetch(&value, 1, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt64 Impl::atomicDecrement(AgtUInt64& value) noexcept {
+agt_u64_t impl::atomicDecrement(agt_u64_t& value) noexcept {
 #if AGT_system_windows
   return _InterlockedDecrement(&value);
 #else
@@ -256,28 +256,28 @@ AgtUInt64 Impl::atomicDecrement(AgtUInt64& value) noexcept {
 }
 
 
-AgtUInt8  Impl::atomicExchangeAdd(AgtUInt8& value, AgtUInt8 newValue) noexcept {
+agt_u8_t  impl::atomicExchangeAdd(agt_u8_t& value, agt_u8_t newValue) noexcept {
 #if AGT_system_windows
-  return (AgtUInt8)_InterlockedExchangeAdd8((char*)&value, (char)newValue);
+  return (agt_u8_t)_InterlockedExchangeAdd8((char*)&value, (char)newValue);
 #else
   return __atomic_fetch_add(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt16 Impl::atomicExchangeAdd(AgtUInt16& value, AgtUInt16 newValue) noexcept {
+agt_u16_t impl::atomicExchangeAdd(agt_u16_t& value, agt_u16_t newValue) noexcept {
 #if AGT_system_windows
-  return (AgtUInt16)_InterlockedExchangeAdd16((AgtInt16*)&value, (AgtInt16)newValue);
+  return (agt_u16_t)_InterlockedExchangeAdd16((agt_i16_t*)&value, (agt_i16_t)newValue);
 #else
   return __atomic_fetch_add(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt32 Impl::atomicExchangeAdd(AgtUInt32& value, AgtUInt32 newValue) noexcept {
+agt_u32_t impl::atomicExchangeAdd(agt_u32_t& value, agt_u32_t newValue) noexcept {
 #if AGT_system_windows
   return _InterlockedExchangeAdd(&value, newValue);
 #else
   return __atomic_fetch_add(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt64 Impl::atomicExchangeAdd(AgtUInt64& value, AgtUInt64 newValue) noexcept {
+agt_u64_t impl::atomicExchangeAdd(agt_u64_t& value, agt_u64_t newValue) noexcept {
 #if AGT_system_windows
   return _InterlockedExchangeAdd(&value, newValue);
 #else
@@ -286,110 +286,110 @@ AgtUInt64 Impl::atomicExchangeAdd(AgtUInt64& value, AgtUInt64 newValue) noexcept
 }
 
 
-AgtUInt8  Impl::atomicExchangeAnd(AgtUInt8& value, AgtUInt8 newValue) noexcept {
+agt_u8_t  impl::atomicExchangeAnd(agt_u8_t& value, agt_u8_t newValue) noexcept {
 #if AGT_system_windows
-  return (AgtUInt8)InterlockedAnd8((char*)&value, (char)newValue);
+  return (agt_u8_t)InterlockedAnd8((char*)&value, (char)newValue);
 #else
   return __atomic_fetch_and(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt16 Impl::atomicExchangeAnd(AgtUInt16& value, AgtUInt16 newValue) noexcept {
+agt_u16_t impl::atomicExchangeAnd(agt_u16_t& value, agt_u16_t newValue) noexcept {
 #if AGT_system_windows
-  return (AgtUInt16)InterlockedAnd16((AgtInt16*)&value, (AgtInt16)newValue);
+  return (agt_u16_t)InterlockedAnd16((agt_i16_t*)&value, (agt_i16_t)newValue);
 #else
   return __atomic_fetch_and(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt32 Impl::atomicExchangeAnd(AgtUInt32& value, AgtUInt32 newValue) noexcept {
+agt_u32_t impl::atomicExchangeAnd(agt_u32_t& value, agt_u32_t newValue) noexcept {
 #if AGT_system_windows
-  return (AgtUInt32)InterlockedAnd((LONG*)&value, (AgtInt32)newValue);
+  return (agt_u32_t)InterlockedAnd((LONG*)&value, (agt_i32_t)newValue);
 #else
   return __atomic_fetch_and(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt64 Impl::atomicExchangeAnd(AgtUInt64& value, AgtUInt64 newValue) noexcept {
+agt_u64_t impl::atomicExchangeAnd(agt_u64_t& value, agt_u64_t newValue) noexcept {
 #if AGT_system_windows
-  return (AgtUInt64)InterlockedAnd64((AgtInt64*)&value, (AgtInt64)newValue);
+  return (agt_u64_t)InterlockedAnd64((agt_i64_t*)&value, (agt_i64_t)newValue);
 #else
   return __atomic_fetch_and(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
 
 
-AgtUInt8  Impl::atomicExchangeOr(AgtUInt8& value, AgtUInt8 newValue) noexcept {
+agt_u8_t  impl::atomicExchangeOr(agt_u8_t& value, agt_u8_t newValue) noexcept {
 #if AGT_system_windows
-  return (AgtUInt8)InterlockedOr8((char*)&value, (char)newValue);
+  return (agt_u8_t)InterlockedOr8((char*)&value, (char)newValue);
 #else
   return __atomic_fetch_or(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt16 Impl::atomicExchangeOr(AgtUInt16& value, AgtUInt16 newValue) noexcept {
+agt_u16_t impl::atomicExchangeOr(agt_u16_t& value, agt_u16_t newValue) noexcept {
 #if AGT_system_windows
-  return (AgtUInt16)InterlockedOr16((AgtInt16*)&value, (AgtInt16)newValue);
+  return (agt_u16_t)InterlockedOr16((agt_i16_t*)&value, (agt_i16_t)newValue);
 #else
   return __atomic_fetch_or(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt32 Impl::atomicExchangeOr(AgtUInt32& value, AgtUInt32 newValue) noexcept {
+agt_u32_t impl::atomicExchangeOr(agt_u32_t& value, agt_u32_t newValue) noexcept {
 #if AGT_system_windows
-  return (AgtUInt32)InterlockedOr((LONG*)&value, (AgtInt32)newValue);
+  return (agt_u32_t)InterlockedOr((LONG*)&value, (agt_i32_t)newValue);
 #else
   return __atomic_fetch_or(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt64 Impl::atomicExchangeOr(AgtUInt64& value, AgtUInt64 newValue) noexcept {
+agt_u64_t impl::atomicExchangeOr(agt_u64_t& value, agt_u64_t newValue) noexcept {
 #if AGT_system_windows
-  return (AgtUInt64)InterlockedOr64((AgtInt64*)&value, (AgtInt64)newValue);
+  return (agt_u64_t)InterlockedOr64((agt_i64_t*)&value, (agt_i64_t)newValue);
 #else
   return __atomic_fetch_or(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
 
 
-AgtUInt8  Impl::atomicExchangeXor(AgtUInt8& value, AgtUInt8 newValue) noexcept {
+agt_u8_t  impl::atomicExchangeXor(agt_u8_t& value, agt_u8_t newValue) noexcept {
 #if AGT_system_windows
-  return (AgtUInt8)InterlockedXor8((char*)&value, (char)newValue);
+  return (agt_u8_t)InterlockedXor8((char*)&value, (char)newValue);
 #else
   return __atomic_fetch_xor(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt16 Impl::atomicExchangeXor(AgtUInt16& value, AgtUInt16 newValue) noexcept {
+agt_u16_t impl::atomicExchangeXor(agt_u16_t& value, agt_u16_t newValue) noexcept {
 #if AGT_system_windows
-  return (AgtUInt16)InterlockedXor16((AgtInt16*)&value, (AgtInt16)newValue);
+  return (agt_u16_t)InterlockedXor16((agt_i16_t*)&value, (agt_i16_t)newValue);
 #else
   return __atomic_fetch_xor(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt32 Impl::atomicExchangeXor(AgtUInt32& value, AgtUInt32 newValue) noexcept {
+agt_u32_t impl::atomicExchangeXor(agt_u32_t& value, agt_u32_t newValue) noexcept {
 #if AGT_system_windows
-  return (AgtUInt32)InterlockedXor((LONG*)&value, (AgtInt32)newValue);
+  return (agt_u32_t)InterlockedXor((LONG*)&value, (agt_i32_t)newValue);
 #else
   return __atomic_fetch_xor(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
-AgtUInt64 Impl::atomicExchangeXor(AgtUInt64& value, AgtUInt64 newValue) noexcept {
+agt_u64_t impl::atomicExchangeXor(agt_u64_t& value, agt_u64_t newValue) noexcept {
 #if AGT_system_windows
-  return (AgtUInt64)InterlockedXor64((AgtInt64*)&value, (AgtInt64)newValue);
+  return (agt_u64_t)InterlockedXor64((agt_i64_t*)&value, (agt_i64_t)newValue);
 #else
   return __atomic_fetch_xor(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
 
 
-void Impl::atomicNotifyOne(void* value) noexcept {
+void impl::atomicNotifyOne(void* value) noexcept {
   WakeByAddressSingle(value);
   syscall(SYS_futex, );
 }
-void Impl::atomicNotifyAll(void* value) noexcept {
+void impl::atomicNotifyAll(void* value) noexcept {
   WakeByAddressAll(value);
 }
 
 
-void Impl::atomicDeepWaitRaw(const void* atomicAddress, void* compareAddress, AgtSize addressSize) noexcept {
+void impl::atomicDeepWaitRaw(const void* atomicAddress, void* compareAddress, size_t addressSize) noexcept {
   WaitOnAddress(const_cast<volatile void*>(atomicAddress), compareAddress, addressSize, INFINITE);
 }
 
-bool Impl::atomicDeepWaitRaw(const void* atomicAddress, void* compareAddress, AgtSize addressSize, AgtUInt32 timeout) noexcept {
+bool impl::atomicDeepWaitRaw(const void* atomicAddress, void* compareAddress, size_t addressSize, agt_u32_t timeout) noexcept {
   if (!WaitOnAddress(const_cast<volatile void*>(atomicAddress), compareAddress, addressSize, timeout))
     return GetLastError() != ERROR_TIMEOUT;
   return true;
@@ -398,16 +398,16 @@ bool Impl::atomicDeepWaitRaw(const void* atomicAddress, void* compareAddress, Ag
 
 
 
-AgtUInt64 Deadline::getCurrentTimestamp() noexcept {
+agt_u64_t deadline::getCurrentTimestamp() noexcept {
   LARGE_INTEGER lrgInt;
   QueryPerformanceCounter(&lrgInt);
   return lrgInt.QuadPart;
 }
 
 
-bool ResponseCount::doDeepWait(AgtUInt32& capturedValue, AgtUInt32 timeout) const noexcept {
+bool ResponseCount::doDeepWait(agt_u32_t& capturedValue, agt_u32_t timeout) const noexcept {
   _InterlockedIncrement(&deepSleepers_);
-  BOOL result = WaitOnAddress(&const_cast<volatile AgtUInt32&>(arrivedCount_), &capturedValue, sizeof(AgtUInt32), timeout);
+  BOOL result = WaitOnAddress(&const_cast<volatile agt_u32_t&>(arrivedCount_), &capturedValue, sizeof(agt_u32_t), timeout);
   _InterlockedDecrement(&deepSleepers_);
   if (result)
     capturedValue = fastLoad();
@@ -415,7 +415,7 @@ bool ResponseCount::doDeepWait(AgtUInt32& capturedValue, AgtUInt32 timeout) cons
 }
 
 void ResponseCount::notifyWaiters() noexcept {
-  const AgtUInt32 waiters = __iso_volatile_load32(&reinterpret_cast<const int&>(deepSleepers_));
+  const agt_u32_t waiters = __iso_volatile_load32(&reinterpret_cast<const int&>(deepSleepers_));
 
   if ( waiters == 0 ) [[likely]] {
 

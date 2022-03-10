@@ -39,7 +39,7 @@ namespace Agt {
 
   class Pool {
 
-    using Index = AgtSize;
+    using Index = size_t;
     using Block = void**;
 
     struct Slab {
@@ -48,10 +48,10 @@ namespace Agt {
       Slab** stackPosition;
     };
 
-    inline constexpr static AgtSize MinimumBlockSize = sizeof(Slab);
-    inline constexpr static AgtSize InitialStackSize = 4;
-    inline constexpr static AgtSize StackGrowthRate  = 2;
-    inline constexpr static AgtSize StackAlignment   = AGT_CACHE_LINE;
+    inline constexpr static size_t MinimumBlockSize = sizeof(Slab);
+    inline constexpr static size_t InitialStackSize = 4;
+    inline constexpr static size_t StackGrowthRate  = 2;
+    inline constexpr static size_t StackAlignment   = AGT_CACHE_LINE;
 
 
 
@@ -74,14 +74,14 @@ namespace Agt {
 #endif
     }
 
-    inline Block lookupBlock(Slab* s, AgtSize blockIndex) const noexcept {
+    inline Block lookupBlock(Slab* s, size_t blockIndex) const noexcept {
       return reinterpret_cast<Block>(reinterpret_cast<char*>(s) + (blockIndex * blockSize));
     }
     inline Slab*  lookupSlab(void* block) const noexcept {
       return reinterpret_cast<Slab*>(reinterpret_cast<uintptr_t>(block) & slabAlignmentMask);
     }
 
-    inline AgtSize indexOfBlock(Slab* s, Block block) const noexcept {
+    inline size_t indexOfBlock(Slab* s, Block block) const noexcept {
       return ((std::byte*)block - (std::byte*)s) / blockSize;
     }
 
@@ -98,12 +98,12 @@ namespace Agt {
     inline void assertSlabIsValid(Slab* s) const noexcept {
       if ( s->availableBlocks == 0 )
         return;
-      AgtSize blockCount = 1;
+      size_t blockCount = 1;
       std::vector<bool> blocks;
       blocks.resize(blocksPerSlab + 1);
       Block currentBlock = s->nextFreeBlock;
       while (blockCount < s->availableBlocks) {
-        AgtSize index = indexOfBlock(s, currentBlock);
+        size_t index = indexOfBlock(s, currentBlock);
         assert( !blocks[index] );
         blocks[index] = true;
         ++blockCount;
@@ -116,8 +116,8 @@ namespace Agt {
 
       if ( slabStackHead == slabStackTop ) [[unlikely]] {
         Slab** oldStackBase = slabStackBase;
-        AgtSize oldStackSize = slabStackTop - oldStackBase;
-        AgtSize newStackSize = oldStackSize * StackGrowthRate;
+        size_t oldStackSize = slabStackTop - oldStackBase;
+        size_t newStackSize = oldStackSize * StackGrowthRate;
         Slab** newStackBase = reallocArray(slabStackBase, newStackSize, oldStackSize, StackAlignment);
         if ( slabStackBase != newStackBase ) {
           slabStackBase = newStackBase;
@@ -195,19 +195,19 @@ namespace Agt {
     }
 
 
-    AgtSize blockSize;
-    AgtSize blocksPerSlab;
+    size_t blockSize;
+    size_t blocksPerSlab;
     Slab**  slabStackBase;
     Slab**  slabStackHead;
     Slab**  slabStackTop;
     Slab**  fullStackOnePastTop;
     Slab*   allocSlab;
     Slab*   freeSlab;
-    AgtSize slabAlignment;
-    AgtSize slabAlignmentMask;
+    size_t slabAlignment;
+    size_t slabAlignmentMask;
 
   public:
-    Pool(AgtSize blockSize, AgtSize blocksPerSlab) noexcept
+    Pool(size_t blockSize, size_t blocksPerSlab) noexcept
         : blockSize(std::max(blockSize, MinimumBlockSize)),
           blocksPerSlab(blocksPerSlab - 1),
           slabStackBase(allocArray<Slab*>(InitialStackSize, StackAlignment)),
@@ -228,7 +228,7 @@ namespace Agt {
         --slabStackHead;
       }
 
-      AgtSize stackSize = slabStackTop - slabStackBase;
+      size_t stackSize = slabStackTop - slabStackBase;
       freeArray(slabStackBase, stackSize, StackAlignment);
     }
 
@@ -261,18 +261,18 @@ namespace Agt {
       allocSlab = parentSlab;
     }
 
-    AGT_nodiscard AgtSize block_size() const noexcept {
+    AGT_nodiscard size_t block_size() const noexcept {
       return blockSize;
     }
-    AGT_nodiscard AgtSize block_alignment() const noexcept {
+    AGT_nodiscard size_t block_alignment() const noexcept {
       return ((~blockSize) + 1) & blockSize;
     }
   };
 
-  template <AgtSize BlockSize, AgtSize BlocksPerSlab>
+  template <size_t BlockSize, size_t BlocksPerSlab>
   class FixedPool {
 
-    using Index = AgtSize;
+    using Index = size_t;
     using Block = void**;
 
     struct Slab {
@@ -281,12 +281,12 @@ namespace Agt {
       Slab** stackPosition;
     };
 
-    inline constexpr static AgtSize InitialStackSize  = 4;
-    inline constexpr static AgtSize StackGrowthRate   = 2;
-    inline constexpr static AgtSize StackAlignment    = AGT_CACHE_LINE;
-    inline constexpr static AgtSize SlabSize          = std::bit_ceil(BlockSize * BlocksPerSlab);
-    inline constexpr static AgtSize SlabAlignment     = SlabSize;
-    inline constexpr static AgtSize SlabAlignmentMask = ~(SlabAlignment - 1);
+    inline constexpr static size_t InitialStackSize  = 4;
+    inline constexpr static size_t StackGrowthRate   = 2;
+    inline constexpr static size_t StackAlignment    = AGT_CACHE_LINE;
+    inline constexpr static size_t SlabSize          = std::bit_ceil(BlockSize * BlocksPerSlab);
+    inline constexpr static size_t SlabAlignment     = SlabSize;
+    inline constexpr static size_t SlabAlignmentMask = ~(SlabAlignment - 1);
 
 
 
@@ -309,14 +309,14 @@ namespace Agt {
 #endif
     }
 
-    inline Block lookupBlock(Slab* s, AgtSize blockIndex) const noexcept {
+    inline Block lookupBlock(Slab* s, size_t blockIndex) const noexcept {
       return reinterpret_cast<Block>(reinterpret_cast<char*>(s) + (blockIndex * BlockSize));
     }
     inline Slab* lookupSlab(void* block) const noexcept {
       return reinterpret_cast<Slab*>(reinterpret_cast<uintptr_t>(block) & SlabAlignmentMask);
     }
 
-    inline AgtSize indexOfBlock(Slab* s, Block block) const noexcept {
+    inline size_t indexOfBlock(Slab* s, Block block) const noexcept {
       return ((std::byte*)block - (std::byte*)s) / BlockSize;
     }
 
@@ -333,12 +333,12 @@ namespace Agt {
     inline void assertSlabIsValid(Slab* s) const noexcept {
       if ( s->availableBlocks == 0 )
         return;
-      AgtSize blockCount = 1;
+      size_t blockCount = 1;
       std::vector<bool> blocks;
       blocks.resize(BlocksPerSlab + 1);
       Block currentBlock = s->nextFreeBlock;
       while (blockCount < s->availableBlocks) {
-        AgtSize index = indexOfBlock(s, currentBlock);
+        size_t index = indexOfBlock(s, currentBlock);
         assert( !blocks[index] );
         blocks[index] = true;
         ++blockCount;
@@ -351,8 +351,8 @@ namespace Agt {
 
       if ( slabStackHead == slabStackTop ) [[unlikely]] {
         Slab** oldStackBase = slabStackBase;
-        AgtSize oldStackSize = slabStackTop - oldStackBase;
-        AgtSize newStackSize = oldStackSize * StackGrowthRate;
+        size_t oldStackSize = slabStackTop - oldStackBase;
+        size_t newStackSize = oldStackSize * StackGrowthRate;
         Slab** newStackBase = reallocArray(slabStackBase, newStackSize, oldStackSize, StackAlignment);
         if ( slabStackBase != newStackBase ) {
           slabStackBase = newStackBase;
@@ -435,7 +435,7 @@ namespace Agt {
     Slab**  fullStackOnePastTop;
     Slab*   allocSlab;
     Slab*   freeSlab;
-    AgtSize totalAllocations;
+    size_t totalAllocations;
 
   public:
     FixedPool() noexcept
@@ -457,7 +457,7 @@ namespace Agt {
         --slabStackHead;
       }
 
-      AgtSize stackSize = slabStackTop - slabStackBase;
+      size_t stackSize = slabStackTop - slabStackBase;
       freeArray(slabStackBase, stackSize, StackAlignment);
     }
 
@@ -492,20 +492,20 @@ namespace Agt {
       allocSlab = parentSlab;
     }
 
-    AGT_forceinline AgtSize getAllocationCount() const noexcept {
+    AGT_forceinline size_t getAllocationCount() const noexcept {
       return totalAllocations;
     }
 
-    AGT_nodiscard AgtSize blockSize() const noexcept {
+    AGT_nodiscard size_t blockSize() const noexcept {
       return BlockSize;
     }
-    AGT_nodiscard AgtSize blockAlignment() const noexcept {
+    AGT_nodiscard size_t blockAlignment() const noexcept {
       return ((~BlockSize) + 1) & BlockSize;
     }
   };
 
 
-  template <typename T, AgtSize BlocksPerSlab = 255>
+  template <typename T, size_t BlocksPerSlab = 255>
   class ObjectPool {
   public:
 
@@ -524,7 +524,7 @@ namespace Agt {
       }
     }
 
-    AGT_forceinline AgtSize activeObjectCount() const noexcept {
+    AGT_forceinline size_t activeObjectCount() const noexcept {
       return fixedPool.getAllocationCount();
     }
 

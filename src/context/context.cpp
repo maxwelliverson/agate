@@ -11,17 +11,19 @@
 #include <memory>
 #include <mutex>
 
-using namespace Agt;
+using namespace agt;
 
 namespace {
-  inline constexpr static jem_size_t CellSize      = 32;
-  inline constexpr static jem_size_t CellAlignment = 32;
 
-  enum PageFlags : AgtUInt32 {
+
+  inline constexpr size_t LocalCellSize      = 32;
+  inline constexpr size_t LocalCellAlignment = 32;
+
+  enum PageFlags : agt_u32_t {
     page_is_shared = 0x1,
     page_is_active = 0x2
   };
-  enum CellFlags : jem_u16_t {
+  enum CellFlags : agt_u16_t {
     cell_object_is_private = 0x1,
     cell_object_is_shared  = 0x2,
     cell_is_shared_export  = 0x4,
@@ -38,42 +40,42 @@ namespace {
       eInternal
     };
 
-    inline constexpr static AgtUInt64 SharedFlagBits = 1;
-    inline constexpr static AgtUInt64 KindBits       = 2;
-    inline constexpr static AgtUInt64 PageIdBits     = 14;
-    inline constexpr static AgtUInt64 PageOffsetBits = 15;
-    inline constexpr static AgtUInt64 EpochBits      = 10;
-    inline constexpr static AgtUInt64 ProcessIdBits  = 22;
-    inline constexpr static AgtUInt64 SegmentIdBits  = ProcessIdBits;
+    inline constexpr static agt_u64_t SharedFlagBits = 1;
+    inline constexpr static agt_u64_t KindBits       = 2;
+    inline constexpr static agt_u64_t PageIdBits     = 14;
+    inline constexpr static agt_u64_t PageOffsetBits = 15;
+    inline constexpr static agt_u64_t EpochBits      = 10;
+    inline constexpr static agt_u64_t ProcessIdBits  = 22;
+    inline constexpr static agt_u64_t SegmentIdBits  = ProcessIdBits;
 
     AGT_forceinline ObjectKind  getKind() const noexcept {
       return static_cast<ObjectKind>(local.kind);
     }
-    AGT_forceinline AgtUInt16   getEpoch() const noexcept {
+    AGT_forceinline agt_u16_t   getEpoch() const noexcept {
       return local.epoch;
     }
-    AGT_forceinline AgtUInt32   getProcessId() const noexcept {
+    AGT_forceinline agt_u32_t   getProcessId() const noexcept {
       return local.processId;
     }
-    AGT_forceinline AgtUInt32   getSegmentId() const noexcept {
+    AGT_forceinline agt_u32_t   getSegmentId() const noexcept {
       return shared.segmentId;
     }
     AGT_forceinline bool        isShared() const noexcept {
       return local.isShared;
     }
-    AGT_forceinline AgtUInt32   getPageId() const noexcept {
+    AGT_forceinline agt_u32_t   getPageId() const noexcept {
       return local.pageId;
     }
-    AGT_forceinline AgtUInt32   getPageOffset() const noexcept {
+    AGT_forceinline agt_u32_t   getPageOffset() const noexcept {
       return local.pageOffset;
     }
 
-    AGT_forceinline AgtObjectId toRaw() const noexcept {
+    AGT_forceinline agt_object_id_t toRaw() const noexcept {
       return bits;
     }
 
 
-    AGT_forceinline static Id makeLocal(AgtUInt32 epoch, AgtUInt32 procId, AgtUInt32 pageId, AgtUInt32 pageOffset) noexcept {
+    AGT_forceinline static Id makeLocal(agt_u32_t epoch, agt_u32_t procId, agt_u32_t pageId, agt_u32_t pageOffset) noexcept {
       Id id;
       id.local.epoch      = epoch;
       id.local.processId  = procId;
@@ -82,7 +84,7 @@ namespace {
       id.local.pageOffset = pageOffset;
       return id;
     }
-    AGT_forceinline static Id makeShared(AgtUInt32 epoch, AgtUInt32 segmentId, AgtUInt32 pageId, AgtUInt32 pageOffset) noexcept {
+    AGT_forceinline static Id makeShared(agt_u32_t epoch, agt_u32_t segmentId, agt_u32_t pageId, agt_u32_t pageOffset) noexcept {
       Id id;
       id.shared.epoch      = epoch;
       id.shared.segmentId  = segmentId;
@@ -92,7 +94,7 @@ namespace {
       return id;
     }
 
-    AGT_forceinline static Id convert(AgtObjectId id) noexcept {
+    AGT_forceinline static Id convert(agt_object_id_t id) noexcept {
       Id realId;
       realId.bits = id;
       return realId;
@@ -111,59 +113,193 @@ namespace {
   private:
     union {
       struct {
-        AgtUInt64 isShared   : SharedFlagBits;
-        AgtUInt64 kind       : KindBits;
-        AgtUInt64 pageId     : PageIdBits;
-        AgtUInt64 pageOffset : PageOffsetBits;
-        AgtUInt64 epoch      : EpochBits;
-        AgtUInt64 processId  : ProcessIdBits;
+        agt_u64_t isShared   : SharedFlagBits;
+        agt_u64_t kind       : KindBits;
+        agt_u64_t pageId     : PageIdBits;
+        agt_u64_t pageOffset : PageOffsetBits;
+        agt_u64_t epoch      : EpochBits;
+        agt_u64_t processId  : ProcessIdBits;
       } local;
       struct {
-        AgtUInt64 isShared   : SharedFlagBits;
-        AgtUInt64 kind       : KindBits;
-        AgtUInt64 pageId     : PageIdBits;
-        AgtUInt64 pageOffset : PageOffsetBits;
-        AgtUInt64 epoch      : EpochBits;
-        AgtUInt64 segmentId  : SegmentIdBits;
+        agt_u64_t isShared   : SharedFlagBits;
+        agt_u64_t kind       : KindBits;
+        agt_u64_t pageId     : PageIdBits;
+        agt_u64_t pageOffset : PageOffsetBits;
+        agt_u64_t epoch      : EpochBits;
+        agt_u64_t segmentId  : SegmentIdBits;
       } shared;
-      AgtUInt64 bits;
+      agt_u64_t bits;
     };
   };
 
-  struct alignas(CellAlignment) ObjectInfoCell {
-    AgtUInt32     nextFreeCell;
-    jem_u16_t     epoch;
-    jem_u16_t     flags;
+  enum class page_type {
+    local_object_info
+  };
 
-    AgtUInt32     thisIndex;
-    AgtUInt32     pageId;
-    AgtUInt32     pageOffset;
+  namespace ctx_impl {
+    class borrow_list_base;
 
-    AgtHandleType objectType;
+    inline constexpr size_t CellSize      = 32;
+    inline constexpr size_t CellAlignment = 32;
+  }
 
-    ObjectHeader* object;
+  class borrowable {
+    borrowable* next;
+    borrowable* prev;
+
+    friend class ctx_impl::borrow_list_base;
+  };
+
+  namespace ctx_impl {
+
+    struct page_header {
+      agt_u32_t     id;
+      agt_flags32_t flags;
+    };
+
+    struct alignas(CellAlignment) cell {
+      cell*            nextFreeCell;
+      agt_u16_t        flags;
+      agt_u16_t        epoch;
+      agt_u32_t        pageId;
+      agt_u32_t        pageOffset;
+      agt::object_type objectType;
+      handle_header*   object;
+    };
+
+    struct alignas(AGT_PHYSICAL_PAGE_SIZE) page {
+      simple_mutex_t writeLock;
+      atomic_u32_t   refCount;
+      agt_flags32_t  flags;
+      cell*          nextFreeCell;
+      agt_u32_t      freeCells;
+      agt_u32_t      totalCells;
+      cell           cells[];
+
+
+      AGT_forceinline cell* allocCell(page* p) noexcept {
+        AGT_assert( !full(p) );
+        auto c = p->nextFreeCell;
+        p->nextFreeCell = c->nextFreeCell;
+        --p->freeCells;
+        return c;
+      }
+      AGT_forceinline void  freeCell(page* p, cell* c) noexcept {
+        AGT_assert( !empty(p) );
+        c->nextFreeCell = std::exchange(p->nextFreeCell, c);
+        ++c->epoch;
+        ++p->freeCells;
+      }
+
+      AGT_forceinline bool empty(page* p) noexcept {
+        return p->freeCells == p->totalCells;
+      }
+      AGT_forceinline bool full(page* p) noexcept {
+        return p->freeCells == 0;
+      }
+    };
+
+
+    class borrow_list_base {
+    protected:
+
+      borrowable head;
+
+      borrow_list_base() {
+        head.prev = &head;
+        head.next = &head;
+      }
+
+      // insert element to after self in list
+      static void doInsertAfter(borrowable* self, borrowable* element) noexcept {
+        element->prev = self;
+        element->next = self->next;
+        self->next->prev = element;
+        self->next = element;
+      }
+      // insert element to before self in list
+      static void doInsertBefore(borrowable* self, borrowable* element) noexcept {
+        element->prev = self->prev;
+        element->next = self;
+        self->prev->next = element;
+        self->prev = element;
+      }
+      // move element to after self in list
+      static void doMoveToAfter(borrowable* self, borrowable* element) noexcept {
+        doRemove(self);
+        doInsertAfter(self, element);
+      }
+      // move element to before self in list
+      static void doMoveToBefore(borrowable* self, borrowable* element) noexcept {
+        doRemove(self);
+        doInsertBefore(self, element);
+      }
+      // remove self from list, self is in indeterminate state after call
+      static void doRemove(borrowable* self) noexcept {
+        self->next->prev = self->prev;
+        self->prev->next = self->next;
+      }
+    };
+  }
+
+  template <typename T>
+  class borrow_list : public ctx_impl::borrow_list_base {
+  public:
+
+
+  };
+
+
+  class local_object_manager {
+
+
+
+  public:
+
+  };
+
+  struct page_table_entry : borrowable {
+    ctx_impl::page_header* page;
+    page_type              type;
+  };
+
+
+
+
+  struct alignas(LocalCellAlignment) ObjectInfoCell {
+    agt_u32_t        nextFreeCell;
+    agt_u16_t        epoch;
+    agt_u16_t        flags;
+
+    agt_u32_t        thisIndex;
+    agt_u32_t        pageId;
+    agt_u32_t        pageOffset;
+
+    agt::object_type objectType;
+
+    handle_header*   object;
   };
 
   class alignas(AGT_PHYSICAL_PAGE_SIZE) Page {
 
     simple_mutex_t writeLock;
     atomic_u32_t   refCount;
-    jem_flags32_t  flags;
-    AgtUInt32      freeCells;
-    AgtUInt32      nextFreeCell;
-    AgtUInt32      totalCells;
+    agt_flags32_t  flags;
+    agt_u32_t      freeCells;
+    agt_u32_t      nextFreeCell;
+    agt_u32_t      totalCells;
     ObjectInfoCell cells[];
 
   public:
 
-    Page(jem_size_t pageSize, jem_flags32_t pageFlags = 0) noexcept
-        : freeCells((pageSize / CellSize) - 1),
+    Page(size_t pageSize, agt_flags32_t pageFlags = 0) noexcept
+        : freeCells((pageSize / LocalCellSize) - 1),
           nextFreeCell(1),
           totalCells(freeCells),
           flags(pageFlags)
     {
-      AgtUInt32 index = 0;
-      jem_u16_t cellFlags = (pageFlags & page_is_shared) ? (cell_object_is_shared | cell_is_shared_export) : 0;
+      agt_u32_t index = 0;
+      agt_u16_t cellFlags = (pageFlags & page_is_shared) ? (cell_object_is_shared | cell_is_shared_export) : 0;
       while (index < totalCells) {
         auto& c = cell(index);
         c.thisIndex = index;
@@ -181,7 +317,7 @@ namespace {
       --freeCells;
       return c;
     }
-    AGT_forceinline void            freeCell(AgtUInt32 index) noexcept {
+    AGT_forceinline void            freeCell(agt_u32_t index) noexcept {
       AGT_assert( !empty() );
       auto& c = cell(index);
       c.nextFreeCell = std::exchange(nextFreeCell, index);
@@ -189,7 +325,7 @@ namespace {
       ++freeCells;
     }
 
-    AGT_forceinline ObjectInfoCell& cell(AgtUInt32 index) const noexcept {
+    AGT_forceinline ObjectInfoCell& cell(agt_u32_t index) const noexcept {
       return const_cast<ObjectInfoCell&>(cells[index]);
     }
 
@@ -238,14 +374,14 @@ namespace {
   class PageList {
 
     ListNodeBase base;
-    AgtSize      entryCount;
+    size_t       entryCount;
 
   public:
 
     PageList() : base{ &base, &base }, entryCount(0){ }
 
 
-    AGT_forceinline AgtSize   size()  const noexcept {
+    AGT_forceinline size_t   size()  const noexcept {
       return entryCount;
     }
     AGT_forceinline bool      empty() const noexcept {
@@ -302,7 +438,7 @@ namespace {
 
     struct SegmentHeader {
       size_t                          segmentSize;
-      AgtUInt32                       allocCount;
+      agt_u32_t                       allocCount;
       ipc::offset_ptr<FreeListEntry*> rootEntry;
     };
 
@@ -333,14 +469,14 @@ namespace {
   class SharedPageMap {
 
     struct MapNode {
-      AgtUInt32 pageId;
+      agt_u32_t pageId;
       Page*     mappedPage;
     };
 
     MapNode*  pNodeTable;
-    AgtUInt32 tableSize;
-    AgtUInt32 bucketCount;
-    AgtUInt32 tombstoneCount;
+    agt_u32_t tableSize;
+    agt_u32_t bucketCount;
+    agt_u32_t tombstoneCount;
 
   public:
 
@@ -360,16 +496,16 @@ struct AgtSharedContext_st {
 
 };
 
-struct AgtContext_st {
+struct agt_ctx_st {
 
-  AgtUInt32        processId;
+  agt_u32_t        processId;
 
   SharedPageMap    sharedPageMap;
   PageList         localFreeList;
   ListNode*        emptyLocalPage;
 
-  AgtSize          localPageSize;
-  AgtSize          localEntryCount;
+  size_t          localPageSize;
+  size_t          localEntryCount;
 
   SharedHandlePool handlePool;
 
@@ -390,17 +526,17 @@ namespace {
 }
 
 /** ========= [ Creation/Destruction ] ========= */
-AgtStatus Agt::createCtx(AgtContext& pCtx) noexcept {
+agt_status_t agt::createCtx(agt_ctx_t& pCtx) noexcept {
   return AGT_ERROR_NOT_YET_IMPLEMENTED;
 }
-void      Agt::destroyCtx(AgtContext ctx) noexcept { }
+void      agt::destroyCtx(agt_ctx_t ctx) noexcept { }
 
 
 /** ========= [ Memory Management ] ========= */
-void*     Agt::ctxLocalAlloc(AgtContext ctx, AgtSize size, AgtSize alignment) noexcept {
+void*     agt::ctxLocalAlloc(agt_ctx_t ctx, size_t size, size_t alignment) noexcept {
   return _aligned_malloc(size, alignment);
 }
-void      Agt::ctxLocalFree(AgtContext ctx, void* memory, AgtSize size, AgtSize alignment) noexcept {
+void      agt::ctxLocalFree(agt_ctx_t ctx, void* memory, size_t size, size_t alignment) noexcept {
   _aligned_free(memory);
 }
 
@@ -412,10 +548,10 @@ void      Agt::ctxLocalFree(AgtContext ctx, void* memory, AgtSize size, AgtSize 
  * @section Object Name Management Examples
  *
  * Intended usage of the name management functions is as follows:
- *
- *      AgtStatus createLocalObject(Object*& object, AgtContext ctx, ...) {
- *          NameToken nameToken;
- *          AgtStatus status;
+ * @code
+ *      agt_status_t createLocalObject(Object*& object, agt_ctx_t ctx, ...) {
+ *          name_token nameToken;
+ *          agt_status_t status;
  *          if ((status = ctxClaimLocalName(ctx, name, nameLength, nameToken)))
  *              return status;
  *
@@ -432,9 +568,9 @@ void      Agt::ctxLocalFree(AgtContext ctx, void* memory, AgtSize size, AgtSize 
  *          return AGT_SUCCESS;
  *      }
  *
- *      AgtStatus createSharedObject(Object*& object, AgtContext ctx, ...) {
-*          NameToken nameToken;
-*          AgtStatus status;
+ *      agt_status_t createSharedObject(Object*& object, agt_ctx_t ctx, ...) {
+*          name_token nameToken;
+*          agt_status_t status;
 *          if ((status = ctxClaimSharedName(ctx, name, nameLength, nameToken)))
 *              return status;
 *
@@ -450,6 +586,7 @@ void      Agt::ctxLocalFree(AgtContext ctx, void* memory, AgtSize size, AgtSize 
 *
 *          return AGT_SUCCESS;
 *      }
+ *      @endcode
  *
  * */
 
@@ -462,8 +599,7 @@ using ay = struct lmao;
  *          AGT_ERROR_NAME_TOO_LONG if the specified name is greater than the maximum name length for this context;
  *          AGT_ERROR_BAD_ENCODING_IN_NAME if the specified name is not a valid string under the context's encoding;
  * */
-AgtStatus     Agt::ctxClaimLocalName(AgtContext ctx, const char* pName, AgtSize nameLength, NameToken& token) noexcept {
-
+agt_status_t     agt::ctxClaimLocalName(agt_ctx_t ctx, const char* pName, size_t nameLength, name_token& token) noexcept {
   // 1: if pName is null, set token to the "null token" and return AGT_SUCCESS
   // 2: if nameLength is zero, set nameLength to strlen(pName)
   // 3: checks if the desired nameLength is less than the maximum limit (default is 256). If not, return AGT_ERROR_NAME_TO_LONG
@@ -475,7 +611,7 @@ AgtStatus     Agt::ctxClaimLocalName(AgtContext ctx, const char* pName, AgtSize 
 /**
  *
  * */
-void          Agt::ctxReleaseLocalName(AgtContext ctx, NameToken nameToken) noexcept {
+void             agt::ctxReleaseLocalName(agt_ctx_t ctx, name_token nameToken) noexcept {
   // 1: if nameToken is "null", do nothing and return
   // 2: get the name block corresponding to nameToken
   // 3: release the name block
@@ -483,7 +619,7 @@ void          Agt::ctxReleaseLocalName(AgtContext ctx, NameToken nameToken) noex
 /**
  *
  * */
-AgtStatus     Agt::ctxClaimSharedName(AgtContext ctx, const char* pName, AgtSize nameLength, NameToken& token) noexcept {
+agt_status_t     agt::ctxClaimSharedName(agt_ctx_t ctx, const char* pName, size_t nameLength, name_token& token) noexcept {
   // TODO: Resolve: what should the local "shared-prefix" be? A prefix is needed on local entries to
   //       avoid name clashes between local and shared objects (as the possibility of this occuring
   //       would cause serious issue when importing shared objects).
@@ -497,13 +633,13 @@ AgtStatus     Agt::ctxClaimSharedName(AgtContext ctx, const char* pName, AgtSize
   // 6: claim the name locally (guaranteed it's available, given the shared prefix)
   // 7: set token to the token corresponding to the acquired name block
 }
-void          Agt::ctxReleaseSharedName(AgtContext ctx, NameToken nameToken) noexcept {
+void             agt::ctxReleaseSharedName(agt_ctx_t ctx, name_token nameToken) noexcept {
   // 1: if nameToken is "null", do nothing and return
   // 2: get the name block corresponding to nameToken
   // 3: release the local name block
   // 4: release the shared name block (must be done in this order to maintain guarantee of local availablity in ctxClaimSharedName)
 }
-void          Agt::ctxBindName(AgtContext ctx, NameToken nameToken, HandleHeader* handle) noexcept {
+void             agt::ctxBindName(agt_ctx_t ctx, name_token nameToken, HandleHeader* handle) noexcept {
   // TODO: workout algorithm here. Probably dependent on choice of implementation of AgtContext_st
   // 1: idk
 }

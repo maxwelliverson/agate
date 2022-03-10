@@ -36,5 +36,5 @@ SharedVPtr Agt::lookupSharedVTable(ObjectType type) noexcept {
     sharedVTableInstance<SharedMpMcChannelReceiver>
   };
 
-  return &sharedVTableTable[static_cast<AgtUInt32>(type)];
+  return &sharedVTableTable[static_cast<agt_u32_t>(type)];
 }

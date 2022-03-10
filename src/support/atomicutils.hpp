@@ -35,10 +35,10 @@
 namespace {
 
   struct deadline_t{
-    jem_u64_t timestamp;
+    agt_u64_t timestamp;
 
-    inline static deadline_t from_timeout_us(jem_u64_t timeout_us) noexcept {
-      jem_u64_t extraTime = timeout_us * 10;
+    inline static deadline_t from_timeout_us(agt_u64_t timeout_us) noexcept {
+      agt_u64_t extraTime = timeout_us * 10;
       LARGE_INTEGER lrgInt;
       QueryPerformanceCounter(&lrgInt);
       return deadline_t{
@@ -46,7 +46,7 @@ namespace {
       };
     }
 
-    inline jem_u32_t to_timeout_ms() const noexcept {
+    inline agt_u32_t to_timeout_ms() const noexcept {
       LARGE_INTEGER lrgInt;
       QueryPerformanceCounter(&lrgInt);
       return (timestamp - lrgInt.QuadPart) / 10000;
@@ -66,7 +66,7 @@ namespace {
 
 
   void spin_sleep_until(deadline_t deadline) noexcept {
-    jem_u32_t backoff = 0;
+    agt_u32_t backoff = 0;
     while ( deadline.has_not_passed() ) {
       switch (backoff) {
         default:
@@ -94,22 +94,22 @@ namespace {
     }
   }
 
-  void sleep(jem_u64_t ms) noexcept {
+  void sleep(agt_u64_t ms) noexcept {
     if ( ms > 20 )
       Sleep((DWORD)ms);
     else
       spin_sleep_until(deadline_t::from_timeout_us(ms * 1000));
   }
-  void usleep(jem_u64_t us) noexcept {
+  void usleep(agt_u64_t us) noexcept {
     spin_sleep_until(deadline_t::from_timeout_us(us));
   }
-  void nanosleep(jem_u64_t ns) noexcept {
+  void nanosleep(agt_u64_t ns) noexcept {
 
   }
 
   template <typename T>
   bool atomic_wait(const std::atomic<T>& target, std::type_identity_t<T> value, deadline_t deadline) noexcept {
-    jem_u32_t backoff = 0;
+    agt_u32_t backoff = 0;
     bool matchesValue = target.load() == value;
     while ( matchesValue ) {
       if ( deadline.has_passed() )
@@ -142,7 +142,7 @@ namespace {
     return true;
   }
   /*template <typename T>
-  bool atomic_wait_for(const std::atomic<T>& target, std::type_identity_t<T> value, jem_u64_t timeout_us) noexcept {
+  bool atomic_wait_for(const std::atomic<T>& target, std::type_identity_t<T> value, agt_u64_t timeout_us) noexcept {
     if ( timeout_us >= TIMEOUT_US_LONG_WAIT_THRESHOLD ) [[unlikely]] {
 
     }
@@ -160,7 +160,7 @@ namespace {
     if ( func(capturedValue) )
       return true;
 
-    jem_u32_t remainingTimeout = deadline.to_timeout_ms();
+    agt_u32_t remainingTimeout = deadline.to_timeout_ms();
     do {
       WaitOnAddress((volatile void*)std::addressof(target), &capturedValue, sizeof(T), remainingTimeout);
       capturedValue = target.load(std::memory_order_acquire);
@@ -181,7 +181,7 @@ namespace {
   }
   /*template <typename T>
   bool atomic_wait(const std::atomic<T>& target, std::type_identity_t<T> value, deadline_t deadline) noexcept {
-    jem_u32_t remainingTimeout = deadline.to_timeout_ms();
+    agt_u32_t remainingTimeout = deadline.to_timeout_ms();
     do {
       WaitOnAddress((volatile void*)std::addressof(target), &value, sizeof(T), remainingTimeout);
       if ( target.load(std::memory_order_relaxed) != value )
@@ -206,7 +206,7 @@ namespace {
 
   public:
     void acquire() noexcept {
-      jem_u32_t backoff = 0;
+      agt_u32_t backoff = 0;
       while(_InterlockedExchange(&value_, 1) != 0) {
         while (__iso_volatile_load32(&reinterpret_cast<int&>(value_)) != 0) {
           switch (backoff) {
@@ -241,10 +241,10 @@ namespace {
   };
 
   class atomic_flag_t {
-    std::atomic<jem_u32_t> value_;
+    std::atomic<agt_u32_t> value_;
   public:
     atomic_flag_t() = default;
-    atomic_flag_t(jem_u32_t val) noexcept : value_(val){ }
+    atomic_flag_t(agt_u32_t val) noexcept : value_(val){ }
 
     void set() noexcept {
       value_.store(1);
@@ -264,7 +264,7 @@ namespace {
     void wait() const noexcept {
       value_.wait(0);
     }
-    bool wait_for(jem_u64_t timeout_us) const noexcept {
+    bool wait_for(agt_u64_t timeout_us) const noexcept {
       return atomic_wait(value_, 0, deadline_t::from_timeout_us(timeout_us));
     }
     bool wait_until(deadline_t deadline) const noexcept {
@@ -417,292 +417,7 @@ namespace {
     std::atomic<flag_type> bits = 0;
   };
   
-  class semaphore_t {
-    inline constexpr static jem_ptrdiff_t LeastMaxValue = (std::numeric_limits<jem_ptrdiff_t>::max)();
-  public:
-    AGT_nodiscard static constexpr jem_ptrdiff_t(max)() noexcept {
-      return LeastMaxValue;
-    }
 
-    constexpr explicit semaphore_t(const jem_ptrdiff_t desired) noexcept
-        : value(desired) { }
-
-    semaphore_t(const semaphore_t&) = delete;
-    semaphore_t& operator=(const semaphore_t&) = delete;
-
-    void release(jem_ptrdiff_t update = 1) noexcept {
-      if (update == 0) {
-        return;
-      }
-      
-      value.fetch_add(update);
-      value.notify_one();
-    }
-
-
-
-    void acquire() noexcept {
-      ptrdiff_t current = value.load(std::memory_order_relaxed);
-      for (;;) {
-        while ( current == 0 ) {
-          priv_wait();
-          current = value.load(std::memory_order_relaxed);
-        }
-        assert(current > 0 && current <= LeastMaxValue);
-
-        if ( value.compare_exchange_weak(current, current - 1) ) 
-          return;
-      }
-    }
-    void acquire(jem_ptrdiff_t n) noexcept {
-      for (jem_ptrdiff_t acquired = 0; acquired < n; ++acquired )
-        acquire();
-    }
-
-    AGT_nodiscard bool try_acquire() noexcept {
-      jem_ptrdiff_t current = value.load();
-      if (current == 0)
-        return false;
-      
-      assert(current > 0 && current <= LeastMaxValue);
-      
-      return value.compare_exchange_weak(current, current - 1);
-    }
-    AGT_nodiscard bool try_acquire(jem_ptrdiff_t n) noexcept {
-      for (jem_ptrdiff_t acquired = 0; acquired < n; ++acquired ) {
-        if ( !try_acquire() ) {
-          release(acquired);
-          return false;
-        }
-      }
-      return true;
-    }
-
-    AGT_nodiscard bool try_acquire_for(jem_u64_t timeout_us) noexcept {
-      return try_acquire_until(deadline_t::from_timeout_us(timeout_us));
-    }
-    AGT_nodiscard bool try_acquire_for(jem_ptrdiff_t n, jem_u64_t timeout_us) noexcept {
-      return try_acquire_until(n, deadline_t::from_timeout_us(timeout_us));
-    }
-    AGT_nodiscard bool try_acquire_until(deadline_t deadline) noexcept {
-      jem_ptrdiff_t current  = value.load(std::memory_order_relaxed);
-      for (;;) {
-        while ( current == 0 ) {
-          if ( !priv_wait_until(deadline) )
-            return false;
-          current = value.load(std::memory_order_relaxed);
-        }
-        assert(current > 0 && current <= LeastMaxValue);
-        if ( value.compare_exchange_weak(current, current - 1) )
-          return true;
-      }
-    }
-    AGT_nodiscard bool try_acquire_until(jem_ptrdiff_t n, deadline_t deadline) noexcept {
-      for (jem_ptrdiff_t acquired = 0; acquired < n; ++acquired ) {
-        if ( !try_acquire_until(deadline) ) {
-          release(acquired);
-          return false;
-        }
-      }
-      return true;
-    }
-    
-  private:
-
-    bool priv_wait_until(deadline_t deadline) noexcept {
-      jem_ptrdiff_t current = value.load();
-      if ( current == 0 )
-        return atomic_wait(value, 0, deadline);
-      return true;
-    }
-    void priv_wait() noexcept {
-      /*jem_ptrdiff_t current = value.load();
-      if ( current == 0 )
-        WaitOnAddress(&value, &current, sizeof(current), INFINITE);*/
-      value.wait(0);
-    }
-
-    std::atomic<jem_ptrdiff_t> value;
-  };
-  class shared_semaphore_t {
-  
-    inline constexpr static jem_ptrdiff_t LeastMaxValue = (std::numeric_limits<jem_ptrdiff_t>::max)();
-  public:
-    AGT_nodiscard static constexpr jem_ptrdiff_t(max)() noexcept {
-      return LeastMaxValue;
-    }
-
-    constexpr explicit shared_semaphore_t(const jem_ptrdiff_t desired) noexcept
-        : value(desired) { }
-
-    shared_semaphore_t(const shared_semaphore_t&) = delete;
-    shared_semaphore_t& operator=(const shared_semaphore_t&) = delete;
-
-    void release(jem_ptrdiff_t update = 1) noexcept {
-      if (update == 0)
-        return;
-      
-      value.fetch_add(update);
-      
-      const jem_ptrdiff_t waitersUpperBound = waiters.load();
-      
-      if ( waitersUpperBound == 0 ) {
-        
-      }
-      else if ( waitersUpperBound <= update ) {
-        value.notify_all();
-      }
-      else {
-        for (; update != 0; --update)
-          value.notify_one();
-      }
-    }
-    
-    void acquire() noexcept {
-      ptrdiff_t current = value.load(std::memory_order_relaxed);
-      for (;;) {
-        while ( current == 0 ) {
-          priv_wait();
-          current = value.load(std::memory_order_relaxed);
-        }
-        assert(current > 0 && current <= LeastMaxValue);
-
-        if ( value.compare_exchange_weak(current, current - 1) ) 
-          return;
-      }
-    }
-    void acquire(jem_ptrdiff_t n) noexcept {
-      for (jem_ptrdiff_t acquired = 0; acquired < n; ++acquired )
-        acquire();
-    }
-
-    AGT_nodiscard bool try_acquire() noexcept {
-      jem_ptrdiff_t current = value.load();
-      if (current == 0)
-        return false;
-      
-      assert(current > 0 && current <= LeastMaxValue);
-      
-      return value.compare_exchange_weak(current, current - 1);
-    }
-    AGT_nodiscard bool try_acquire(jem_ptrdiff_t n) noexcept {
-      for (jem_ptrdiff_t acquired = 0; acquired < n; ++acquired ) {
-        if ( !try_acquire() ) {
-          release(acquired);
-          return false;
-        }
-      }
-      return true;
-    }
-
-    AGT_nodiscard bool try_acquire_for(jem_u64_t timeout_us) noexcept {
-      return try_acquire_until(deadline_t::from_timeout_us(timeout_us));
-    }
-    AGT_nodiscard bool try_acquire_for(jem_ptrdiff_t n, jem_u64_t timeout_us) noexcept {
-      return try_acquire_until(n, deadline_t::from_timeout_us(timeout_us));
-    }
-    AGT_nodiscard bool try_acquire_until(deadline_t deadline) noexcept {
-      jem_ptrdiff_t current  = value.load(std::memory_order_relaxed);
-      for (;;) {
-        while ( current == 0 ) {
-          if ( !priv_wait_until(deadline) )
-            return false;
-          current = value.load(std::memory_order_relaxed);
-        }
-        assert(current > 0 && current <= LeastMaxValue);
-        if ( value.compare_exchange_weak(current, current - 1) )
-          return true;
-      }
-    }
-    AGT_nodiscard bool try_acquire_until(jem_ptrdiff_t n, deadline_t deadline) noexcept {
-      for (jem_ptrdiff_t acquired = 0; acquired < n; ++acquired ) {
-        if ( !try_acquire_until(deadline) ) {
-          release(acquired);
-          return false;
-        }
-      }
-      return true;
-    }
-    
-  private:
-    
-    bool priv_wait_until(deadline_t deadline) noexcept {
-      waiters.fetch_add(1);
-      jem_ptrdiff_t current = value.load();
-      bool retVal = true;
-      if ( current == 0 )
-        retVal = atomic_wait(value, 0, deadline);
-      waiters.fetch_sub(1, std::memory_order_relaxed);
-      return retVal;
-    }
-    void priv_wait() noexcept {
-      waiters.fetch_add(1);
-      jem_ptrdiff_t current = value.load();
-      if ( current == 0 )
-        WaitOnAddress(&value, &current, sizeof(current), INFINITE);
-      waiters.fetch_sub(1, std::memory_order_relaxed);
-    }
-    
-    std::atomic<jem_ptrdiff_t> value;
-    std::atomic<jem_ptrdiff_t> waiters;
-  };
-  class binary_semaphore_t{
-    inline constexpr static jem_ptrdiff_t LeastMaxValue = 1;
-  public:
-    AGT_nodiscard static constexpr jem_ptrdiff_t(max)() noexcept {
-      return 1;
-    }
-
-    constexpr explicit binary_semaphore_t(const jem_ptrdiff_t desired) noexcept
-        : value(desired) { }
-
-    binary_semaphore_t(const binary_semaphore_t&) = delete;
-    binary_semaphore_t& operator=(const binary_semaphore_t&) = delete;
-    
-    void release(const jem_ptrdiff_t update = 1) noexcept {
-      if (update == 0)
-        return;
-      assert(update == 1);
-      // TRANSITION, GH-1133: should be memory_order_release
-      value.store(1, std::memory_order_release);
-      value.notify_one();
-    }
-
-    void acquire() noexcept {
-      for (;;) {
-        jem_u8_t previous = value.exchange(0, std::memory_order_acquire);
-        if (previous == 1)
-          break;
-        assert(previous == 0);
-        value.wait(0, std::memory_order_relaxed);
-      }
-    }
-
-    AGT_nodiscard bool try_acquire() noexcept {
-      // TRANSITION, GH-1133: should be memory_order_acquire
-      jem_u8_t previous = value.exchange(0);
-      assert((previous & ~1) == 0);
-      return reinterpret_cast<const bool&>(previous);
-    }
-
-    AGT_nodiscard bool try_acquire_for(jem_u64_t timeout_us) {
-      return try_acquire_until(deadline_t::from_timeout_us(timeout_us));
-    }
-
-    AGT_nodiscard bool try_acquire_until(deadline_t deadline) {
-      for (;;) {
-        jem_u8_t previous = value.exchange(0, std::memory_order_acquire);
-        if (previous == 1)
-          return true;
-        assert(previous == 0);
-        if ( !atomic_wait(value, 0, deadline) )
-          return false;
-      }
-    }
-    
-  private:
-    std::atomic<jem_u8_t> value;
-  };
 
   /*class atomic_counter_t{
   public:
@@ -710,23 +425,23 @@ namespace {
     atomic_counter_t() = default;
 
 
-    void increase(jem_u32_t value = 1) noexcept {
+    void increase(agt_u32_t value = 1) noexcept {
       value_.fetch_add(value, std::memory_order_relaxed);
       value_.notify_one();
     }
 
-    AGT_nodiscard jem_u32_t take() noexcept {
+    AGT_nodiscard agt_u32_t take() noexcept {
       return value_.exchange(0);
     }
 
-    AGT_nodiscard jem_u32_t take_at_least(jem_u32_t value) noexcept {
+    AGT_nodiscard agt_u32_t take_at_least(agt_u32_t value) noexcept {
 
     }
 
 
 
   private:
-    std::atomic<jem_u32_t> value_ = 0;
+    std::atomic<agt_u32_t> value_ = 0;
   };*/
 
   class mpsc_counter_t{
@@ -736,11 +451,11 @@ namespace {
     mpsc_counter_t() = default;
 
 
-    void increase(jem_u32_t value) noexcept {
+    void increase(agt_u32_t value) noexcept {
       mp_value_.fetch_add(value, std::memory_order_relaxed);
       mp_value_.notify_one();
     }
-    void decrease(jem_u32_t value) noexcept {
+    void decrease(agt_u32_t value) noexcept {
       while ( sc_value_ < value ) {
         mp_value_.wait(0, std::memory_order_acquire);
         priv_update();
@@ -748,7 +463,7 @@ namespace {
       sc_value_ -= value;
     }
 
-    AGT_nodiscard jem_u32_t take_all() noexcept {
+    AGT_nodiscard agt_u32_t take_all() noexcept {
       if ( sc_value_ == 0 ) {
         do {
           mp_value_.wait(0, std::memory_order_acquire);
@@ -762,7 +477,7 @@ namespace {
     }
 
 
-    AGT_nodiscard bool try_decrease(jem_u32_t value) noexcept {
+    AGT_nodiscard bool try_decrease(agt_u32_t value) noexcept {
       if ( sc_value_ < value ) {
         priv_update();
         if ( sc_value_ < value )
@@ -771,7 +486,7 @@ namespace {
       sc_value_ -= value;
       return true;
     }
-    AGT_nodiscard bool try_decrease_for(jem_u32_t value, jem_u64_t timeout_us) noexcept {
+    AGT_nodiscard bool try_decrease_for(agt_u32_t value, agt_u64_t timeout_us) noexcept {
       if ( sc_value_ < value ) {
         atomic_wait(mp_value_, 0, deadline_t::from_timeout_us(timeout_us));
         priv_update();
@@ -781,7 +496,7 @@ namespace {
       sc_value_ -= value;
       return true;
     }
-    AGT_nodiscard bool try_decrease_until(jem_u32_t value, deadline_t deadline) noexcept {
+    AGT_nodiscard bool try_decrease_until(agt_u32_t value, deadline_t deadline) noexcept {
       if ( sc_value_ < value ) {
         atomic_wait(mp_value_, 0, deadline);
         priv_update();
@@ -798,14 +513,14 @@ namespace {
       sc_value_ += mp_value_.exchange(0, std::memory_order_acquire);
     }
 
-    std::atomic<jem_u32_t> mp_value_ = 0;
-    jem_u32_t              sc_value_ = 0;
+    std::atomic<agt_u32_t> mp_value_ = 0;
+    agt_u32_t              sc_value_ = 0;
   };
 
-  using atomic_flags8_t  = atomic_flags<jem_u8_t>;
-  using atomic_flags16_t = atomic_flags<jem_u16_t>;
-  using atomic_flags32_t = atomic_flags<jem_u32_t>;
-  using atomic_flags64_t = atomic_flags<jem_u64_t>;
+  using atomic_flags8_t  = atomic_flags<agt_u8_t>;
+  using atomic_flags16_t = atomic_flags<agt_u16_t>;
+  using atomic_flags32_t = atomic_flags<agt_u32_t>;
+  using atomic_flags64_t = atomic_flags<agt_u64_t>;
 
   using atomic_u8_t  = std::atomic_uint8_t;
   using atomic_u16_t = std::atomic_uint16_t;

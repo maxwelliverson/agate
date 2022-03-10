@@ -9,7 +9,7 @@
 
 
 namespace Agt {
-  AGT_forceinline AgtSize alignSize(AgtSize size, AgtSize align) noexcept {
+  AGT_forceinline size_t alignSize(size_t size, size_t align) noexcept {
     return ((size - 1) | (align - 1)) + 1;
   }
 }

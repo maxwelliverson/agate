@@ -12,405 +12,364 @@
 // #include <ipc/offset_ptr.hpp>
 
 
-namespace Agt {
-
-  struct PrivateChannelMessage;
-  struct LocalChannelMessage;
-  struct SharedChannelMessage;
-
-
-  class PrivateChannel;
-  class LocalSpScChannel;
-  class LocalSpMcChannel;
-  class LocalMpScChannel;
-  class LocalMpMcChannel;
-  class SharedSpScChannel;
-  class SharedSpMcChannel;
-  class SharedMpScChannel;
-  class SharedMpMcChannel;
-
-  class SharedSpScChannelHandle;
-  class SharedSpMcChannelHandle;
-  class SharedMpScChannelHandle;
-  class SharedMpMcChannelHandle;
-
-  class PrivateChannelSender;
-  class LocalSpScChannelSender;
-  class LocalSpMcChannelSender;
-  class LocalMpScChannelSender;
-  class LocalMpMcChannelSender;
-  class SharedSpScChannelSender;
-  class SharedSpMcChannelSender;
-  class SharedMpScChannelSender;
-  class SharedMpMcChannelSender;
-
-  class PrivateChannelReceiver;
-  class LocalSpScChannelReceiver;
-  class LocalSpMcChannelReceiver;
-  class LocalMpScChannelReceiver;
-  class LocalMpMcChannelReceiver;
-  class SharedSpScChannelReceiver;
-  class SharedSpMcChannelReceiver;
-  class SharedMpScChannelReceiver;
-  class SharedMpMcChannelReceiver;
-
-
-  AgtStatus createInstance(PrivateChannel*& outHandle,   AgtContext ctx, const AgtChannelCreateInfo& createInfo, PrivateChannelSender* sender, PrivateChannelReceiver* receiver) noexcept;
-  AgtStatus createInstance(LocalSpScChannel*& outHandle, AgtContext ctx, const AgtChannelCreateInfo& createInfo, LocalSpScChannelSender* sender, LocalSpScChannelReceiver* receiver) noexcept;
-  AgtStatus createInstance(LocalSpMcChannel*& outHandle, AgtContext ctx, const AgtChannelCreateInfo& createInfo, LocalSpMcChannelSender* sender, LocalSpMcChannelReceiver* receiver) noexcept;
-  AgtStatus createInstance(LocalMpScChannel*& outHandle, AgtContext ctx, const AgtChannelCreateInfo& createInfo, LocalMpScChannelSender* sender, LocalMpScChannelReceiver* receiver) noexcept;
-  AgtStatus createInstance(LocalMpMcChannel*& outHandle, AgtContext ctx, const AgtChannelCreateInfo& createInfo, LocalMpMcChannelSender* sender, LocalMpMcChannelReceiver* receiver) noexcept;
-
-  AgtStatus createInstance(PrivateChannelSender*& objectRef, AgtContext ctx) noexcept;
-  AgtStatus createInstance(PrivateChannelReceiver*& objectRef, AgtContext ctx) noexcept;
-  AgtStatus createInstance(LocalSpScChannelSender*& objectRef, AgtContext ctx) noexcept;
-  AgtStatus createInstance(LocalSpScChannelReceiver*& objectRef, AgtContext ctx) noexcept;
-  AgtStatus createInstance(LocalMpScChannelSender*& objectRef, AgtContext ctx) noexcept;
-  AgtStatus createInstance(LocalMpScChannelReceiver*& objectRef, AgtContext ctx) noexcept;
-  AgtStatus createInstance(LocalSpMcChannelSender*& objectRef, AgtContext ctx) noexcept;
-  AgtStatus createInstance(LocalSpMcChannelReceiver*& objectRef, AgtContext ctx) noexcept;
-  AgtStatus createInstance(LocalMpMcChannelSender*& objectRef, AgtContext ctx) noexcept;
-  AgtStatus createInstance(LocalMpMcChannelReceiver*& objectRef, AgtContext ctx) noexcept;
-
-
-  AgtStatus createInstance(SharedSpScChannelHandle*& outHandle, AgtContext ctx, const AgtChannelCreateInfo& createInfo, SharedSpScChannelSender* sender, SharedSpScChannelReceiver* receiver) noexcept;
-  AgtStatus createInstance(SharedSpMcChannelHandle*& outHandle, AgtContext ctx, const AgtChannelCreateInfo& createInfo, SharedSpMcChannelSender* sender, SharedSpMcChannelReceiver* receiver) noexcept;
-  AgtStatus createInstance(SharedMpScChannelHandle*& outHandle, AgtContext ctx, const AgtChannelCreateInfo& createInfo, SharedMpScChannelSender* sender, SharedMpScChannelReceiver* receiver) noexcept;
-  AgtStatus createInstance(SharedMpMcChannelHandle*& outHandle, AgtContext ctx, const AgtChannelCreateInfo& createInfo, SharedMpMcChannelSender* sender, SharedMpMcChannelReceiver* receiver) noexcept;
-
-
-  AgtStatus createInstance(SharedSpScChannelSender*& objectRef, AgtContext ctx) noexcept;
-  AgtStatus createInstance(SharedSpScChannelReceiver*& objectRef, AgtContext ctx) noexcept;
-  AgtStatus createInstance(SharedMpScChannelSender*& objectRef, AgtContext ctx) noexcept;
-  AgtStatus createInstance(SharedMpScChannelReceiver*& objectRef, AgtContext ctx) noexcept;
-  AgtStatus createInstance(SharedSpMcChannelSender*& objectRef, AgtContext ctx) noexcept;
-  AgtStatus createInstance(SharedSpMcChannelReceiver*& objectRef, AgtContext ctx) noexcept;
-  AgtStatus createInstance(SharedMpMcChannelSender*& objectRef, AgtContext ctx) noexcept;
-  AgtStatus createInstance(SharedMpMcChannelReceiver*& objectRef, AgtContext ctx) noexcept;
-
+namespace agt {
 
   // sizeof == 64 bytes, or 1 cache line
-  struct LocalChannelHeader : HandleHeader {
-    AgtSize        slotCount;
-    AgtSize        inlineBufferSize;
+  struct local_channel_header : handle_header {
+    size_t        slotCount;
+    size_t        inlineBufferSize;
     std::byte*     messageSlots;
   };
 
   // sizeof == 64 bytes, or 1 cache line
-  struct SharedChannelHeader : SharedObjectHeader {
-    ReferenceCount     refCount;
-    AgtSize            slotCount;
-    AgtSize            inlineBufferSize;
+  struct shared_channel_header : shared_object_header {
+    ref_count refCount;
+    size_t            slotCount;
+    size_t            inlineBufferSize;
     SharedAllocationId messageSlotsId;
   };
 
 
   // sizeof == 128 bytes, or 2 cache lines
-  struct AGT_cache_aligned PrivateChannel   : LocalChannelHeader {
+  struct AGT_cache_aligned private_channel    : local_channel_header {
   AGT_cache_aligned
-    AgtHandle  consumer;
-    AgtHandle  producer;
-    AgtSize    availableSlotCount;
-    AgtSize    queuedMessageCount;
-    AgtMessage nextFreeSlot;
-    AgtMessage prevReceivedMessage;
-    AgtMessage prevQueuedMessage;
-    AgtSize    refCount;
+    agt_handle_t  consumer;
+    agt_handle_t  producer;
+    size_t    availableSlotCount;
+    size_t    queuedMessageCount;
+    agt_message_t nextFreeSlot;
+    agt_message_t prevReceivedMessage;
+    agt_message_t prevQueuedMessage;
+    size_t    refCount;
   };
 
-  struct AGT_cache_aligned LocalSpScChannel : LocalChannelHeader {
+  struct AGT_cache_aligned local_spsc_channel : local_channel_header {
   AGT_cache_aligned
-    semaphore_t    slotSemaphore;
-    AgtMessage     producerPreviousQueuedMsg;
-    AgtMessage     producerNextFreeSlot;
+    semaphore    slotSemaphore;
+    agt_message_t     producerPreviousQueuedMsg;
+    agt_message_t     producerNextFreeSlot;
 
   AGT_cache_aligned
-    semaphore_t    queuedMessages;
-    AgtMessage     consumerPreviousMsg;
+    semaphore    queuedMessages;
+    agt_message_t     consumerPreviousMsg;
 
   AGT_cache_aligned
-    ReferenceCount refCount;
-    AgtMessage     lastFreeSlot;
-    HandleHeader*  consumer;
-    HandleHeader*  producer;
+        ref_count refCount;
+    agt_message_t     lastFreeSlot;
+    handle_header*  consumer;
+    handle_header*  producer;
   };
-  struct AGT_cache_aligned LocalMpScChannel : LocalChannelHeader {
+  struct AGT_cache_aligned local_mpsc_channel : local_channel_header {
   AGT_cache_aligned
-    std::atomic<AgtMessage> nextFreeSlot;
-    semaphore_t             slotSemaphore;
+    std::atomic<agt_message_t> nextFreeSlot;
+    semaphore             slotSemaphore;
   AGT_cache_aligned
-    std::atomic<AgtMessage> lastQueuedSlot;
-    std::atomic<AgtMessage> lastFreeSlot;
-    AgtMessage              previousReceivedMessage;
+    std::atomic<agt_message_t> lastQueuedSlot;
+    std::atomic<agt_message_t> lastFreeSlot;
+    agt_message_t              previousReceivedMessage;
   AGT_cache_aligned
     mpsc_counter_t          queuedMessageCount;
-    ReferenceCount          refCount;
-    HandleHeader*           consumer;
-    jem_u32_t               maxProducers;
-    semaphore_t             producerSemaphore;
+  ref_count refCount;
+    handle_header*           consumer;
+    agt_u32_t               maxProducers;
+    semaphore             producerSemaphore;
   };
-  struct AGT_cache_aligned LocalSpMcChannel : LocalChannelHeader {
+  struct AGT_cache_aligned local_spmc_channel : local_channel_header {
   AGT_cache_aligned
-    semaphore_t                       slotSemaphore;
-    std::atomic<AgtMessage> lastFreeSlot;
-    AgtMessage              nextFreeSlot;
-    AgtMessage              lastQueuedSlot;
+    semaphore                       slotSemaphore;
+    std::atomic<agt_message_t> lastFreeSlot;
+    agt_message_t              nextFreeSlot;
+    agt_message_t              lastQueuedSlot;
   AGT_cache_aligned
-    std::atomic<AgtMessage> previousReceivedMessage;
+    std::atomic<agt_message_t> previousReceivedMessage;
   AGT_cache_aligned
-    semaphore_t                       queuedMessages;
-    ReferenceCount                    refCount;
-    HandleHeader*                     producer;
-    jem_u32_t                         maxConsumers;
-    semaphore_t                       consumerSemaphore;
+    semaphore                       queuedMessages;
+  ref_count refCount;
+    handle_header*                     producer;
+    agt_u32_t                         maxConsumers;
+    semaphore                       consumerSemaphore;
   };
-  struct AGT_cache_aligned LocalMpMcChannel : LocalChannelHeader {
+  struct AGT_cache_aligned local_mpmc_channel : local_channel_header {
   AGT_cache_aligned
-    std::atomic<AgtMessage> nextFreeSlot;
-    std::atomic<AgtMessage> lastQueuedSlot;
+    std::atomic<agt_message_t> nextFreeSlot;
+    std::atomic<agt_message_t> lastQueuedSlot;
   AGT_cache_aligned
-    semaphore_t             slotSemaphore;
-    std::atomic<AgtMessage> previousReceivedMessage;
+    semaphore             slotSemaphore;
+    std::atomic<agt_message_t> previousReceivedMessage;
   AGT_cache_aligned
-    semaphore_t                       queuedMessages;
-    jem_u32_t                         maxProducers;
-    jem_u32_t                         maxConsumers;
-    ReferenceCount                    refCount;
-    semaphore_t                       producerSemaphore;
-    semaphore_t                       consumerSemaphore;
+    semaphore                       queuedMessages;
+    agt_u32_t                         maxProducers;
+    agt_u32_t                         maxConsumers;
+    ref_count refCount;
+    semaphore                       producerSemaphore;
+    semaphore                       consumerSemaphore;
   };
 
 
-  struct AGT_cache_aligned SharedSpScChannel : SharedChannelHeader {
+  struct AGT_cache_aligned shared_spsc_channel : shared_channel_header {
   AGT_cache_aligned
-    semaphore_t        availableSlotSema;
-    binary_semaphore_t producerSemaphore;
-    AgtSize            producerPreviousMsgOffset;
+    semaphore        availableSlotSema;
+    binary_semaphore producerSemaphore;
+    size_t            producerPreviousMsgOffset;
   AGT_cache_aligned
-    semaphore_t        queuedMessageSema;
-    binary_semaphore_t consumerSemaphore;
-    AgtSize            consumerPreviousMsgOffset;
-    AgtSize            consumerLastFreeSlotOffset;
+    semaphore        queuedMessageSema;
+    binary_semaphore consumerSemaphore;
+    size_t            consumerPreviousMsgOffset;
+    size_t            consumerLastFreeSlotOffset;
   AGT_cache_aligned
     atomic_size_t      nextFreeSlotIndex;
   
   
-    using HandleType = SharedSpScChannelHandle;
+    using handle_type = shared_spsc_channel_handle;
   };
-  struct AGT_cache_aligned SharedMpScChannel : SharedChannelHeader {
+  struct AGT_cache_aligned shared_mpsc_channel : shared_channel_header {
   AGT_cache_aligned
-    semaphore_t    slotSemaphore;
-    std::atomic<AgtMessage> nextFreeSlot;
-    jem_size_t              payloadOffset;
+    semaphore    slotSemaphore;
+    std::atomic<agt_message_t> nextFreeSlot;
+    size_t              payloadOffset;
   AGT_cache_aligned
-    std::atomic<AgtMessage> lastQueuedSlot;
-    AgtMessage              previousReceivedMessage;
+    std::atomic<agt_message_t> lastQueuedSlot;
+    agt_message_t              previousReceivedMessage;
   AGT_cache_aligned
     mpsc_counter_t     queuedMessageCount;
-    jem_u32_t          maxProducers;
-    binary_semaphore_t consumerSemaphore;
-    semaphore_t        producerSemaphore;
+    agt_u32_t          maxProducers;
+    binary_semaphore consumerSemaphore;
+    semaphore        producerSemaphore;
     
-    using HandleType = SharedMpScChannelHandle;
+    using handle_type = shared_mpsc_channel_handle;
   };
-  struct AGT_cache_aligned SharedSpMcChannel : SharedChannelHeader {
-    ReferenceCount     refCount;
-    AgtSize            slotCount;
-    AgtSize            slotSize;
-    AgtObjectId        messageSlotsId;
+  struct AGT_cache_aligned shared_spmc_channel : shared_channel_header {
+    ref_count refCount;
+    size_t            slotCount;
+    size_t            slotSize;
+    agt_object_id_t        messageSlotsId;
   AGT_cache_aligned
     atomic_size_t      nextFreeSlot;
-    semaphore_t        slotSemaphore;
+    semaphore        slotSemaphore;
   AGT_cache_aligned
     atomic_size_t      lastQueuedSlot;
   AGT_cache_aligned
     atomic_u32_t       queuedSinceLastCheck;
-    jem_u32_t          minQueuedMessages;
-    jem_u32_t          maxConsumers;
-    binary_semaphore_t producerSemaphore;
-    semaphore_t        consumerSemaphore;
+    agt_u32_t          minQueuedMessages;
+    agt_u32_t          maxConsumers;
+    binary_semaphore producerSemaphore;
+    semaphore        consumerSemaphore;
     
-    using HandleType = SharedSpMcChannelHandle;
+    using handle_type = shared_spmc_channel_handle;
   };
-  struct AGT_cache_aligned SharedMpMcChannel : SharedChannelHeader {
-    AgtSize          slotCount;
-    AgtSize          slotSize;
-    AgtObjectId      messageSlotsId;
-    semaphore_t      slotSemaphore;
+  struct AGT_cache_aligned shared_mpmc_channel : shared_channel_header {
+    size_t          slotCount;
+    size_t          slotSize;
+    agt_object_id_t      messageSlotsId;
+    semaphore      slotSemaphore;
   AGT_cache_aligned
     atomic_size_t    nextFreeSlot;
   AGT_cache_aligned
     atomic_size_t    lastQueuedSlot;
   AGT_cache_aligned
     atomic_u32_t     queuedSinceLastCheck;
-    ReferenceCount   refCount;
-    jem_u32_t        minQueuedMessages;
-    jem_u32_t        maxProducers;         // 220
-    jem_u32_t        maxConsumers;         // 224
-    semaphore_t      producerSemaphore;    // 240
-    semaphore_t      consumerSemaphore;    // 256
+  ref_count refCount;
+    agt_u32_t        minQueuedMessages;
+    agt_u32_t        maxProducers;         // 220
+    agt_u32_t        maxConsumers;         // 224
+    semaphore      producerSemaphore;    // 240
+    semaphore      consumerSemaphore;    // 256
     
-    using HandleType = SharedMpMcChannelHandle;
+    using handle_type = shared_mpmc_channel_handle;
   };
 
 
-  struct PrivateChannelSender : HandleHeader {
-    PrivateChannel* channel;
+  struct private_channel_sender : handle_header {
+    private_channel* channel;
 
-    using ObjectType = PrivateChannel;
+    using object_type = private_channel;
   };
-  struct PrivateChannelReceiver : HandleHeader {
-    PrivateChannel* channel;
+  struct private_channel_receiver : handle_header {
+    private_channel* channel;
 
-    using ObjectType = PrivateChannel;
+    using object_type = private_channel;
   };
-  struct LocalSpScChannelSender : HandleHeader {
-    LocalSpScChannel* channel;
+  struct local_spsc_channel_sender : handle_header {
+    local_spsc_channel* channel;
 
-    using ObjectType = LocalSpScChannel;
+    using object_type = local_spsc_channel;
   };
-  struct LocalSpScChannelReceiver : HandleHeader {
-    LocalSpScChannel* channel;
+  struct local_spsc_channel_receiver : handle_header {
+    local_spsc_channel* channel;
 
-    using ObjectType = LocalSpScChannel;
+    using object_type = local_spsc_channel;
   };
-  struct LocalMpScChannelSender : HandleHeader {
-    LocalMpScChannel* channel;
+  struct local_mpsc_channel_sender : handle_header {
+    local_mpsc_channel* channel;
 
-    using ObjectType = LocalMpScChannel;
+    using object_type = local_mpsc_channel;
   };
-  struct LocalMpScChannelReceiver : HandleHeader {
-    LocalMpScChannel* channel;
+  struct local_mpsc_channel_receiver : handle_header {
+    local_mpsc_channel* channel;
 
-    using ObjectType = LocalMpScChannel;
+    using object_type = local_mpsc_channel;
   };
-  struct LocalSpMcChannelSender : HandleHeader {
-    LocalSpMcChannel* channel;
+  struct local_spmc_channel_sender : handle_header {
+    local_spmc_channel* channel;
 
-    using ObjectType = LocalSpMcChannel;
+    using object_type = local_spmc_channel;
   };
-  struct LocalSpMcChannelReceiver : HandleHeader {
-    LocalSpMcChannel* channel;
+  struct local_spmc_channel_receiver : handle_header {
+    local_spmc_channel* channel;
 
-    using ObjectType = LocalSpMcChannel;
+    using object_type = local_spmc_channel;
   };
-  struct LocalMpMcChannelSender : HandleHeader {
-    LocalMpMcChannel* channel;
+  struct local_mpmc_channel_sender : handle_header {
+    local_mpmc_channel* channel;
 
-    using ObjectType = LocalMpMcChannel;
+    using object_type = local_mpmc_channel;
   };
-  struct LocalMpMcChannelReceiver : HandleHeader {
-    LocalMpMcChannel* channel;
+  struct local_mpmc_channel_receiver : handle_header {
+    local_mpmc_channel* channel;
 
-    using ObjectType = LocalMpMcChannel;
+    using object_type = local_mpmc_channel;
   };
 
 
-  struct SharedSpScChannelHandle   : SharedHandleHeader {
-    AgtSize    slotCount;
-    AgtSize    inlineBufferSize;
+  struct shared_spsc_channel_handle   : shared_handle_header {
+    size_t    slotCount;
+    size_t    inlineBufferSize;
     std::byte* messageSlots;
 
-    using ObjectType = SharedSpScChannel;
+    using object_type = shared_spsc_channel;
   };
-  struct SharedSpScChannelSender   : SharedHandleHeader {
-    AgtSize    slotCount;
-    AgtSize    inlineBufferSize;
+  struct shared_spsc_channel_sender   : shared_handle_header {
+    size_t    slotCount;
+    size_t    inlineBufferSize;
     std::byte* messageSlots;
-    AgtSize    previousMessageOffset;
+    size_t    previousMessageOffset;
 
-    using ObjectType = SharedSpScChannel;
+    using object_type = shared_spsc_channel;
   };
-  struct SharedSpScChannelReceiver : SharedHandleHeader {
-    AgtSize    slotCount;
-    AgtSize    inlineBufferSize;
+  struct shared_spsc_channel_receiver : shared_handle_header {
+    size_t    slotCount;
+    size_t    inlineBufferSize;
     std::byte* messageSlots;
-    AgtSize    previousMessageOffset;
-    AgtSize    lastFreeSlotOffset;
+    size_t    previousMessageOffset;
+    size_t    lastFreeSlotOffset;
 
-    using ObjectType = SharedSpScChannel;
+    using object_type = shared_spsc_channel;
   };
 
-  struct SharedMpScChannelHandle   : SharedHandleHeader {
+  struct shared_mpsc_channel_handle   : shared_handle_header {
 
-    using ObjectType = SharedMpScChannel;
+    using object_type = shared_mpsc_channel;
   };
-  struct SharedMpScChannelSender   : SharedHandleHeader {
+  struct shared_mpsc_channel_sender   : shared_handle_header {
 
-    using ObjectType = SharedMpScChannel;
+    using object_type = shared_mpsc_channel;
   };
-  struct SharedMpScChannelReceiver : SharedHandleHeader {
+  struct shared_mpsc_channel_receiver : shared_handle_header {
 
-    using ObjectType = SharedMpScChannel;
-  };
-
-  struct SharedSpMcChannelHandle   : SharedHandleHeader {
-
-    using ObjectType = SharedSpMcChannel;
-  };
-  struct SharedSpMcChannelSender   : SharedHandleHeader {
-
-    using ObjectType = SharedSpMcChannel;
-  };
-  struct SharedSpMcChannelReceiver : SharedHandleHeader {
-
-    using ObjectType = SharedSpMcChannel;
+    using object_type = shared_mpsc_channel;
   };
 
-  struct SharedMpMcChannelHandle   : SharedHandleHeader {
+  struct shared_spmc_channel_handle   : shared_handle_header {
 
-    using ObjectType = SharedMpMcChannel;
+    using object_type = shared_spmc_channel;
   };
-  struct SharedMpMcChannelSender   : SharedHandleHeader {
+  struct shared_spmc_channel_sender   : shared_handle_header {
 
-    using ObjectType = SharedMpMcChannel;
+    using object_type = shared_spmc_channel;
   };
-  struct SharedMpMcChannelReceiver : SharedHandleHeader {
+  struct shared_spmc_channel_receiver : shared_handle_header {
 
-    using ObjectType = SharedMpMcChannel;
+    using object_type = shared_spmc_channel;
+  };
+
+  struct shared_mpmc_channel_handle   : shared_handle_header {
+
+    using object_type = shared_mpmc_channel;
+  };
+  struct shared_mpmc_channel_sender   : shared_handle_header {
+
+    using object_type = shared_mpmc_channel;
+  };
+  struct shared_mpmc_channel_receiver : shared_handle_header {
+
+    using object_type = shared_mpmc_channel;
   };
 
 
 
+  agt_status_t createInstance(private_channel*& outHandle,   agt_ctx_t ctx, const agt_channel_create_info_t& createInfo, private_channel_sender* sender, private_channel_receiver* receiver) noexcept;
+  agt_status_t createInstance(local_spsc_channel*& outHandle, agt_ctx_t ctx, const agt_channel_create_info_t& createInfo, local_spsc_channel_sender* sender, local_spsc_channel_receiver* receiver) noexcept;
+  agt_status_t createInstance(local_spmc_channel*& outHandle, agt_ctx_t ctx, const agt_channel_create_info_t& createInfo, local_spmc_channel_sender* sender, local_spmc_channel_receiver* receiver) noexcept;
+  agt_status_t createInstance(local_mpsc_channel*& outHandle, agt_ctx_t ctx, const agt_channel_create_info_t& createInfo, local_mpsc_channel_sender* sender, local_mpsc_channel_receiver* receiver) noexcept;
+  agt_status_t createInstance(local_mpmc_channel*& outHandle, agt_ctx_t ctx, const agt_channel_create_info_t& createInfo, local_mpmc_channel_sender* sender, local_mpmc_channel_receiver* receiver) noexcept;
+
+  agt_status_t createInstance(private_channel_sender*& objectRef, agt_ctx_t ctx) noexcept;
+  agt_status_t createInstance(private_channel_receiver*& objectRef, agt_ctx_t ctx) noexcept;
+  agt_status_t createInstance(local_spsc_channel_sender*& objectRef, agt_ctx_t ctx) noexcept;
+  agt_status_t createInstance(local_spsc_channel_receiver*& objectRef, agt_ctx_t ctx) noexcept;
+  agt_status_t createInstance(local_mpsc_channel_sender*& objectRef, agt_ctx_t ctx) noexcept;
+  agt_status_t createInstance(local_mpsc_channel_receiver*& objectRef, agt_ctx_t ctx) noexcept;
+  agt_status_t createInstance(local_spmc_channel_sender*& objectRef, agt_ctx_t ctx) noexcept;
+  agt_status_t createInstance(local_spmc_channel_receiver*& objectRef, agt_ctx_t ctx) noexcept;
+  agt_status_t createInstance(local_mpmc_channel_sender*& objectRef, agt_ctx_t ctx) noexcept;
+  agt_status_t createInstance(local_mpmc_channel_receiver*& objectRef, agt_ctx_t ctx) noexcept;
 
 
-  AGT_declare_vtable(PrivateChannel);
-  AGT_declare_vtable(PrivateChannelSender);
-  AGT_declare_vtable(PrivateChannelReceiver);
+  agt_status_t createInstance(shared_spsc_channel_handle*& outHandle, agt_ctx_t ctx, const agt_channel_create_info_t& createInfo, shared_spsc_channel_sender* sender, shared_spsc_channel_receiver* receiver) noexcept;
+  agt_status_t createInstance(shared_spmc_channel_handle*& outHandle, agt_ctx_t ctx, const agt_channel_create_info_t& createInfo, shared_spmc_channel_sender* sender, shared_spmc_channel_receiver* receiver) noexcept;
+  agt_status_t createInstance(shared_mpsc_channel_handle*& outHandle, agt_ctx_t ctx, const agt_channel_create_info_t& createInfo, shared_mpsc_channel_sender* sender, shared_mpsc_channel_receiver* receiver) noexcept;
+  agt_status_t createInstance(shared_mpmc_channel_handle*& outHandle, agt_ctx_t ctx, const agt_channel_create_info_t& createInfo, shared_mpmc_channel_sender* sender, shared_mpmc_channel_receiver* receiver) noexcept;
+
+
+  agt_status_t createInstance(shared_spsc_channel_sender*& objectRef, agt_ctx_t ctx) noexcept;
+  agt_status_t createInstance(shared_spsc_channel_receiver*& objectRef, agt_ctx_t ctx) noexcept;
+  agt_status_t createInstance(shared_mpsc_channel_sender*& objectRef, agt_ctx_t ctx) noexcept;
+  agt_status_t createInstance(shared_mpsc_channel_receiver*& objectRef, agt_ctx_t ctx) noexcept;
+  agt_status_t createInstance(shared_spmc_channel_sender*& objectRef, agt_ctx_t ctx) noexcept;
+  agt_status_t createInstance(shared_spmc_channel_receiver*& objectRef, agt_ctx_t ctx) noexcept;
+  agt_status_t createInstance(shared_mpmc_channel_sender*& objectRef, agt_ctx_t ctx) noexcept;
+  agt_status_t createInstance(shared_mpmc_channel_receiver*& objectRef, agt_ctx_t ctx) noexcept;
+
+
+
+
+  AGT_declare_vtable(private_channel);
+  AGT_declare_vtable(private_channel_sender);
+  AGT_declare_vtable(private_channel_receiver);
   
-  AGT_declare_vtable(LocalSpScChannel);
-  AGT_declare_vtable(LocalSpScChannelSender);
-  AGT_declare_vtable(LocalSpScChannelReceiver);
+  AGT_declare_vtable(local_spsc_channel);
+  AGT_declare_vtable(local_spsc_channel_sender);
+  AGT_declare_vtable(local_spsc_channel_receiver);
   
-  AGT_declare_vtable(LocalMpScChannel);
-  AGT_declare_vtable(LocalMpScChannelSender);
-  AGT_declare_vtable(LocalMpScChannelReceiver);
+  AGT_declare_vtable(local_mpsc_channel);
+  AGT_declare_vtable(local_mpsc_channel_sender);
+  AGT_declare_vtable(local_mpsc_channel_receiver);
   
-  AGT_declare_vtable(LocalSpMcChannel);
-  AGT_declare_vtable(LocalSpMcChannelSender);
-  AGT_declare_vtable(LocalSpMcChannelReceiver);
+  AGT_declare_vtable(local_spmc_channel);
+  AGT_declare_vtable(local_spmc_channel_sender);
+  AGT_declare_vtable(local_spmc_channel_receiver);
   
-  AGT_declare_vtable(LocalMpMcChannel);
-  AGT_declare_vtable(LocalMpMcChannelSender);
-  AGT_declare_vtable(LocalMpMcChannelReceiver);
+  AGT_declare_vtable(local_mpmc_channel);
+  AGT_declare_vtable(local_mpmc_channel_sender);
+  AGT_declare_vtable(local_mpmc_channel_receiver);
   
   
   
-  AGT_declare_vtable(SharedSpScChannelHandle);
-  AGT_declare_vtable(SharedSpScChannelSender);
-  AGT_declare_vtable(SharedSpScChannelReceiver);
+  AGT_declare_vtable(shared_spsc_channel_handle);
+  AGT_declare_vtable(shared_spsc_channel_sender);
+  AGT_declare_vtable(shared_spsc_channel_receiver);
   
-  AGT_declare_vtable(SharedMpScChannelHandle);
-  AGT_declare_vtable(SharedMpScChannelSender);
-  AGT_declare_vtable(SharedMpScChannelReceiver);
+  AGT_declare_vtable(shared_mpsc_channel_handle);
+  AGT_declare_vtable(shared_mpsc_channel_sender);
+  AGT_declare_vtable(shared_mpsc_channel_receiver);
   
-  AGT_declare_vtable(SharedSpMcChannelHandle);
-  AGT_declare_vtable(SharedSpMcChannelSender);
-  AGT_declare_vtable(SharedSpMcChannelReceiver);
+  AGT_declare_vtable(shared_spmc_channel_handle);
+  AGT_declare_vtable(shared_spmc_channel_sender);
+  AGT_declare_vtable(shared_spmc_channel_receiver);
   
-  AGT_declare_vtable(SharedMpMcChannelHandle);
-  AGT_declare_vtable(SharedMpMcChannelSender);
-  AGT_declare_vtable(SharedMpMcChannelReceiver);
+  AGT_declare_vtable(shared_mpmc_channel_handle);
+  AGT_declare_vtable(shared_mpmc_channel_sender);
+  AGT_declare_vtable(shared_mpmc_channel_receiver);
 }
 
 #endif//JEMSYS_AGATE2_CHANNEL_HPP

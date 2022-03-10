@@ -8,41 +8,41 @@
 #include "../core/objects.hpp"
 #include "../fwd.hpp"
 
-namespace Agt {
+namespace agt {
 
-  namespace Impl {
-    struct SystemThread {
+  namespace impl {
+    struct system_thread {
       void* handle_;
       int   id_;
     };
   }
 
 
-  struct Thread : HandleHeader {
+  struct thread : HandleHeader {
     Impl::SystemThread sysThread;
   };
 
-  struct LocalBlockingThread : HandleHeader {
-    LocalMpScChannel*  channel;
-    Impl::SystemThread sysThread;
+  struct local_blocking_thread : handle_header {
+    local_mpsc_channel* channel;
+    impl::system_thread sysThread;
 
-    inline constexpr static ObjectType TypeValue = ObjectType::localBlockingThread;
+    inline constexpr static object_type type_value = object_type::localBlockingThread;
   };
 
-  struct SharedBlockingThread : HandleHeader {
-    SharedMpScChannelSender* channel;
+  struct shared_blocking_thread : handle_header {
+    shared_mpsc_channel_sender* channel;
 
-    inline constexpr static ObjectType TypeValue = ObjectType::sharedBlockingThread;
+    inline constexpr static object_type type_value = object_type::sharedBlockingThread;
   };
 
-  struct ThreadPool : HandleHeader {
-    AgtSize             threadCount;
-    Impl::SystemThread* pThreads;
+  struct thread_pool : handle_header {
+    size_t               threadCount;
+    impl::system_thread* pThreads;
   };
 
 
-  AgtStatus createInstance(LocalBlockingThread*& handle, AgtContext ctx, const AgtBlockingThreadCreateInfo& createInfo) noexcept;
-  AgtStatus createInstance(SharedBlockingThread*& handle, AgtContext ctx, const AgtBlockingThreadCreateInfo& createInfo) noexcept;
+  agt_status_t createInstance(local_blocking_thread*& handle, agt_ctx_t ctx, const agt_blocking_thread_create_info_t& createInfo) noexcept;
+  agt_status_t createInstance(shared_blocking_thread*& handle, agt_ctx_t ctx, const agt_blocking_thread_create_info_t& createInfo) noexcept;
 }
 
 #endif//JEMSYS_AGATE2_INTERNAL_THREAD_HPP

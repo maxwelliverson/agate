@@ -71,10 +71,22 @@ In looking around at existing message passing libraries, I found that almost all
  - Support interprocess use transparently 
  - Minimal dependencies
 
+
 ## Design Choices
+ - Handle based API
+ - Dedicated "async" type that can be attached to any asynchronous operaiton
+ - Each object has a **scope**, which is one of the following:
+    - **Private**: Not thread safe, process local.
+    - **Local**:   Thread safe, process local.
+    - **Shared**:  Thread safe, shared between processes.
+ - Proper API use requires handles to be "attached" and "detatched".
+   Handle users must attach successfully before use, and must detach when done. Scope/user limits are enforced only during attachment
 
 
 ## Undecided Design Choices
+
+ - Scope of objects integrated as handles (ie. should users be able to implement/"install" their own object types that can then be used as handles? If so, how?)
+ - Should 
 
 
 

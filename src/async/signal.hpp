@@ -9,15 +9,15 @@
 
 namespace Agt {
 
-  AgtAsyncData signalGetAttachment(const AgtSignal_st* signal) noexcept;
+  agt_async_data_t signalGetAttachment(const agt_signal_st* signal) noexcept;
 
-  void         signalAttach(AgtSignal signal, AgtAsync async) noexcept;
+  void         signalAttach(agt_signal_t signal, agt_async_t async) noexcept;
 
-  void         signalDetach(AgtSignal signal) noexcept;
+  void         signalDetach(agt_signal_t signal) noexcept;
 
-  void         signalRaise(AgtSignal signal) noexcept;
+  void         signalRaise(agt_signal_t signal) noexcept;
 
-  void         signalClose(AgtSignal signal) noexcept;
+  void         signalClose(agt_signal_t signal) noexcept;
 
 }
 

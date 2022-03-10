@@ -15,11 +15,11 @@
 #include <cmath>
 
 
-using namespace Agt;
+using namespace agt;
 
 namespace {
 
-  AGT_BITFLAG_ENUM(AsyncFlags, AgtUInt32) {
+  AGT_BITFLAG_ENUM(AsyncFlags, agt_u32_t) {
     eUnbound   = 0x0,
     eBound     = 0x1,
     eReady     = 0x2,
@@ -36,10 +36,10 @@ namespace {
   /*struct ArrivalCount {
     union {
       struct {
-        AgtUInt32     arrivedCount;
-        AgtUInt32     droppedCount;
+        agt_u32_t     arrivedCount;
+        agt_u32_t     droppedCount;
       };
-      AgtUInt64       totalCount;
+      agt_u64_t       totalCount;
     };
   };
 
@@ -50,7 +50,7 @@ namespace {
       eAllowDropped    = 0x4
     };
 
-    ResponseQuery(AgtUInt32 minResponseCount, AgtUInt32 flags) noexcept
+    ResponseQuery(agt_u32_t minResponseCount, agt_u32_t flags) noexcept
         : minDesiredResponseCount(minResponseCount), flags(flags){}
 
   public:
@@ -66,7 +66,7 @@ namespace {
     static ResponseQuery requireAll(bool countDropped = false) noexcept {
       return { 0, countDropped ? eAllowDropped : 0u };
     }
-    static ResponseQuery requireAtLeast(AgtUInt32 minCount, bool countDropped = false) noexcept {
+    static ResponseQuery requireAtLeast(agt_u32_t minCount, bool countDropped = false) noexcept {
       return { minCount, eRequireMinCount | (countDropped ? eAllowDropped : 0u) };
     }
 
@@ -74,8 +74,8 @@ namespace {
 
     friend class ResponseCount;
 
-    AgtUInt32 minDesiredResponseCount;
-    AgtUInt32 flags;
+    agt_u32_t minDesiredResponseCount;
+    agt_u32_t flags;
   };
 
   enum class ResponseQueryResult {
@@ -100,13 +100,13 @@ namespace {
       notifyWaiters();
     }
 
-    void reset(AgtUInt32 maxExpectedResponses) noexcept {
-      AgtUInt32 capturedValue = 0;
+    void reset(agt_u32_t maxExpectedResponses) noexcept {
+      agt_u32_t capturedValue = 0;
       while ((capturedValue = _InterlockedCompareExchange(&arrivedCount_, 0, capturedValue)));
 
     }
 
-    bool waitFor(ResponseQuery query, AgtTimeout timeout) const noexcept {
+    bool waitFor(ResponseQuery query, agt_timeout_t timeout) const noexcept {
       switch (timeout) {
         case AGT_WAIT:
           deepWait(expectedValue);
@@ -121,7 +121,7 @@ namespace {
       }
     }
 
-    bool waitUntil(ResponseQuery query, Deadline deadline) const noexcept {
+    bool waitUntil(ResponseQuery query, deadline deadline) const noexcept {
       if (!deadline.isLong()) [[likely]] {
         return shallowWaitUntil(expectedValue, deadline);
       } else {
@@ -133,22 +133,22 @@ namespace {
 
   private:
 
-    bool      doDeepWait(AgtUInt32& capturedValue, AgtUInt32 timeout) const noexcept;
+    bool      doDeepWait(agt_u32_t& capturedValue, agt_u32_t timeout) const noexcept;
     void      notifyWaiters() noexcept;
 
 
-    AGT_forceinline AgtUInt32 fastLoad() const noexcept {
+    AGT_forceinline agt_u32_t fastLoad() const noexcept {
       return __iso_volatile_load32(&reinterpret_cast<const int&>(arrivedCount_));
     }
 
-    AGT_forceinline AgtUInt32 orderedLoad() const noexcept {
-      return _InterlockedCompareExchange(&const_cast<volatile AgtUInt32&>(arrivedCount_), 0, 0);
+    AGT_forceinline agt_u32_t orderedLoad() const noexcept {
+      return _InterlockedCompareExchange(&const_cast<volatile agt_u32_t&>(arrivedCount_), 0, 0);
     }
 
-    AGT_forceinline bool      isLessThan(AgtUInt32 value) const noexcept {
+    AGT_forceinline bool      isLessThan(agt_u32_t value) const noexcept {
       return orderedLoad() < value;
     }
-    AGT_forceinline bool      isAtLeast(AgtUInt32 value) const noexcept {
+    AGT_forceinline bool      isAtLeast(agt_u32_t value) const noexcept {
       return orderedLoad() >= value;
     }
 
@@ -159,12 +159,12 @@ namespace {
       return orderedLoad() >= value;
     }
 
-    AGT_forceinline bool      shallowWaitFor(ResponseQuery query, AgtTimeout timeout) const noexcept {
-      return shallowWaitUntil(query, Deadline::fromTimeout(timeout));
+    AGT_forceinline bool      shallowWaitFor(ResponseQuery query, agt_timeout_t timeout) const noexcept {
+      return shallowWaitUntil(query, deadline::fromTimeout(timeout));
     }
 
-    AGT_forceinline bool      shallowWaitUntil(ResponseQuery query, Deadline deadline) const noexcept {
-      AgtUInt32 backoff = 0;
+    AGT_forceinline bool      shallowWaitUntil(ResponseQuery query, deadline deadline) const noexcept {
+      agt_u32_t backoff = 0;
       while (isLessThan(expectedValue)) {
         if (deadline.hasPassed())
           return false;
@@ -179,15 +179,15 @@ namespace {
 
 
     AGT_noinline    void      deepWait(ResponseQuery query) const noexcept {
-      AgtUInt32 capturedValue = fastLoad();
+      agt_u32_t capturedValue = fastLoad();
       while (capturedValue < expectedValue) {
         doDeepWait(capturedValue, 0xFFFF'FFFF);
       }
     }
 
-    AGT_noinline    bool      deepWaitFor(ResponseQuery query, AgtTimeout timeout) const noexcept {
-      Deadline deadline = Deadline::fromTimeout(timeout);
-      AgtUInt32 capturedValue = fastLoad();
+    AGT_noinline    bool      deepWaitFor(ResponseQuery query, agt_timeout_t timeout) const noexcept {
+      deadline deadline = deadline::fromTimeout(timeout);
+      agt_u32_t capturedValue = fastLoad();
 
       while (capturedValue < expectedValue) {
         if (!doDeepWait(capturedValue, deadline.toTimeoutMs()))
@@ -196,8 +196,8 @@ namespace {
       return true;
     }
 
-    AGT_noinline    bool      deepWaitUntil(ResponseQuery query, Deadline deadline) const noexcept {
-      AgtUInt32 capturedValue = fastLoad();
+    AGT_noinline    bool      deepWaitUntil(ResponseQuery query, deadline deadline) const noexcept {
+      agt_u32_t capturedValue = fastLoad();
 
       while (capturedValue < expectedValue) {
         if (!doDeepWait(capturedValue, deadline.toTimeoutMs()))
@@ -210,14 +210,14 @@ namespace {
 
     union {
       struct {
-        AgtUInt32     arrivedCount_;
-        AgtUInt32     droppedCount_;
+        agt_u32_t     arrivedCount_;
+        agt_u32_t     droppedCount_;
       };
-      AgtUInt64       totalCount_ = 0;
+      agt_u64_t       totalCount_ = 0;
     };
 
-    AgtUInt32         expectedResponses_ = 0;
-    mutable AgtUInt32 deepSleepers_ = 0;
+    agt_u32_t         expectedResponses_ = 0;
+    mutable agt_u32_t deepSleepers_ = 0;
   };*/
 }
 
@@ -225,38 +225,38 @@ namespace {
 extern "C" {
 
 struct AgtLocalAsyncData_st {
-  AgtUInt32 attachedRefCount;
-  AgtUInt32 waiterRefCount;
+  agt_u32_t attachedRefCount;
+  agt_u32_t waiterRefCount;
 };
 
-struct AgtAsyncData_st {
+struct agt_async_data_st {
   union {
-    AgtAsyncData next;                     //
-    AgtSize      nextOffset;               //
+    agt_async_data_t next;                     //
+    size_t      nextOffset;               //
   };
-  AgtUInt32              currentKey;       // Current epoch
-  AgtUInt32              instanceRefCount; // Total number of references to this object in memory, regardless of epoch
-  AgtUInt32              epochRefCount;    // Total number of active waiters for this epoch. This data is considered "active" so long as this is non-zero.
-  ReferenceCount         refCount;
-  AgtUInt32              waiterRefCount;
-  ReferenceCount         attachedRefCount;
-  AtomicMonotonicCounter responseCount;
+  async_key              currentKey;       // Current epoch
+  agt_u32_t              instanceRefCount; // Total number of references to this object in memory, regardless of epoch
+  agt_u32_t              epochRefCount;    // Total number of active waiters for this epoch. This data is considered "active" so long as this is non-zero.
+  ref_count refCount;
+  agt_u32_t              waiterRefCount;
+  ref_count attachedRefCount;
+  atomic_monotonic_counter responseCount;
 };
 
 struct AgtSharedAsyncData_st {
   ObjectType type;
   ContextId  ownerCtx;
-  ReferenceCount refCount;
-  ReferenceCount waiterRefCount;
-  AgtUInt32  currentKey;
+  ref_count refCount;
+  ref_count waiterRefCount;
+  agt_u32_t  currentKey;
 };
 
-struct AgtAsync_st {
-  AgtContext   context;
-  AgtUInt32    desiredResponseCount;
-  AsyncFlags   flags;
-  AgtUInt32    dataKey;
-  AgtAsyncData data;
+struct agt_async_st {
+  agt_ctx_t        context;
+  agt_u32_t        desiredResponseCount;
+  AsyncFlags       flags;
+  async_key        dataKey;
+  agt_async_data_t data;
 };
 
 }
@@ -270,19 +270,19 @@ namespace {
 
 
 
-  void        asyncDataDoReset(AgtAsyncData data, AgtUInt32& key, AgtUInt32 maxExpectedCount) noexcept {
+  void             asyncDataDoReset(agt_async_data_t data, async_key& key, agt_u32_t maxExpectedCount) noexcept {
     key = ++data->currentKey;
 
-    data->attachedRefCount = ReferenceCount(maxExpectedCount);
-    data->responseCount    = AtomicMonotonicCounter();
+    data->attachedRefCount = ref_count(maxExpectedCount);
+    data->responseCount    = atomic_monotonic_counter();
     data->maxResponseCount = maxExpectedCount;
   }
 
 
-  bool         asyncDataResetWaiter(AgtAsyncData data, AgtUInt32& key, AgtUInt32 maxExpectedCount) noexcept {
+  bool             asyncDataResetWaiter(agt_async_data_t data, async_key& key, agt_u32_t maxExpectedCount) noexcept {
 
-    AgtUInt32 expectedWaiterCount = 1;
-    AgtUInt32 expectedNextWaiterCount = 1;
+    agt_u32_t expectedWaiterCount = 1;
+    agt_u32_t expectedNextWaiterCount = 1;
 
     while ( !Impl::atomicCompareExchange(data->waiterRefCount, expectedWaiterCount, expectedNextWaiterCount) ) {
       expectedNextWaiterCount = std::max(expectedWaiterCount - 1, 1u);
@@ -296,9 +296,9 @@ namespace {
     return true;
   }
 
-  bool         asyncDataResetNonWaiter(AgtAsyncData data, AgtUInt32& key, AgtUInt32 maxExpectedCount) noexcept {
+  bool             asyncDataResetNonWaiter(agt_async_data_t data, async_key& key, agt_u32_t maxExpectedCount) noexcept {
 
-    AgtUInt32 expectedWaiterCount = 0;
+    agt_u32_t expectedWaiterCount = 0;
 
     if ( !Impl::atomicCompareExchange(data->waiterRefCount, expectedWaiterCount, 1) )
       return false;
@@ -309,7 +309,7 @@ namespace {
   }
 
 
-  bool         asyncDataWait(AgtAsyncData data, AgtUInt32 expectedCount, AgtTimeout timeout) noexcept {
+  bool             asyncDataWait(agt_async_data_t data, agt_u32_t expectedCount, agt_timeout_t timeout) noexcept {
     if (expectedCount != 0) [[likely]] {
       if (!data->responseCount.waitFor(expectedCount, timeout))
         return false;
@@ -317,7 +317,7 @@ namespace {
     return true;
   }
 
-  void         asyncDataDestroy(AgtAsyncData data, AgtContext context) noexcept {
+  void             asyncDataDestroy(agt_async_data_t data, agt_ctx_t context) noexcept {
 
     AGT_assert(data->waiterRefCount == 0);
     AGT_assert(data->attachedRefCount.get() == 0);
@@ -330,15 +330,15 @@ namespace {
     }
   }
 
-  AgtAsyncData createUnboundAsyncData(AgtContext context) noexcept {
+  agt_async_data_t createUnboundAsyncData(agt_ctx_t context) noexcept {
     auto memory = ctxAllocAsyncData(context);
 
     auto data = new (memory) AgtAsyncData_st {
       .contextId        = ctxGetContextId(context),
-      .refCount         = ReferenceCount(1),
+      .refCount         = ref_count(1),
       .waiterRefCount   = 0,
-      .attachedRefCount = ReferenceCount(0),
-      .responseCount    = AtomicMonotonicCounter(),
+      .attachedRefCount = ref_count(0),
+      .responseCount    = atomic_monotonic_counter(),
       .currentKey       = 0,
       .maxResponseCount = 0,
       .isShared         = false
@@ -347,15 +347,15 @@ namespace {
     return data;
   }
 
-  AgtAsyncData createAsyncData(AgtContext context, AgtUInt32 maxExpectedCount) noexcept {
+  agt_async_data_t createAsyncData(agt_ctx_t context, agt_u32_t maxExpectedCount) noexcept {
     auto memory = ctxAllocAsyncData(context);
 
     auto data = new (memory) AgtAsyncData_st {
       .contextId        = ctxGetContextId(context),
-      .refCount         = ReferenceCount(1),
+      .refCount         = ref_count(1),
       .waiterRefCount   = 1,
-      .attachedRefCount = ReferenceCount(maxExpectedCount),
-      .responseCount    = AtomicMonotonicCounter(),
+      .attachedRefCount = ref_count(maxExpectedCount),
+      .responseCount    = atomic_monotonic_counter(),
       .currentKey       = 0,
       .maxResponseCount = maxExpectedCount,
       .isShared         = false
@@ -373,7 +373,7 @@ namespace {
 
 
 
-void         Agt::asyncDataAttach(AgtAsyncData data, AgtContext ctx, AgtUInt32& key) noexcept {
+void         Agt::asyncDataAttach(agt_async_data_t data, agt_ctx_t ctx, async_key& key) noexcept {
   // data->attachedRefCount.acquire();
   data->refCount.acquire();
   if (data->contextId != ctxGetContextId(ctx)) {
@@ -382,7 +382,7 @@ void         Agt::asyncDataAttach(AgtAsyncData data, AgtContext ctx, AgtUInt32& 
   key = data->currentKey;
 }
 
-void         Agt::asyncDataDrop(AgtAsyncData data, AgtContext ctx, AgtUInt32 key) noexcept {
+void         Agt::asyncDataDrop(agt_async_data_t data, agt_ctx_t ctx, async_key key) noexcept {
   if (data->currentKey == key) {
     ++data->responseCount;
   }
@@ -392,7 +392,7 @@ void         Agt::asyncDataDrop(AgtAsyncData data, AgtContext ctx, AgtUInt32 key
   }
 }
 
-void         Agt::asyncDataArrive(AgtAsyncData data, AgtContext ctx, AgtUInt32 key) noexcept {
+void         Agt::asyncDataArrive(agt_async_data_t data, agt_ctx_t ctx, async_key key) noexcept {
   if (data->currentKey == key) {
     ++data->responseCount;
   }
@@ -412,34 +412,34 @@ void         Agt::asyncDataArrive(AgtAsyncData data, AgtContext ctx, AgtUInt32 k
 
 
 
-AgtContext   Agt::asyncGetContext(const AgtAsync_st* async) noexcept {
+agt_ctx_t   Agt::asyncGetContext(const agt_async_st* async) noexcept {
   return async->context;
 }
-AgtAsyncData Agt::asyncGetData(const AgtAsync_st* async) noexcept {
+agt_async_data_t Agt::asyncGetData(const agt_async_st* async) noexcept {
   return async->data;
 }
 
-void         Agt::asyncCopyTo(const AgtAsync_st* fromAsync, AgtAsync toAsync) noexcept {
+void         Agt::asyncCopyTo(const agt_async_st* fromAsync, agt_async_t toAsync) noexcept {
 
 }
 
-AgtAsyncData Agt::asyncAttach(AgtAsync async, AgtSignal) noexcept {
+agt_async_data_t Agt::asyncAttach(agt_async_t async, agt_signal_t) noexcept {
 
 }
 
 
 
-void         Agt::asyncClear(AgtAsync async) noexcept {
-  if ( static_cast<AgtUInt32>(async->flags & AsyncFlags::eWaiting) ) {
+void         Agt::asyncClear(agt_async_t async) noexcept {
+  if ( static_cast<agt_u32_t>(async->flags & AsyncFlags::eWaiting) ) {
     --async->data->waiterRefCount;
   }
 
   async->flags = async->flags & eAsyncBound;
 }
 
-void         Agt::asyncDestroy(AgtAsync async) noexcept {
+void         Agt::asyncDestroy(agt_async_t async) noexcept {
 
-  if ( static_cast<AgtUInt32>(async->flags & AsyncFlags::eWaiting) ) {
+  if ( static_cast<agt_u32_t>(async->flags & AsyncFlags::eWaiting) ) {
     --async->data->waiterRefCount;
   }
 
@@ -450,9 +450,9 @@ void         Agt::asyncDestroy(AgtAsync async) noexcept {
   delete async;
 }
 
-void         Agt::asyncReset(AgtAsync async, AgtUInt32 targetExpectedCount, AgtUInt32 maxExpectedCount) noexcept {
+void         Agt::asyncReset(agt_async_t async, agt_u32_t targetExpectedCount, agt_u32_t maxExpectedCount) noexcept {
 
-  const bool isWaiting = static_cast<AgtUInt32>(async->flags & AsyncFlags::eWaiting);
+  const bool isWaiting = static_cast<agt_u32_t>(async->flags & AsyncFlags::eWaiting);
 
   if ( !( isWaiting ? asyncDataResetWaiter : asyncDataResetNonWaiter )(async->data, async->dataKey, maxExpectedCount) ) {
     if ( --async->data->refCount == 0 ) {
@@ -468,12 +468,12 @@ void         Agt::asyncReset(AgtAsync async, AgtUInt32 targetExpectedCount, AgtU
   async->desiredResponseCount = targetExpectedCount;
 }
 
-AgtStatus    Agt::asyncWait(AgtAsync async, AgtTimeout timeout) noexcept {
+agt_status_t    Agt::asyncWait(agt_async_t async, agt_timeout_t timeout) noexcept {
 
-  if ( static_cast<AgtUInt32>(async->flags & eAsyncReady) )
+  if ( static_cast<agt_u32_t>(async->flags & eAsyncReady) )
     return AGT_SUCCESS;
 
-  if ( !static_cast<AgtUInt32>(async->flags & eAsyncBound) )
+  if ( !static_cast<agt_u32_t>(async->flags & eAsyncBound) )
     return AGT_ERROR_NOT_BOUND;
 
   if (asyncDataWait(async->data, async->desiredResponseCount, timeout)) {
@@ -484,9 +484,9 @@ AgtStatus    Agt::asyncWait(AgtAsync async, AgtTimeout timeout) noexcept {
   return AGT_NOT_READY;
 }
 
-AgtAsync     Agt::createAsync(AgtContext context) noexcept {
-  auto async = new AgtAsync_st;
-  auto data = createUnboundAsyncData(context);
+agt_async_t     Agt::createAsync(agt_ctx_t context) noexcept {
+  auto async = new agt_async_st;
+  auto data  = createUnboundAsyncData(context);
 
   async->context   = context;
   async->data      = data;
