@@ -9,9 +9,9 @@ carefully designed with modern needs and capabilities in mind, as both the hardw
 landscape have changed significantly since the first OpenGL specification was written. (WIP)
 
 Initially, the design of Vulkan's command buffer API confused me a little. Almost none of the 
-functions are thread safe with respect to both the command buffer *and* the pool from which the 
-buffer was allocated. If I had to take a surface level guess, this likely so that command buffers 
-can be allocated and reallocated with an optimized allocation algorithm, all while maintaining 
+functions are synchronized with respect to either the command buffer *or* the pool from which the 
+buffer was allocated. If I had to take a surface level guess, this is likely so that command buffers 
+can be allocated and reallocated with an optimized allocation algorithm, all while preserving 
 Vulkan's guarantee of maintaining no shared state by storing allocator state in the command pool 
 object. For the sake of flexibility of use, simplicity of driver implementation, and efficiency, 
 Vulkan also seeks to be as thread agnostic as possible. To my understanding, most (if not all) of 
@@ -21,9 +21,9 @@ allocator is left entirely up to callers.
 
 While this makes sense from a design perspective, when used with standard threading models, it 
 makes for weird control flow. Ensuring synchronization of any given command buffer is simple; only 
-allow it to be written to by a single thread. When working in a "job" or "task" oriented
-environment, this model points one in the direction of having tasks that look something like the
-following:
+allow for it to be written to by a single thread. When working in a "job" or "task" oriented
+environment, this model points one in the direction of having tasks whose layouts look something 
+like the following:
 
  - Allocate command buffer
  - Write appropriate commands to said buffer
@@ -60,8 +60,9 @@ significant improvements in logging latency.
 
 In looking around at existing message passing libraries, I found that almost all of them were either
  - Primarily designed for interprocess and/or cross-network use, and thus have a lot of overhead that is unnecessary in process local use
- - Very heavyweight, requiring one to "buy into" an entire framework
+ - Very heavyweight, requiring users to "buy into" an entire framework
 
+As such, I figured there was need for a small, fast, low-level message passing library optimized for in-process use.
 
 
 ## Goals
@@ -69,6 +70,7 @@ In looking around at existing message passing libraries, I found that almost all
  - Optimized for in-process use
  - Support interprocess use transparently 
  - Minimal dependencies
+ - Small
 
 
 ## Design Choices
