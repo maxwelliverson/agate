@@ -6,8 +6,7 @@
 The motivation for Agate came initially from toying around with Vulkan, a modern graphics API.
 One major benefit that Vulkan has over its predecessor, OpenGL, is simply that it has been
 carefully designed with modern needs and capabilities in mind, as both the hardware and software
-landscape have changed significantly since the first OpenGL specification was written. Some of the
-core choices 
+landscape have changed significantly since the first OpenGL specification was written. (WIP)
 
 Initially, the design of Vulkan's command buffer API confused me a little. Almost none of the 
 functions are thread safe with respect to both the command buffer *and* the pool from which the 
@@ -86,7 +85,7 @@ In looking around at existing message passing libraries, I found that almost all
 ## Undecided Design Choices
 
  - Scope of objects integrated as handles (ie. should users be able to implement/"install" their own object types that can then be used as handles? If so, how?)
- - Should 
+ - WIP
 
 
 
