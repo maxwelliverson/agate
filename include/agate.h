@@ -281,6 +281,10 @@
 #define AGT_VIRTUAL_PAGE_SIZE  ((agt_size_t)(1 << 16))
 
 
+#define AGT_ASYNC_STRUCT_SIZE 32
+#define AGT_SIGNAL_STRUCT_SIZE 24
+
+
 #define AGT_INVALID_OBJECT_ID ((agt_object_id_t)-1)
 #define AGT_SYNCHRONIZE ((agt_async_t)AGT_NULL_HANDLE)
 
@@ -368,8 +372,8 @@ typedef agt_u64_t agt_name_token_t;
 typedef void*                  agt_handle_t;
 
 typedef struct agt_ctx_st*     agt_ctx_t;
-typedef struct agt_async_st*   agt_async_t;
-typedef struct agt_signal_st*  agt_signal_t;
+// typedef struct agt_async_st*   agt_async_t;
+// typedef struct agt_signal_st*  agt_signal_t;
 typedef struct agt_message_st* agt_message_t;
 
 
@@ -487,9 +491,18 @@ typedef enum agt_agency_action_t {
 
 
 
+
+typedef struct agt_async_t {
+  agt_u8_t reserved[AGT_ASYNC_STRUCT_SIZE];
+} agt_async_t;
+
+typedef struct agt_signal_t {
+  agt_u8_t reserved[AGT_SIGNAL_STRUCT_SIZE];
+} agt_signal_t;
+
 typedef struct agt_send_info_t {
   agt_send_flags_t flags;
-  agt_async_t      asyncHandle;
+  agt_async_t*     asyncHandle;
   agt_handle_t     returnHandle;
   agt_message_id_t messageId;
   agt_size_t       messageSize;
@@ -520,6 +533,8 @@ typedef struct agt_proxy_object_functions_t {
   agt_size_t   (* const releaseRef)(void* object) noexcept;
   void         (* const destroy)(void* object) noexcept;
 } agt_proxy_object_functions_t;
+
+
 
 
 typedef agt_status_t (*agt_actor_message_proc_t)(void* actorState, const agt_message_info_t* message);
@@ -717,10 +732,6 @@ AGT_api agt_status_t AGT_stdcall agt_connect(agt_handle_t to, agt_handle_t from,
 
 /* ========================= [ Messages ] ========================= */
 
-AGT_api agt_status_t AGT_stdcall agt_get_multi_frame_message(agt_message_t message, agt_multi_frame_message_info_t* pMultiFrameInfo) AGT_noexcept;
-AGT_api agt_status_t AGT_stdcall agt_get_next_frame(agt_multi_frame_message_info_t* pMultiFrameInfo, agt_message_frame_t* pFrame) AGT_noexcept;
-
-
 AGT_api void         AGT_stdcall agt_return(agt_message_t message, agt_status_t status) AGT_noexcept;
 
 
@@ -743,13 +754,13 @@ AGT_api agt_status_t AGT_stdcall agt_get_sender_handle(agt_message_t message, ag
 /* ========================= [ Async ] ========================= */
 
 AGT_api agt_status_t AGT_stdcall agt_new_async(agt_ctx_t ctx, agt_async_t* pAsync) AGT_noexcept;
-AGT_api void         AGT_stdcall agt_copy_async(agt_async_t from, agt_async_t to) AGT_noexcept;
-AGT_api void         AGT_stdcall agt_clear_async(agt_async_t async) AGT_noexcept;
-AGT_api void         AGT_stdcall agt_destroy_async(agt_async_t async) AGT_noexcept;
+AGT_api void         AGT_stdcall agt_copy_async(const agt_async_t* from, agt_async_t* to) AGT_noexcept;
+AGT_api void         AGT_stdcall agt_clear_async(agt_async_t* async) AGT_noexcept;
+AGT_api void         AGT_stdcall agt_destroy_async(agt_async_t* async) AGT_noexcept;
 
-AGT_api agt_status_t AGT_stdcall agt_wait(agt_async_t async, agt_timeout_t timeout) AGT_noexcept;
-AGT_api agt_status_t AGT_stdcall agt_wait_all(const agt_async_t* pAsyncs, agt_size_t asyncCount, agt_timeout_t timeout) AGT_noexcept;
-AGT_api agt_status_t AGT_stdcall agt_wait_any(const agt_async_t* pAsyncs, agt_size_t asyncCount, agt_size_t* pIndex, agt_timeout_t timeout) AGT_noexcept;
+AGT_api agt_status_t AGT_stdcall agt_wait(agt_async_t* async, agt_timeout_t timeout) AGT_noexcept;
+AGT_api agt_status_t AGT_stdcall agt_wait_all(agt_async_t* const * pAsyncs, agt_size_t asyncCount, agt_timeout_t timeout) AGT_noexcept;
+AGT_api agt_status_t AGT_stdcall agt_wait_any(agt_async_t* const * pAsyncs, agt_size_t asyncCount, agt_size_t* pIndex, agt_timeout_t timeout) AGT_noexcept;
 
 
 
@@ -757,10 +768,10 @@ AGT_api agt_status_t AGT_stdcall agt_wait_any(const agt_async_t* pAsyncs, agt_si
 /* ========================= [ Signal ] ========================= */
 
 AGT_api agt_status_t AGT_stdcall agt_new_signal(agt_ctx_t ctx, agt_signal_t* pSignal) AGT_noexcept;
-AGT_api void         AGT_stdcall agt_attach_signal(agt_signal_t signal, agt_async_t async) AGT_noexcept;
-AGT_api void         AGT_stdcall agt_raise_signal(agt_signal_t signal) AGT_noexcept;
-AGT_api void         AGT_stdcall agt_raise_many_signals(const agt_signal_t* pSignals, agt_size_t signalCount) AGT_noexcept;
-AGT_api void         AGT_stdcall agt_destroy_signal(agt_signal_t signal) AGT_noexcept;
+AGT_api void         AGT_stdcall agt_attach_signal(agt_signal_t* signal, agt_async_t* async) AGT_noexcept;
+AGT_api void         AGT_stdcall agt_raise_signal(agt_signal_t* signal) AGT_noexcept;
+AGT_api void         AGT_stdcall agt_raise_many_signals(agt_signal_t* const * pSignals, agt_size_t signalCount) AGT_noexcept;
+AGT_api void         AGT_stdcall agt_destroy_signal(agt_signal_t* signal) AGT_noexcept;
 
 
 

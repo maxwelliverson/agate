@@ -291,7 +291,7 @@ namespace {
 }
 
 
-agt_status_t Agt::createInstance(local_blocking_thread*& handle, agt_ctx_t ctx, const agt_blocking_thread_create_info_t& createInfo) noexcept {
+agt_status_t agt::createInstance(local_blocking_thread*& handle, agt_ctx_t ctx, const agt_blocking_thread_create_info_t& createInfo) noexcept {
 
   local_blocking_thread_data_header* header;
   local_mpsc_channel*                channel;
