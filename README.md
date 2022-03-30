@@ -41,7 +41,7 @@ for the duration of individual commands would be even worse performance wise, as
 functions are specifically meant to be on the fast path).
 
 All these issues and more are solved however by use of message passing. Imagine we have a thread of
-execution that has a non-blocking message queue attached to it. This thread hold unique ownership over 
+execution that has a non-blocking message queue attached to it. This thread holds unique ownership over 
 the command buffer pool, and is the only thread that calls command buffer API functions directly. 
 Consumers send messages to the thread to request a command buffer, forward commands with a reference to 
 the command buffer in question, and then queue said command buffer for execution. In this scenario, 
