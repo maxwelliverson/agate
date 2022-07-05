@@ -40,6 +40,8 @@ IndentCaseLabels: true
 IndentPPDirectives: None
 IndentWidth: 2
 KeepEmptyLinesAtTheStartOfBlocks: true
+MacroBlockBegin: 'AGT_open_category'
+MacroBlockEnd:   'AGT_close_category'
 MaxEmptyLinesToKeep: 2
 NamespaceIndentation: All
 ObjCSpaceAfterProperty: false
