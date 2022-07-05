@@ -9,31 +9,10 @@
 
 namespace agt {
 
-  /*enum class AsyncType {
-    eUnbound,
-    eDirect,
-    eMessage,
-    eSignal
-  };
-  enum class AsyncState {
-    eEmpty,
-    eBound,
-    eReady
-  };
-  enum class AsyncDataState {
-    eUnbound,
-    eNotReady,
-    eReady,
-    eReadyAndRecyclable
-  };*/
-
-  enum class async_key : agt_u32_t;
-
-
-
-  void         asyncDataAttach(agt_async_data_t asyncData, agt_ctx_t ctx, async_key& key) noexcept;
-  void         asyncDataDrop(agt_async_data_t asyncData,   agt_ctx_t ctx, async_key key) noexcept;
-  void         asyncDataArrive(agt_async_data_t asyncData, agt_ctx_t ctx, async_key key) noexcept;
+  async_key_t  asyncDataAttach(async_data_t asyncData, agt_ctx_t ctx) noexcept;
+  async_key_t  asyncDataGetKey(async_data_t asyncData, agt_ctx_t ctx) noexcept;
+  void         asyncDataDrop(async_data_t asyncData,   agt_ctx_t ctx, async_key_t key) noexcept;
+  void         asyncDataArrive(async_data_t asyncData, agt_ctx_t ctx, async_key_t key) noexcept;
 
 
 
@@ -49,23 +28,24 @@ namespace agt {
 
 
 
+  agt_ctx_t    asyncGetContext(const agt_async_t& async) noexcept;
+  async_data_t asyncGetData(const agt_async_t& async) noexcept;
 
+  void         asyncCopyTo(const agt_async_t& fromAsync, agt_async_t& toAsync) noexcept;
+  void         asyncClear(agt_async_t& async) noexcept;
+  void         asyncDestroy(agt_async_t& async, bool wipeMemory = true) noexcept;
 
+  void         asyncAttachLocal(agt_async_t& async, agt_u32_t expectedCount, agt_u32_t attachedCount) noexcept;
 
-  agt_ctx_t   asyncGetContext(const agt_async_st* async) noexcept;
-  agt_async_data_t asyncGetData(const agt_async_st* async) noexcept;
+  void         asyncAttachShared(agt_async_t& async, agt_u32_t expectedCount, agt_u32_t attachedCount) noexcept;
 
-  void         asyncCopyTo(const agt_async_st* fromAsync, agt_async_t toAsync) noexcept;
-  void         asyncClear(agt_async_t async) noexcept;
-  void         asyncDestroy(agt_async_t async) noexcept;
+  agt_status_t asyncWait(agt_async_t& async, agt_timeout_t timeout) noexcept;
 
-  agt_async_data_t asyncAttach(agt_async_t async, agt_signal_t) noexcept;
+  // Functionally equivalent to calling "asyncWait" with a timeout of 0, but slightly optimized
+  // TODO: Benchmark to see whether or not there is actually any speedup from this, or if the gains are outweighed by the optimized instruction caching
+  agt_status_t asyncStatus(agt_async_t& async) noexcept;
 
-  void         asyncReset(agt_async_t async, agt_u32_t targetExpectedCount, agt_u32_t maxExpectedCount) noexcept;
-
-  agt_status_t    asyncWait(agt_async_t async, agt_timeout_t timeout) noexcept;
-
-  agt_async_t     createAsync(agt_ctx_t context) noexcept;
+  void         initAsync(agt_ctx_t context, agt_async_t& async, agt_async_flags_t flags) noexcept;
 
 }
 
