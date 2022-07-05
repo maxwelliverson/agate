@@ -10,6 +10,8 @@
 
 namespace agt {
 
+
+
   struct AGT_cache_aligned inline_buffer {};
 
   /*struct StagedMessage {
@@ -23,12 +25,16 @@ namespace agt {
   };*/
 
   AGT_BITFLAG_ENUM(message_flags, agt_u32_t) {
-    isShared            = 0x01,
-    isOutOfLine         = 0x02,
-    isMultiFrame        = 0x04,
-    shouldDoFastCleanup = 0x08,
-    externalMemory      = 0x10,
-    externalOwnership   = 0x20
+    // dispatchKindById    = AGT_DISPATCH_BY_ID,
+    // dispatchKindByName  = AGT_DISPATCH_BY_NAME,
+
+    isOutOfLine         = 0x04,
+    isMultiFrame        = 0x08,
+
+    ownedByChannel      = 0x40,
+    isAgentInvocation   = 0x80,
+    isShared            = 0x100,
+    shouldDoFastCleanup = 0x200,
   };
 
   AGT_BITFLAG_ENUM(message_state, agt_u32_t) {
@@ -68,7 +74,10 @@ struct agt_message_st {
     agt_message_t             next;
     size_t                    nextOffset;
   };
-  agt_handle_t                owner;
+  union {
+    agt_handle_t              owner;
+    agt::message_pool_t       pool;
+  };
   union {
     agt_handle_t              returnHandle;
     agt_object_id_t           returnHandleId;
@@ -77,15 +86,17 @@ struct agt_message_st {
     agt_async_data_t          asyncData;
     agt::shared_allocation_id asyncDataAllocId;
   };
-  agt::async_key              asyncDataKey;
+  agt::async_key_t            asyncDataKey;
   agt::message_flags          flags;
   agt::message_state          state;
   agt_u32_t                   refCount;
-  agt_message_id_t            id;
+  agt_u32_t                   messageType;
+  // Free 32 bits
   size_t                      payloadSize;
   agt::inline_buffer          inlineBuffer[];
 };
 
+static_assert(sizeof(agt_message_st) == AGT_CACHE_LINE);
 
 
 #endif//JEMSYS_AGATE2_MESSAGE_HPP

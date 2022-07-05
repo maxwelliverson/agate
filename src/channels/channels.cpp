@@ -243,86 +243,39 @@ namespace {
     // Default to be used if default lookup fails
     // Each slot is 256 bytes, or 4 cachelines long.
     constexpr static size_t SuperDefault = AGT_CACHE_LINE * 3;
-
-
-    size_t messageSize;
-    size_t dataSize = sizeof(size_t);
-
-    if (!ctxGetBuiltinValue(ctx, builtin_value::defaultPrivateChannelMessageSize, &messageSize, dataSize)) [[unlikely]]
-      return SuperDefault; // If this path is taken, there's likely something very wrong
-
-    return messageSize;
+    return ctxGetBuiltin(ctx, builtin_value::defaultPrivateChannelMessageSize);
   }
   inline size_t getDefaultPrivateChannelSlotCount(agt_ctx_t ctx) noexcept {
     // Default to be used if default lookup fails
     // Using both SuperDefaults, each channel would be 64 KiB in size
     constexpr static size_t SuperDefault = 256;
-
-
-    size_t slotCount;
-    size_t dataSize = sizeof(size_t);
-
-    if (!ctxGetBuiltinValue(ctx, builtin_value::defaultPrivateChannelSlotCount, &slotCount, dataSize)) [[unlikely]]
-      return SuperDefault; // If this path is taken, there's likely something very wrong
-
-    return slotCount;
+    return ctxGetBuiltin(ctx, builtin_value::defaultPrivateChannelSlotCount);
   }
   inline size_t getDefaultLocalChannelMessageSize(agt_ctx_t ctx) noexcept {
 
     // Default to be used if default lookup fails
     // Each slot is 256 bytes, or 4 cachelines long.
     constexpr static size_t SuperDefault = AGT_CACHE_LINE * 3;
-
-
-    size_t messageSize;
-    size_t dataSize = sizeof(size_t);
-
-    if (!ctxGetBuiltinValue(ctx, builtin_value::defaultLocalChannelMessageSize, &messageSize, dataSize)) [[unlikely]]
-      return SuperDefault; // If this path is taken, there's likely something very wrong
-
-    return messageSize;
+    return ctxGetBuiltin(ctx, builtin_value::defaultLocalChannelMessageSize);
   }
   inline size_t getDefaultLocalChannelSlotCount(agt_ctx_t ctx) noexcept {
     // Default to be used if default lookup fails
     // Using both SuperDefaults, each channel would be 64 KiB in size
     constexpr static size_t SuperDefault = 256;
-
-
-    size_t slotCount;
-    size_t dataSize = sizeof(size_t);
-
-    if (!ctxGetBuiltinValue(ctx, builtin_value::defaultLocalChannelSlotCount, &slotCount, dataSize)) [[unlikely]]
-      return SuperDefault; // If this path is taken, there's likely something very wrong
-
-    return slotCount;
+    return ctxGetBuiltin(ctx, builtin_value::defaultLocalChannelSlotCount);
   }
   inline size_t getDefaultSharedChannelMessageSize(agt_ctx_t ctx) noexcept {
 
     // Default to be used if default lookup fails
     // Each slot is 1024 bytes, or 16 cachelines long.
     constexpr static size_t SuperDefault = AGT_CACHE_LINE * 15;
-
-    size_t messageSize;
-    size_t dataSize = sizeof(size_t);
-
-    if (!ctxGetBuiltinValue(ctx, builtin_value::defaultSharedChannelMessageSize, &messageSize, dataSize)) [[unlikely]]
-      return SuperDefault; // If this path is taken, there's likely something very wrong
-
-    return messageSize;
+    return ctxGetBuiltin(ctx, builtin_value::defaultSharedChannelMessageSize);
   }
   inline size_t getDefaultSharedChannelSlotCount(agt_ctx_t ctx) noexcept {
     // Default to be used if default lookup fails
     // Using both SuperDefaults, each channel would be 64 KiB in size
     constexpr static size_t SuperDefault = 256;
-
-
-    size_t slotCount;
-    size_t dataSize = sizeof(size_t);
-
-    if (!ctxGetBuiltinValue(ctx, builtin_value::defaultSharedChannelSlotCount, &slotCount, dataSize)) [[unlikely]]
-      return SuperDefault; // If this path is taken, there's likely something very wrong
-
-    return slotCount;
+    return ctxGetBuiltin(ctx, builtin_value::defaultSharedChannelSlotCount);
   }
 
 

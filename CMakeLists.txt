@@ -108,6 +108,13 @@ function(add_agate_executable target_)
 endfunction()
 
 
+add_agate_library(
+        agents
+            PRIVATE
+            SOURCES
+                agents.cpp
+                dispatch.cpp
+)
 
 add_agate_library(
         async
@@ -122,6 +129,8 @@ add_agate_library(
             PRIVATE
             SOURCES
                 channels.cpp
+                message_pool.cpp
+                message_queue.cpp
 )
 
 add_agate_library(
@@ -172,6 +181,7 @@ add_agate_library(
             SOURCES
                 agate.cpp
             DEPENDENCIES
+                agents
                 async
                 channels
                 context
