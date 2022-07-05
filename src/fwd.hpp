@@ -5,7 +5,7 @@
 #ifndef JEMSYS_AGATE2_FWD_HPP
 #define JEMSYS_AGATE2_FWD_HPP
 
-#include <agate.h>
+#include "agate.h"
 
 extern "C" {
 
@@ -16,6 +16,15 @@ typedef struct agt_message_data_st* agt_message_data_t;
 
 namespace agt {
 
+  /**
+   * TODO: Implement idea for simple, opaque storage of both local and shared handles:
+   *           - Opaque handle type is a pointer sized integer (uintptr_t)
+   *           - Pointers to handles are always at least word aligned, meaning there are a couple low bits that will always be 0.
+   *           - Store the shared allocation handles with such a scheme that the lowest bit is always 1
+   *           - When using a handle, test the lowest bit: If the low bit is zero, cast the integer to a pointer and use as is.
+   *           -                                           If the low bit is one, interpret the integer as a shared allocation handle, and convert to a local pointer using the local context
+   * */
+
   enum class shared_allocation_id : agt_u64_t;
 
   enum class object_type : agt_u32_t;
@@ -23,6 +32,14 @@ namespace agt {
   enum class connect_action : agt_u32_t;
 
   enum class error_state : agt_u32_t;
+
+  enum class async_data_t : agt_u64_t;
+  enum class async_key_t  : agt_u32_t;
+
+
+  using message_pool_t = void*;
+
+  using message_block_t = struct message_pool_block*;
 
 
   struct handle_header;
@@ -72,8 +89,8 @@ namespace agt {
   struct shared_mpmc_channel_receiver;
 
 
-
-
+  struct async_data;
+  struct imported_async_data;
 
 
 
