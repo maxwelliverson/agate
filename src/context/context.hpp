@@ -19,15 +19,17 @@ namespace agt {
     defaultSharedChannelMessageSize,
     defaultPrivateChannelSlotCount,
     defaultLocalChannelSlotCount,
-    defaultSharedChannelSlotCount
+    defaultSharedChannelSlotCount,
+    asyncStructSize,
+    signalStructSize
   };
 
 
   void*         ctxLocalAlloc(agt_ctx_t ctx, size_t size, size_t alignment) noexcept;
   void          ctxLocalFree(agt_ctx_t ctx, void* memory, size_t size, size_t alignment) noexcept;
 
-  void*         ctxSharedAlloc(agt_ctx_t ctx, size_t size, size_t alignment, SharedAllocationId& allocationId) noexcept;
-  void          ctxSharedFree(agt_ctx_t ctx, SharedAllocationId allocId) noexcept;
+  void*         ctxSharedAlloc(agt_ctx_t ctx, size_t size, size_t alignment, shared_allocation_id& allocationId) noexcept;
+  void          ctxSharedFree(agt_ctx_t ctx, shared_allocation_id allocId) noexcept;
   void          ctxSharedFree(agt_ctx_t ctx, void* memory, size_t size, size_t alignment) noexcept;
 
   HandleHeader* ctxAllocHandle(agt_ctx_t ctx, size_t size, size_t alignment) noexcept;
@@ -42,7 +44,7 @@ namespace agt {
 
 
 
-  void*        ctxGetLocalAddress(SharedAllocationId allocId) noexcept;
+  void*        ctxGetLocalAddress(shared_allocation_id allocId) noexcept;
 
   agt_status_t ctxOpenHandleById(agt_ctx_t ctx, agt_object_id_t id, HandleHeader*& handle) noexcept;
   agt_status_t ctxOpenHandleByName(agt_ctx_t ctx, const char* name, HandleHeader*& handle) noexcept;
@@ -63,14 +65,22 @@ namespace agt {
 
   VPointer      ctxLookupVTable(agt_ctx_t ctx, agt_type_id_t typeId) noexcept;
 
-  bool          ctxSetBuiltinValue(agt_ctx_t ctx, BuiltinValue value, const void* data, size_t dataSize) noexcept;
-  bool          ctxGetBuiltinValue(agt_ctx_t ctx, BuiltinValue value, void* data, size_t& outSize) noexcept;
+  // bool          ctxSetBuiltinValue(agt_ctx_t ctx, builtin_value value, const void* data, size_t dataSize) noexcept;
+  // bool          ctxGetBuiltinValue(agt_ctx_t ctx, builtin_value value, void* data, size_t& outSize) noexcept;
+
+  uintptr_t        ctxGetBuiltin(agt_ctx_t ctx, builtin_value value) noexcept;
+
 
   agt_status_t     createCtx(agt_ctx_t& pCtx) noexcept;
   void          destroyCtx(agt_ctx_t ctx) noexcept;
 
 
+  void*         ctxAcquireLocalAsyncData(agt_ctx_t ctx) noexcept;
+  void          ctxReleaseLocalAsyncData(agt_ctx_t ctx, void* data) noexcept;
 
+  void*         ctxAcquireSharedAsyncData(agt_ctx_t ctx, async_data_t& handle) noexcept;
+  void*         ctxMapSharedAsyncData(agt_ctx_t ctx, async_data_t handle) noexcept;
+  void          ctxReleaseSharedAsyncData(agt_ctx_t ctx, async_data_t handle) noexcept;
 
 }
 

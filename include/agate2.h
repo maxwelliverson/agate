@@ -1,10 +1,9 @@
 //
-// Created by maxwe on 2022-03-04.
+// Created by maxwe on 2022-06-03.
 //
 
-#ifndef AGATE_AGATE_LOWER_H
-#define AGATE_AGATE_LOWER_H
-
+#ifndef AGATE_AGATE2_H
+#define AGATE_AGATE2_H
 
 /* ====================[ Portability Config ]================== */
 
@@ -253,6 +252,8 @@
 #define AGT_page_aligned      AGT_alignas(AGT_PHYSICAL_PAGE_SIZE)
 
 
+#define AGT_agent_api AGT_api
+
 
 
 
@@ -315,11 +316,7 @@
 
 /* =================[ Types ]================= */
 
-
-
-
 AGT_begin_c_namespace
-
 
 
 typedef unsigned char      agt_u8_t;
@@ -335,7 +332,7 @@ typedef   signed long long agt_i64_t;
 
 
 typedef size_t             agt_size_t;
-typedef size_t             agt_address_t;
+typedef uintptr_t          agt_address_t;
 typedef ptrdiff_t          agt_ptrdiff_t;
 
 
@@ -343,23 +340,10 @@ typedef agt_u32_t          agt_flags32_t;
 typedef agt_u64_t          agt_flags64_t;
 
 
-typedef agt_u32_t          agt_local_id_t;
-typedef agt_u64_t          agt_global_id_t;
-
-
-typedef void*              agt_handle_t;
-
-
-
-
-
-
-
 typedef agt_i32_t agt_bool_t;
 
 typedef agt_u64_t agt_timeout_t;
 
-typedef agt_u32_t agt_protocol_id_t;
 typedef agt_u64_t agt_message_id_t;
 typedef agt_u64_t agt_type_id_t;
 typedef agt_u64_t agt_object_id_t;
@@ -368,19 +352,17 @@ typedef agt_u64_t agt_send_token_t;
 typedef agt_u64_t agt_name_token_t;
 
 
+typedef agt_u32_t          agt_local_id_t;
+typedef agt_u64_t          agt_global_id_t;
 
-typedef void*                      agt_handle_t;
 
 typedef struct agt_ctx_st*         agt_ctx_t;
-typedef struct agt_message_st*     agt_message_t;
+typedef struct agt_channel_st*     agt_channel_t;
 typedef struct agt_agent_st*       agt_agent_t;
+typedef struct agt_semaphore_st*   agt_semaphore_t;
+typedef struct agt_barrier_st*     agt_barrier_t;
+
 typedef struct agt_agent_group_st* agt_agent_group_t;
-typedef struct agt_agency_st*      agt_agency_t;
-
-
-
-
-
 
 
 
@@ -402,7 +384,7 @@ typedef enum agt_status_t {
   AGT_ERROR_FOREIGN_SENDER,
   AGT_ERROR_STATUS_NOT_SET,
   AGT_ERROR_UNKNOWN_MESSAGE_TYPE,
-  AGT_ERROR_INVALID_OPERATION /** < The given handle does not implement the called function. eg. agt_receive_message cannot be called on a channel sender*/,
+  AGT_ERROR_INVALID_CMDERATION /** < The given handle does not implement the called function. eg. agt_receive_message cannot be called on a channel sender*/,
   AGT_ERROR_INVALID_FLAGS,
   AGT_ERROR_INVALID_MESSAGE,
   AGT_ERROR_INVALID_SIGNAL,
@@ -430,108 +412,8 @@ typedef enum agt_status_t {
   AGT_ERROR_NOT_YET_IMPLEMENTED
 } agt_status_t;
 
-typedef enum agt_handle_type_t {
-  AGT_CHANNEL,
-  AGT_AGENT,
-  AGT_SOCKET,
-  AGT_SENDER,
-  AGT_RECEIVER,
-  AGT_THREAD,
-  AGT_AGENCY
-} agt_handle_type_t;
 
 
-
-
-typedef enum agt_handle_flag_bits_t {
-  AGT_OBJECT_IS_SHARED = 0x1,
-  AGT_HANDLE_FLAGS_MAX
-} agt_handle_flag_bits_t;
-typedef agt_flags32_t agt_handle_flags_t;
-
-typedef enum agt_send_flag_bits_t {
-  AGT_SEND_WAIT_FOR_ANY      = 0x00 /**< The asynchronous operation will be considered complete as soon as a single consumer processes the message (Default behaviour)*/,
-  AGT_SEND_WAIT_FOR_ALL      = 0x01 /**< The asynchronous operation will be considered complete once all consumers have processed the message */,
-  AGT_SEND_BROADCAST_MESSAGE = 0x02 /**< The message will be received by all consumers rather than just one*/,
-  AGT_SEND_DATA_CSTRING      = 0x04 /**< The message data is in the form of a null terminated string. When this flag is specified, messageSize can be 0, in which case the messageSize is interpreted to be strlen(data) + 1*/,
-  AGT_SEND_WITH_TIMESTAMP    = 0x08 /**< */,
-  AGT_SEND_FAST_CLEANUP      = 0x10 /**< */,
-} agt_send_flag_bits_t;
-typedef agt_flags32_t agt_send_flags_t;
-
-typedef enum agt_message_flag_bits_t {
-  AGT_MESSAGE_DATA_IS_CSTRING   = 0x1,
-  AGT_MESSAGE_HAS_ID            = 0x2,
-  AGT_MESSAGE_IS_FOREIGN        = 0x4,
-  AGT_MESSAGE_HAS_RETURN_HANDLE = 0x8
-} agt_message_flag_bits_t;
-typedef agt_flags32_t agt_message_flags_t;
-
-typedef enum agt_connect_flag_bits_t {
-  AGT_CONNECT_FORWARD   = 0x1,
-} agt_connect_flag_bits_t;
-typedef agt_flags32_t agt_connect_flags_t;
-
-typedef enum agt_agent_type_flag_bits_t {
-  AGT_AGENT_TYPE_MAY_BE_SHARED = 0x1,
-  // AGT_AGENT_
-} agt_agent_type_flag_bits_t;
-typedef agt_flags32_t agt_agent_type_flags_t;
-
-typedef enum agt_agent_create_flag_bits_t {
-  AGT_AGENT_CREATE_ALWAYS = 0x1,
-  AGT_AGENT_CREATE_DETATCHED = 0x2,
-  AGT_AGENT_CREATE_DISCONNECTED = 0x4
-  // AGT_AGENT_
-} agt_agent_create_flag_bits_t;
-typedef agt_flags32_t agt_agent_create_flags_t;
-
-typedef enum agt_blocking_thread_create_flag_bits_t {
-  AGT_BLOCKING_THREAD_COPY_USER_DATA   = 0x1,
-  AGT_BLOCKING_THREAD_USER_DATA_STRING = 0x2
-} agt_blocking_thread_create_flag_bits_t;
-typedef agt_flags32_t agt_blocking_thread_create_flags_t;
-
-typedef enum agt_async_flag_bits_t {
-  AGT_ASYNC_ATTACH_OP_REPLACE = 0x0, // default mode
-  AGT_ASYNC_ATTACH_OP_AND     = 0x1,
-  AGT_ASYNC_ATTACH_OP_OR      = 0x2
-} agt_async_flag_bits_t;
-typedef agt_flags32_t agt_async_flags_t;
-
-typedef enum agt_scope_t {
-  AGT_SCOPE_LOCAL,
-  AGT_SCOPE_SHARED,
-  AGT_SCOPE_PRIVATE
-} agt_scope_t;
-
-typedef enum agt_message_action_t {
-  AGT_COMPLETE_MESSAGE,
-  AGT_DEFER_MESSAGE,
-  AGT_DISCARD_MESSAGE // idk
-} agt_message_action_t;
-
-typedef enum agt_agency_action_t {
-  AGT_AGENCY_ACTION_CONTINUE,
-  AGT_AGENCY_ACTION_DEFER,
-  AGT_AGENCY_ACTION_YIELD,
-  AGT_AGENCY_ACTION_CLOSE
-} agt_agency_action_t;
-
-typedef enum agt_dispatch_kind_t {
-  AGT_NO_DISPATCH,
-  AGT_DISPATCH_BY_ID,
-  AGT_DISPATCH_BY_NAME
-} agt_dispatch_kind_t;
-
-typedef enum agt_action_result_t {
-  AGT_ACTION_SUCCESS,
-  AGT_ACTION_INCOMPLETE,
-  AGT_ACTION_ERROR_UNKNOWN,
-  AGT_ACTION_ERROR_ACTION_FAILED,
-  AGT_ACTION_ERROR_UNKNOWN_ACTION,
-  AGT_ACTION_ERROR_UNAVAILABLE_RESOURCE
-} agt_action_result_t;
 
 
 
@@ -545,155 +427,92 @@ typedef struct agt_signal_t {
   agt_u8_t reserved[AGT_SIGNAL_STRUCT_SIZE];
 } agt_signal_t;
 
+
+
+typedef void* (*agt_agent_ctor_t)(void* userData);
+typedef void  (*agt_agent_dtor_t)(void* agentState);
+typedef void  (*agt_agent_start_t)(void* agentState);
+typedef void  (*agt_agent_proc_t)(void* agentState, agt_message_id_t msgId, void* message, agt_size_t messageSize);
+
+
+typedef void  (*agt_free_agent_proc_t)(agt_message_id_t msgId, void* message, agt_size_t messageSize);
+
+
+typedef enum agt_agent_create_flag_bits_t {
+  AGT_AGENT_CREATE_SHARED = 0x1
+} agt_agent_create_flag_bits_t;
+typedef agt_flags32_t agt_agent_create_flags_t;
+
+
+typedef enum agt_agent_flag_bits_t {
+  AGT_AGENT_IS_NAMED               = 0x1,
+  AGT_AGENT_IS_SHARED              = 0x2,
+  AGT_AGENT_HAS_DYNAMIC_PROPERTIES = 0x1000
+} agt_agent_flag_bits_t;
+typedef agt_flags32_t agt_agent_flags_t;
+
+typedef enum agt_agent_cmd_t {
+  AGT_CMD_NOOP,                    ///< As the name would imply, this is a noop.
+  AGT_CMD_KILL,                    ///< Command sent on abnormal termination. Minimal cleanup is performed, typically indicates some unhandled error
+  AGT_CMD_CLOSE_QUEUE,             ///< Normal termination command. Any messages sent before this will be processed as normal, but no new messages will be sent. As soon as the queue is empty, the agent is destroyed.
+  AGT_CMD_INVALIDATE_QUEUE,        ///< Current message queue is discarded without having been processed, but the queue is not closed, nor is the agent destroyed.
+
+  AGT_CMD_BARRIER_ARRIVE,          ///< When this message is dequeued, the arrival count of the provided barrier is incremented. If the post-increment arrival count is equal to the expected arrival count, any agents waiting on the barrier are unblocked, and if the barrier was set with a continuation callback, it is called (in the context of the last agent to arrive).
+  AGT_CMD_BARRIER_WAIT,            ///< If the arrival count of the provided barrier is less than the expected arrival count, the agent is blocked until they are equal. Otherwise, this is a noop.
+  AGT_CMD_BARRIER_ARRIVE_AND_WAIT, ///< Equivalent to sending AGT_CMD_BARRIER_ARRIVE immediately followed by AGT_CMD_BARRIER_WAIT
+  AGT_CMD_BARRIER_ARRIVE_AND_DROP, ///<
+  AGT_CMD_ACQUIRE_SEMAPHORE,       ///<
+  AGT_CMD_RELEASE_SEMAPHORE,       ///<
+  
+  AGT_CMD_QUERY_UUID,              ///<
+  AGT_CMD_QUERY_NAME,              ///<
+  AGT_CMD_QUERY_DESCRIPTION,       ///<
+  AGT_CMD_QUERY_PRODUCER_COUNT,    ///<
+  AGT_CMD_QUERY_METHOD,            ///<
+  
+  AGT_CMD_QUERY_PROPERTY,          ///<
+  AGT_CMD_QUERY_SUPPORT,           ///<
+  AGT_CMD_SET_PROPERTY,            ///<
+  AGT_CMD_WRITE,                   ///<
+  AGT_CMD_READ,                    ///<
+  
+  AGT_CMD_FLUSH,                   ///<
+  AGT_CMD_START,                   ///< Sent as the initial message to an eager agent; invokes an agent's start routine
+  AGT_CMD_INVOKE_METHOD_BY_ID,     ///<
+  AGT_CMD_INVOKE_METHOD_BY_NAME,   ///<
+  AGT_CMD_REGISTER_METHOD,         ///<
+  AGT_CMD_UNREGISTER_METHOD,       ///<
+  AGT_CMD_INVOKE_CALLBACK,         ///<
+  AGT_CMD_INVOKE_COROUTINE,        ///<
+  AGT_CMD_REGISTER_HOOK,           ///<
+  AGT_CMD_UNREGISTER_HOOK          ///<
+} agt_agent_cmd_t;
+
+
+
 typedef struct agt_send_info_t {
-  agt_send_flags_t flags;
+
+  agt_message_id_t id;
+  agt_size_t       size;
+  const void*      buffer;
   agt_async_t*     asyncHandle;
-  agt_handle_t     returnHandle;
-  agt_message_id_t messageId;
-  agt_size_t       messageSize;
-  const void*      pMessageBuffer;
+  agt_send_flags_t flags;
 } agt_send_info_t;
 
-typedef struct agt_message_info_t {
-  agt_message_t       message;
-  agt_size_t          size;
-  agt_message_flags_t flags;
-} agt_message_info_t;
 
-typedef struct agt_object_info_t {
-  agt_object_id_t    id;
-  agt_handle_t       handle;
-  agt_handle_type_t  type;
-  agt_handle_flags_t flags;
-  agt_object_id_t    exportId;
-} agt_object_info_t;
-
-typedef struct agt_proxy_object_functions_t {
-  agt_status_t (* const acquireMessage)(void* object, agt_staged_message_t* pStagedMessage, agt_timeout_t timeout) noexcept;
-  void         (* const pushQueue)(void* object, agt_message_t message, agt_send_flags_t flags) noexcept;
-  agt_status_t (* const popQueue)(void* object, agt_message_info_t* pMessageInfo, agt_timeout_t timeout) noexcept;
-  void         (* const releaseMessage)(void* object, agt_message_t message) noexcept;
-  agt_status_t (* const connect)(void* object, agt_handle_t handle, agt_connect_flags_t flags) noexcept;
-  agt_status_t (* const acquireRef)(void* object) noexcept;
-  agt_size_t   (* const releaseRef)(void* object) noexcept;
-  void         (* const destroy)(void* object) noexcept;
-} agt_proxy_object_functions_t;
-
-
-typedef agt_status_t (*agt_actor_message_proc_t)(void* actorState, const agt_message_info_t* message);
-typedef void*        (*agt_agent_ctor_t)(void* userData);
-typedef void         (*agt_agent_dtor_t)(void* actorState);
-
-
-// TODO: Add a function to the public API that extends the lifetime of a message, and one that ends that extension.
-//       Having these functions in place, messages can be automatically returned after use. Possibly with reference counting??
-typedef void      (*agt_blocking_thread_message_proc_t)(agt_handle_t threadHandle, const agt_message_info_t* message, void* pUserData);
-typedef void      (*agt_user_data_dtor_t)(void* pUserData);
-
-typedef struct agt_actor_t {
-  agt_type_id_t            type;
-  agt_actor_message_proc_t proc;
-  agt_agent_dtor_t         dtor;
-  void*                    state;
-} agt_actor_t;
-
-typedef struct agt_agent_message_info_t {
-  agt_agent_t         self;
-  agt_message_t       messageHandle;
-  agt_size_t          messageSize;
-  agt_dispatch_kind_t dispatchKind;
-  agt_message_flags_t flags;
-} agt_agent_message_info_t;
-
-typedef agt_action_result_t (*agt_agent_proc_t)(void* agentState, agt_message_id_t msgId, void* message, const agt_agent_message_info_t* messageInfo);
-
-
-typedef struct agt_agent_type_registration_info_t {
-  agt_agent_type_flags_t flags;
-  const char*            name;
-  size_t                 nameLength;
-  agt_agent_ctor_t       constructor;
-  agt_agent_dtor_t       destructor;
-  agt_agent_proc_t       proc;
-} agt_agent_type_registration_info_t;
-
-typedef struct agt_agent_literal_info_t {
-  agt_agent_dtor_t    destructor;
-  agt_agent_proc_t    proc;
-} agt_agent_literal_info_t;
-
-typedef struct agt_channel_create_info_t {
-  size_t      minCapacity;
-  size_t      maxMessageSize;
-  size_t      maxSenders;
-  size_t      maxReceivers;
-  agt_scope_t scope;
-  agt_async_t asyncHandle;
-  const char* name;
-  size_t      nameLength;
-} agt_channel_create_info_t;
-
-typedef struct agt_socket_create_info_t {
-
-} agt_socket_create_info_t;
 
 typedef struct agt_agent_create_info_t {
   agt_agent_create_flags_t flags;
   const char*              name;
-  size_t                   nameLength; ///< Length of name in characters. If 0, name must be null terminated.
-  size_t                   fixedMessageSize; ///< If not 0, all messages sent to this agent must be equal to or less than messageSize. If 0, messages of any size may be sent.
-  agt_agent_group_t        group; ///< If non-null, agency must be null. If null, this agent will be placed in a default group.
-  agt_agency_t             agency; ///< If non-null, group must be null. If null, this agent will be placed in a default agency, or if group is non-null, the agency will be inferred from the group.
-  void*                    userData; ///< The argument passed to the agent's constructor. If the agent does not have a constructor, then this points to the agent state (NOTE: in this case, the memory pointed to by userData must remain valid for the entire lifetime of the agent. May be null if the agent type has no state).
+  size_t                   nameLength;       ///< Length of name in characters. If 0, name must be null terminated.
+  size_t                   fixedMessageSize; ///< If not 0, all messages sent to this agent must be equal to or less than fixedMessageSize. If 0, messages of any size may be sent.
+  agt_agent_start_t        initializer;      ///< Initial callback executed in the agent's context before it starts receiving messages.
+  void*                    userData;         ///< The argument passed to the agent's constructor. If the agent does not have a constructor, then this points to the agent state (NOTE: in this case, the memory pointed to by userData must remain valid for the entire lifetime of the agent. May be null if the agent type has no state).
 } agt_agent_create_info_t;
 
 
 
-typedef struct agt_agent_group_create_info_t {
 
-} agt_agent_group_create_info_t;
-
-typedef struct agt_agency_create_info_t {
-
-} agt_agency_create_info_t;
-
-typedef struct agt_blocking_thread_create_info_t {
-  agt_blocking_thread_message_proc_t pfnMessageProc;
-  agt_scope_t                        scope;
-  agt_blocking_thread_create_flags_t flags;
-  size_t                             minCapacity;
-  size_t                             maxMessageSize;
-  size_t                             maxSenders;
-  union {
-    size_t                           dataSize;
-    agt_user_data_dtor_t             pfnUserDataDtor;
-  };
-  void*                              pUserData;
-  const char*                        name;
-  size_t                             nameLength;
-} agt_blocking_thread_create_info_t;
-
-typedef struct agt_thread_create_info_t {
-
-} agt_thread_create_info_t;
-
-
-/**
- * Agent types:
- *  - event driven
- *  - blocking (thread)
- *  - virtual
- *  -
- *
- * */
-
-
-
-/////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////
-/* ========================= [ Context ] ========================= */
 
 /**
  * Initializes a library context.
@@ -743,160 +562,61 @@ AGT_api agt_status_t AGT_stdcall agt_finalize(agt_ctx_t context) AGT_noexcept;
 /**
  * Returns the API version of the linked library.
  * */
-AGT_api int          AGT_stdcall agt_get_version() AGT_noexcept;
-
-
-
-/* ========================= [ Handles ] ========================= */
-
-/**
- *
- * */
-AGT_api agt_status_t AGT_stdcall agt_get_object_info(agt_ctx_t context, agt_object_info_t* pObjectInfo) AGT_noexcept;
-/**
- *
- * */
-AGT_api agt_status_t AGT_stdcall agt_duplicate_handle(agt_handle_t inHandle, agt_handle_t* pOutHandle) AGT_noexcept;
-/**
- *
- * */
-AGT_api void         AGT_stdcall agt_close_handle(agt_handle_t handle) AGT_noexcept;
-
-
-/**
- *
- * @param [in] context    The context in which this type is registered
- * @param [in] cpTypeInfo The parameters describing the type to be registered
- * @param [out] pTypeId (Optional) Returns the type id for the newly registered type (or the already registered type, in the case of a nameclash)
- *
- * */
-AGT_api agt_status_t AGT_stdcall agt_register_type(agt_ctx_t context, const agt_agent_type_registration_info_t* cpTypeInfo, agt_type_id_t* pTypeId) AGT_noexcept;
-
-
-
-/**
- *
- * */
-AGT_api agt_status_t AGT_stdcall agt_create_channel(agt_ctx_t context, const agt_channel_create_info_t* cpCreateInfo, agt_handle_t* pSender, agt_handle_t* pReceiver) AGT_noexcept;
-
-AGT_api agt_status_t AGT_stdcall agt_create_agent_by_typeid(agt_ctx_t context, agt_type_id_t typeId, const agt_agent_create_info_t* cpCreateInfo, agt_agent_t* pAgent) AGT_noexcept;
-AGT_api agt_status_t AGT_stdcall agt_create_agent_by_typename(agt_ctx_t context, const char* typeName, size_t typeNameLength, const agt_agent_create_info_t* cpCreateInfo, agt_agent_t* pAgent) AGT_noexcept;
-AGT_api agt_status_t AGT_stdcall agt_create_agent_literal(agt_ctx_t context, const agt_agent_literal_info_t* cpLiteralInfo, const agt_agent_create_info_t* cpCreateInfo, agt_agent_t* pAgent) AGT_noexcept;
-
-AGT_api agt_status_t AGT_stdcall agt_create_agency(agt_ctx_t context, const agt_agency_create_info_t* cpCreateInfo, agt_handle_t* pAgency) AGT_noexcept;
-AGT_api agt_status_t AGT_stdcall agt_create_thread(agt_ctx_t context, const agt_thread_create_info_t* cpCreateInfo, agt_handle_t* pThread) AGT_noexcept;
-
-
-/**
- * pSendInfo must not be null.
- * If sender is null, returns AGT_ERROR_NULL_HANDLE
- * If pSendInfo->messageSize is zero, agt_get_send_token will write the handle's maximum message size to pSendInfo->messageSize.
- * If pSendInfo->messageSize is not zero, its value will not be modified. In that case, if the value of pSendInfo->messageSize is greater than the handle's maximum message size, AGT_ERROR_MESSAGE_TOO_LARGE is returned.
- * If timeout is AGT_DO_NOT_WAIT, the call immediately returns AGT_ERROR_MAILBOX_IS_FULL if no send tokens are available.
- * If timeout is AGT_WAIT, the call waits indefinitely until a send token is available. In this case, AGT_ERROR_MAILBOX_IS_FULL is never returned.
- * If the timeout is some positive integer N, if after N microseconds, no send tokens have been made available, AGT_ERROR_MAILBOX_IS_FULL is returned.
- *
- * If AGT_SUCCESS is returned, a valid send token will have been written to *pSendToken
- * This send token must then be used in a call to agt_send_with_token.
- */
-AGT_api agt_status_t AGT_stdcall agt_get_send_token(agt_handle_t sender, size_t* messageSize, agt_send_token_t* pSendToken, agt_timeout_t timeout) AGT_noexcept;
-/**
- * The value of sendToken must have previously been acquired from a successful call to agt_get_send_token.
- * If the value of pSendInfo->messageSize has changed since the call to agt_get_send_token, N bytes will be copied from the buffer pointed to by cpSendInfo->pMessageBuffer,
- *     where N is equal to the minimum of cpSendInfo->messageSize and the sender handle's maximum supported message size.
- * For speed purposes, this function does not do any error checking. It is up to the caller to ensure proper usage.
- *
- * sender must be the same handle used in the prior call to agt_get_send_token from which sendToken was returned.
- * cpSendInfo must point to the same struct pointed to by the pSendInfo parameter of the prior call to agt_get_send_token.
- * sendToken must have been returned from a successful prior call to agt_get_send_token.
- * cpSendInfo->messageSize must not be greater than the maximum message size supported by sender.
- * cpSendInfo->pMessageBuffer must point to a valid, readable buffer of at least cpSendInfo->messageSize bytes.
- * cpSendInfo->messageId is optional.
- * cpSendInfo->asyncHandle must either be null, or be a valid handle obtained from a call to agt_new_async. If the asyncHandle was already attached to an asynchronous operation, that operation is dropped and replaced.
- *
- * If the sender object has set a "returnHandle" property, cpSendInfo->returnHandle is ignored.
- * Otherwise, if the caller does not wish to provide a return handle (or simply has no need), ensure cpSendInfo->returnHandle is set to AGT_NULL_HANDLE.
- *
- * This call "consumes" sendToken, and sendToken must not be used for any other calls.
- */
-AGT_api void         AGT_stdcall agt_send_with_token(agt_handle_t sender, const agt_send_info_t* cpSendInfo, agt_send_token_t sendToken) AGT_noexcept;
-/**
- * Essentially performs agt_get_send_token and agt_send_with_token in a single call, allowing for fewer API calls and simpler control flow,
- * but removing the ability to ensure the send operation will be successful before preparing the buffer. All the same
- * conditions for use as agt_send_with_token are true here.
- *
- * In the case that the operation fails, the async handle will not be attached (and moreover, won't be detatched from a prior operation),
- * no buffer write will occur, etc. etc.
- *
- */
-AGT_api agt_status_t AGT_stdcall agt_send_message(agt_handle_t sender, const agt_send_info_t* cpSendInfo, agt_timeout_t timeout) AGT_noexcept;
-
-
-/**
- *
- */
-AGT_api agt_status_t AGT_stdcall agt_receive_message(agt_handle_t receiver, agt_message_info_t* pMessageInfo, agt_timeout_t timeout) AGT_noexcept;
-
-/**
- * Prerequisites:
- *  - message is a valid handle obtained from a prior call to agt_receive_message
- *  - buffer is a valid pointer to a memory buffer with at least bufferLength bytes of data
- *
- * If bufferLength is less than the value returned in pMessageInfo->size from the call to agt_receive_message,
- * this will return AGT_ERROR_INSUFFICIENT_SIZE (?).
- */
-AGT_api agt_status_t AGT_stdcall agt_read_message_data(agt_message_t message, agt_size_t bufferLength, void* buffer) AGT_noexcept;
-
-
-AGT_api agt_status_t AGT_stdcall agt_receive_message_data(agt_handle_t receiver, void* buffer, agt_size_t bufferLength, agt_message_info_t* pMessageInfo, agt_timeout_t timeout) AGT_noexcept;
-
-
-/**
- * Close message
- */
-AGT_api void         AGT_stdcall agt_close_message(agt_handle_t owner, agt_message_t message) AGT_noexcept;
-
-/**
- *
- */
-AGT_api agt_status_t AGT_stdcall agt_connect(agt_handle_t* from, agt_handle_t to, agt_connect_flags_t flags) AGT_noexcept;
+AGT_api int          AGT_stdcall agt_get_library_version() AGT_noexcept;
 
 
 
 
 
 
-/* ========================= [ Messages ] ========================= */
 
-AGT_api void         AGT_stdcall agt_return(agt_message_t message, agt_status_t status) AGT_noexcept;
-
+/***/
 
 
-
-AGT_api agt_status_t AGT_stdcall agt_dispatch_message(const agt_actor_t* pActor, const agt_message_info_t* pMessageInfo) AGT_noexcept;
-// AGT_api agt_status_t     AGT_stdcall agt_execute_on_thread(agt_thread_t thread, ) AGT_noexcept;
-
-AGT_api agt_status_t AGT_stdcall agt_get_sender_handle(agt_message_t message, agt_handle_t* pSenderHandle) AGT_noexcept;
-
+AGT_api agt_status_t AGT_stdcall agt_create_event_agent(agt_ctx_t ctx, const agt_agent_create_info_t* cpCreateInfo, agt_agent_t* pAgent) AGT_noexcept;
 
 
 /* ========================= [ Agents ] ========================= */
 
-AGT_api agt_agent_t  AGT_stdcall agt_parent() AGT_noexcept;
-AGT_api agt_agent_t  AGT_stdcall agt_self() AGT_noexcept;
-AGT_api agt_agent_t  AGT_stdcall agt_retain(agt_agent_t agent) AGT_noexcept;
-AGT_api void         AGT_stdcall agt_send(agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept;
-AGT_api void         AGT_stdcall agt_send_as(agt_agent_t spoof, agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept;
-AGT_api void         AGT_stdcall agt_reply(const agt_send_info_t* pSendInfo) AGT_noexcept;
-AGT_api void         AGT_stdcall agt_delegate(agt_agent_t recipient) AGT_noexcept;
-AGT_api void         AGT_stdcall agt_release(agt_agent_t agent) AGT_noexcept;
+AGT_agent_api agt_ctx_t    AGT_stdcall agt_current_context() AGT_noexcept;
+
+AGT_agent_api agt_agent_t  AGT_stdcall agt_self() AGT_noexcept;
+
+AGT_agent_api agt_agent_t  AGT_stdcall agt_retain(agt_agent_t agent) AGT_noexcept;
+
+AGT_agent_api void         AGT_stdcall agt_send(agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept;
+
+AGT_agent_api void         AGT_stdcall agt_send_as(agt_agent_t spoofSender, agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept;
+
+AGT_agent_api void         AGT_stdcall agt_send_many(const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept;
+
+AGT_agent_api void         AGT_stdcall agt_send_many_as(agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept;
+
+AGT_agent_api void         AGT_stdcall agt_reply(const agt_send_info_t* pSendInfo) AGT_noexcept;
+
+AGT_agent_api void         AGT_stdcall agt_delegate(agt_agent_t recipient) AGT_noexcept;
+
+AGT_agent_api void         AGT_stdcall agt_release(agt_agent_t agent) AGT_noexcept;
+
+AGT_agent_api void         AGT_stdcall agt_exit() AGT_noexcept;
 
 
 
+/* ======================= [ Coroutine ] ======================= */
+
+AGT_agent_api void         AGT_stdcall agt_resume_coroutine(agt_agent_t receiver, void* coroutine, agt_async_t* asyncHandle) AGT_noexcept;
+
+
+
+/* ======================= [ Semaphore ] ======================= */
+
+
+AGT_api agt_status_t AGT_stdcall agt_new_semaphore(agt_semaphore_t* ) AGT_noexcept;
+
+/* ======================== [ Barrier ] ======================== */
 
 
 /* ========================= [ Async ] ========================= */
-
 
 /**
  * Initializes a new async object that can store/track the state of asynchronous operations.
@@ -975,16 +695,11 @@ AGT_api void         AGT_stdcall agt_destroy_signal(agt_signal_t* signal) AGT_no
 
 
 
-// AGT_api agt_status_t     AGT_stdcall agt_get_async
-
-
-
-// AGT_api void          AGT_stdcall agt_yield_execution() AGT_noexcept;
-
-
 
 
 AGT_end_c_namespace
 
 
-#endif//AGATE_AGATE_LOWER_H
+
+
+#endif//AGATE_AGATE2_H
