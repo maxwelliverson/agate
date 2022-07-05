@@ -62,7 +62,7 @@ endfunction()
 function(add_agate_executable target_)
     set(optionalArgs TEST SAMPLE)
     set(singleValueArgs LINK)
-    set(multiValueArgs SOURCES DEPENDENCIES)
+    set(multiValueArgs SOURCES DEPENDENCIES OPTIONS)
     cmake_parse_arguments(AGATE_EXE "${optionalArgs}" "${singleValueArgs}" "${multiValueArgs}" ${ARGN})
     if(AGATE_EXE_TEST)
         if(target_ MATCHES "catch")
@@ -101,6 +101,9 @@ function(add_agate_executable target_)
     endif()
     if(AGATE_EXE_TEST)
         set_target_properties(${AGATE_EXE_TARGET} PROPERTIES EXCLUDE_FROM_ALL 1)
+    endif()
+    if(DEFINED AGATE_EXE_OPTIONS)
+        target_compile_options(${AGATE_EXE_TARGET} PRIVATE ${AGATE_EXE_OPTIONS})
     endif()
 endfunction()
 
@@ -176,6 +179,36 @@ add_agate_library(
                 messages
                 support
                 threads
+)
+
+
+add_agate_executable(
+        command_buffers
+            TEST
+            SOURCES
+                main.cpp
+            DEPENDENCIES
+                agate
+)
+
+add_agate_executable(
+        coro
+            TEST
+            SOURCES
+                main.cpp
+            DEPENDENCIES
+                agate
+            OPTIONS
+                /await:strict
+)
+
+add_agate_executable(
+        ring_benchmark
+            TEST
+            SOURCES
+                main.cpp
+            DEPENDENCIES
+                agate
 )
 
 
