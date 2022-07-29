@@ -31,15 +31,49 @@ namespace agt {
   };
 
 
+  enum agent_kind {
+    free_agent_kind,
+    standard_agent_kind
+  };
+
   struct agent_instance {
-    agt_dispatch_kind_t dispatchKind;
+    agent_kind  kind;
     union {
-      agt_agent_no_dispatch_proc_t   noDispatchProc;
-      agt_agent_id_dispatch_proc_t   idDispatchProc;
-      agt_agent_name_dispatch_proc_t nameDispatchProc;
+      struct {
+        agt_free_agent_proc_t proc;
+      } free;
+      struct {
+        agt_agent_proc_t proc;
+        agt_agent_dtor_t destructor;
+        void*            state;
+      } standard;
     };
+    message_pool_t        messagePool;
+    message_queue_t       messageQueue;
+  };
+
+
+
+
+  struct agent_header {
+    agent_kind kind;
+  };
+
+
+
+
+  struct free_agent {
+    agt_free_agent_proc_t proc;
+    message_pool_t        messagePool;
+    message_queue_t       messageQueue;
+  };
+
+  struct standard_agent {
+    agt_agent_proc_t proc;
     agt_agent_dtor_t destructor;
-    void* state;
+    void*            state;
+    message_pool_t   messagePool;
+    message_queue_t  messageQueue;
   };
 
 

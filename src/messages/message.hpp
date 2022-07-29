@@ -75,12 +75,12 @@ struct agt_message_st {
     size_t                    nextOffset;
   };
   union {
-    agt_handle_t              owner;
-    agt::message_pool_t       pool;
+    agt_agent_t               sender;
+    agt_object_id_t           senderId;
   };
   union {
-    agt_handle_t              returnHandle;
-    agt_object_id_t           returnHandleId;
+    agt::agent_instance*      receiver;
+    agt_object_id_t           receiverId;
   };
   union {
     agt_async_data_t          asyncData;
@@ -90,9 +90,11 @@ struct agt_message_st {
   agt::message_flags          flags;
   agt::message_state          state;
   agt_u32_t                   refCount;
-  agt_u32_t                   messageType;
-  // Free 32 bits
-  size_t                      payloadSize;
+
+  agt_u64_t                   extraData;
+
+  agt_agent_cmd_t             messageType;
+  agt_u32_t                   payloadSize;
   agt::inline_buffer          inlineBuffer[];
 };
 

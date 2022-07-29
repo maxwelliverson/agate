@@ -5,7 +5,7 @@
 #ifndef JEMSYS_ATOMICUTILS_INTERNAL_HPP
 #define JEMSYS_ATOMICUTILS_INTERNAL_HPP
 
-#include "agate.h"
+#include "agate2.h"
 
 #include <atomic>
 #include <semaphore>

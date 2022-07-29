@@ -114,6 +114,7 @@ add_agate_library(
             SOURCES
                 agents.cpp
                 dispatch.cpp
+                state.cpp
 )
 
 add_agate_library(
@@ -201,16 +202,19 @@ add_agate_executable(
                 agate
 )
 
-add_agate_executable(
-        coro
+if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    add_agate_executable(
+            coro
             TEST
             SOURCES
-                main.cpp
+            main.cpp
             DEPENDENCIES
-                agate
+            agate
             OPTIONS
-                /await:strict
-)
+            /await:strict
+    )
+endif()
+
 
 add_agate_executable(
         ring_benchmark

@@ -5,7 +5,7 @@
 #ifndef JEMSYS_AGATE2_FWD_HPP
 #define JEMSYS_AGATE2_FWD_HPP
 
-#include "agate.h"
+#include "agate2.h"
 
 extern "C" {
 
@@ -38,6 +38,7 @@ namespace agt {
 
 
   using message_pool_t = void*;
+  using message_queue_t = void*;
 
   using message_block_t = struct message_pool_block*;
 
@@ -60,6 +61,10 @@ namespace agt {
   struct local_spmc_channel;
   struct local_mpsc_channel;
   struct local_mpmc_channel;
+
+
+
+  struct agent_instance;
 
 
 

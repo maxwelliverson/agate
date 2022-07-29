@@ -5,7 +5,7 @@
 #ifndef JEMSYS_MEMUTILS_INTERNAL_HPP
 #define JEMSYS_MEMUTILS_INTERNAL_HPP
 
-#include "agate.h"
+#include "agate2.h"
 
 
 namespace {
