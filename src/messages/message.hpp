@@ -11,6 +11,59 @@
 namespace agt {
 
 
+  enum agent_cmd_t {
+    AGT_CMD_NOOP,                    ///< As the name would imply, this is a noop.
+    AGT_CMD_KILL,                    ///< Command sent on abnormal termination. Minimal cleanup is performed, typically indicates some unhandled error
+
+    AGT_CMD_SEND,                    ///< Process message sent with agt_send
+
+    AGT_CMD_SEND_AS,                 ///< Process message sent with agt_send_as
+
+    AGT_CMD_SEND_MANY,               ///< Process message sent with agt_send_many
+
+    AGT_CMD_SEND_MANY_AS,            ///< Process message sent with agt_send_many_as
+
+    AGT_CMD_PROC_MESSAGE_SHARED,     ///< Process shared message
+
+    // AGT_CMD_PROC_INDIRECT_MESSAGE,   ///< Process indirect message
+
+    AGT_CMD_NAKED_MESSAGE,           ///< Message type of messages sent using raw channel API
+
+    AGT_CMD_CLOSE_QUEUE,             ///< Normal termination command. Any messages sent before this will be processed as normal, but no new messages will be sent. As soon as the queue is empty, the agent is destroyed.
+    AGT_CMD_INVALIDATE_QUEUE,        ///< Current message queue is discarded without having been processed, but the queue is not closed, nor is the agent destroyed.
+
+    AGT_CMD_BARRIER_ARRIVE,          ///< When this message is dequeued, the arrival count of the provided barrier is incremented. If the post-increment arrival count is equal to the expected arrival count, any agents waiting on the barrier are unblocked, and if the barrier was set with a continuation callback, it is called (in the context of the last agent to arrive).
+    AGT_CMD_BARRIER_WAIT,            ///< If the arrival count of the provided barrier is less than the expected arrival count, the agent is blocked until they are equal. Otherwise, this is a noop.
+    AGT_CMD_BARRIER_ARRIVE_AND_WAIT, ///< Equivalent to sending AGT_CMD_BARRIER_ARRIVE immediately followed by AGT_CMD_BARRIER_WAIT
+    AGT_CMD_BARRIER_ARRIVE_AND_DROP, ///<
+    AGT_CMD_ACQUIRE_SEMAPHORE,       ///<
+    AGT_CMD_RELEASE_SEMAPHORE,       ///<
+
+    AGT_CMD_QUERY_UUID,              ///<
+    AGT_CMD_QUERY_NAME,              ///<
+    AGT_CMD_QUERY_DESCRIPTION,       ///<
+    AGT_CMD_QUERY_PRODUCER_COUNT,    ///<
+    AGT_CMD_QUERY_METHOD,            ///<
+
+    AGT_CMD_QUERY_PROPERTY,          ///<
+    AGT_CMD_QUERY_SUPPORT,           ///<
+    AGT_CMD_SET_PROPERTY,            ///<
+    AGT_CMD_WRITE,                   ///<
+    AGT_CMD_READ,                    ///<
+
+    AGT_CMD_FLUSH,                   ///<
+    AGT_CMD_START,                   ///< Sent as the initial message to an eager agent; invokes an agent's start routine
+    AGT_CMD_INVOKE_METHOD_BY_ID,     ///<
+    AGT_CMD_INVOKE_METHOD_BY_NAME,   ///<
+    AGT_CMD_REGISTER_METHOD,         ///<
+    AGT_CMD_UNREGISTER_METHOD,       ///<
+    AGT_CMD_INVOKE_CALLBACK,         ///<
+    AGT_CMD_INVOKE_COROUTINE,        ///<
+    AGT_CMD_REGISTER_HOOK,           ///<
+    AGT_CMD_UNREGISTER_HOOK          ///<
+  };
+
+
 
   struct AGT_cache_aligned inline_buffer {};
 
@@ -55,9 +108,6 @@ namespace agt {
    * */
   void* initMessageArray(shared_handle_header* owner, shared_channel_header* channel) noexcept;
 
-  agt_status_t getMultiFrameMessage(inline_buffer* inlineBuffer, agt_multi_frame_message_info_t& messageInfo) noexcept;
-  bool      getNextFrame(agt_message_frame_t& frame, agt_multi_frame_message_info_t& messageInfo) noexcept;
-
 
   void initMessage(agt_message_t message) noexcept;
 
@@ -93,7 +143,7 @@ struct agt_message_st {
 
   agt_u64_t                   extraData;
 
-  agt_agent_cmd_t             messageType;
+  agt::agent_cmd_t            messageType;
   agt_u32_t                   payloadSize;
   agt::inline_buffer          inlineBuffer[];
 };

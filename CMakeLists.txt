@@ -142,6 +142,7 @@ add_agate_library(
                 segment.cpp
                 random.cpp
                 shared.cpp
+                error.cpp
 )
 
 add_agate_library(

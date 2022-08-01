@@ -362,6 +362,13 @@ typedef struct agt_async_t  agt_async_t;
 typedef struct agt_signal_t agt_signal_t;
 
 
+
+typedef enum agt_error_handler_status_t {
+  AGT_ERROR_HANDLED,
+  AGT_ERROR_IGNORED,
+  AGT_ERROR_NOT_HANDLED
+} agt_error_handler_status_t;
+
 typedef enum agt_status_t {
   AGT_SUCCESS   /** < No errors */,
   AGT_NOT_READY /** < An asynchronous operation is not yet complete */,
@@ -405,8 +412,11 @@ typedef enum agt_status_t {
   AGT_ERROR_INITIALIZATION_FAILED,
   AGT_ERROR_CANNOT_CREATE_SHARED,
   AGT_ERROR_NOT_YET_IMPLEMENTED,
-  AGT_ERROR_UNKNOWN_MESSAGE_CMD
+  AGT_ERROR_CORRUPTED_MESSAGE
 } agt_status_t;
+
+
+typedef agt_error_handler_status_t (AGT_stdcall *agt_error_handler_t)(agt_status_t errorCode, void* errorData);
 
 
 
@@ -462,6 +472,12 @@ AGT_api agt_status_t AGT_stdcall agt_finalize(agt_ctx_t context) AGT_noexcept;
  * Returns the API version of the linked library.
  * */
 AGT_api int          AGT_stdcall agt_get_library_version() AGT_noexcept;
+
+
+
+AGT_api agt_error_handler_t AGT_stdcall agt_get_error_handler(agt_ctx_t context) AGT_noexcept;
+
+AGT_api agt_error_handler_t AGT_stdcall agt_set_error_handler(agt_ctx_t context, agt_error_handler_t errorHandlerCallback) AGT_noexcept;
 
 
 AGT_end_c_namespace

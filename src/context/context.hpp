@@ -25,6 +25,9 @@ namespace agt {
   };
 
 
+  bool          ctxMayIgnoreErrors(agt_ctx_t ctx) noexcept;
+
+
   void*         ctxLocalAlloc(agt_ctx_t ctx, size_t size, size_t alignment) noexcept;
   void          ctxLocalFree(agt_ctx_t ctx, void* memory, size_t size, size_t alignment) noexcept;
 

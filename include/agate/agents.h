@@ -13,8 +13,10 @@ AGT_begin_c_namespace
 /* =================[ Types ]================= */
 
 
+
 typedef struct agt_agent_st*      agt_agent_t;
 typedef struct agt_pinned_msg_st* agt_pinned_msg_t;
+typedef agt_u64_t                 agt_agent_handle_t; // For sending shared handles across shared channels
 
 
 
@@ -46,57 +48,7 @@ typedef enum agt_agent_flag_bits_t {
 } agt_agent_flag_bits_t;
 typedef agt_flags32_t agt_agent_flags_t;
 
-
-
-
-typedef enum agt_agent_cmd_t {
-  AGT_CMD_NOOP,                    ///< As the name would imply, this is a noop.
-  AGT_CMD_KILL,                    ///< Command sent on abnormal termination. Minimal cleanup is performed, typically indicates some unhandled error
-
-  AGT_CMD_PROC_MESSAGE,            ///< Process message
-
-  AGT_CMD_PROC_INDIRECT_MESSAGE,   ///< Process indirect message
-
-  AGT_CMD_NAKED_MESSAGE,           ///< Message type of messages sent using raw channel API
-
-  AGT_CMD_CLOSE_QUEUE,             ///< Normal termination command. Any messages sent before this will be processed as normal, but no new messages will be sent. As soon as the queue is empty, the agent is destroyed.
-  AGT_CMD_INVALIDATE_QUEUE,        ///< Current message queue is discarded without having been processed, but the queue is not closed, nor is the agent destroyed.
-
-  AGT_CMD_BARRIER_ARRIVE,          ///< When this message is dequeued, the arrival count of the provided barrier is incremented. If the post-increment arrival count is equal to the expected arrival count, any agents waiting on the barrier are unblocked, and if the barrier was set with a continuation callback, it is called (in the context of the last agent to arrive).
-  AGT_CMD_BARRIER_WAIT,            ///< If the arrival count of the provided barrier is less than the expected arrival count, the agent is blocked until they are equal. Otherwise, this is a noop.
-  AGT_CMD_BARRIER_ARRIVE_AND_WAIT, ///< Equivalent to sending AGT_CMD_BARRIER_ARRIVE immediately followed by AGT_CMD_BARRIER_WAIT
-  AGT_CMD_BARRIER_ARRIVE_AND_DROP, ///<
-  AGT_CMD_ACQUIRE_SEMAPHORE,       ///<
-  AGT_CMD_RELEASE_SEMAPHORE,       ///<
-
-  AGT_CMD_QUERY_UUID,              ///<
-  AGT_CMD_QUERY_NAME,              ///<
-  AGT_CMD_QUERY_DESCRIPTION,       ///<
-  AGT_CMD_QUERY_PRODUCER_COUNT,    ///<
-  AGT_CMD_QUERY_METHOD,            ///<
-
-  AGT_CMD_QUERY_PROPERTY,          ///<
-  AGT_CMD_QUERY_SUPPORT,           ///<
-  AGT_CMD_SET_PROPERTY,            ///<
-  AGT_CMD_WRITE,                   ///<
-  AGT_CMD_READ,                    ///<
-
-  AGT_CMD_FLUSH,                   ///<
-  AGT_CMD_START,                   ///< Sent as the initial message to an eager agent; invokes an agent's start routine
-  AGT_CMD_INVOKE_METHOD_BY_ID,     ///<
-  AGT_CMD_INVOKE_METHOD_BY_NAME,   ///<
-  AGT_CMD_REGISTER_METHOD,         ///<
-  AGT_CMD_UNREGISTER_METHOD,       ///<
-  AGT_CMD_INVOKE_CALLBACK,         ///<
-  AGT_CMD_INVOKE_COROUTINE,        ///<
-  AGT_CMD_REGISTER_HOOK,           ///<
-  AGT_CMD_UNREGISTER_HOOK          ///<
-} agt_agent_cmd_t;
-
-
-
 typedef struct agt_send_info_t {
-
   agt_message_id_t id;
   agt_size_t       size;
   const void*      buffer;
@@ -105,6 +57,9 @@ typedef struct agt_send_info_t {
 } agt_send_info_t;
 
 
+
+
+// typedef struct agt_agent_
 
 typedef struct agt_agent_create_info_t {
   agt_agent_create_flags_t flags;
@@ -139,6 +94,18 @@ AGT_api agt_status_t AGT_stdcall agt_create_event_agent(agt_ctx_t ctx, const agt
 AGT_api agt_status_t AGT_stdcall agt_create_free_event_agent(agt_ctx_t ctx, const agt_agent_create_info_t* cpCreateInfo, agt_agent_t* pAgent) AGT_noexcept;
 
 
+
+/* =============[ Import/Export ]============= */
+
+/**
+ * Optimized equivalent to agt_export_agent(agt_self())
+ * Obviously, only works within an agent execution context
+ * */
+AGT_agent_api agt_agent_handle_t AGT_stdcall agt_export_self() AGT_noexcept;
+
+AGT_api       agt_status_t       AGT_stdcall agt_export_agent(agt_ctx_t ctx, agt_agent_t agent, agt_agent_handle_t* pHandle) AGT_noexcept;
+
+AGT_api       agt_status_t       AGT_stdcall agt_import(agt_ctx_t ctx, agt_agent_handle_t importHandle, agt_agent_t* pAgent) AGT_noexcept;
 
 
 
@@ -182,7 +149,16 @@ AGT_agent_api void         AGT_stdcall agt_abort() AGT_noexcept;
 
 
 
-
+/**
+ * Interop with C++20 coroutine API.
+ * Coroutine can be passed across C APIs as a simple address thanks to the standardized function calls
+ *     - std::coroutine_handle<PromiseType>::address
+ *     - std::coroutine_handle<PromiseType>::from_address
+ * TODO: Figure out some way to set which C++ standard library implmentation is used internally. Possibly with an environment variable?
+ *       On windows, it should generally be safe to default to the MSVC coroutine implmentation (what about MinGW/Cygwin?), but on
+ *       unix-like systems, the choice between libstdc++ and libc++ is a meaningful one, and I'd have to double check but I'm virtually
+ *       certain they're totally incompatible at the ABI level. At the very least there's no guarantee of compatibility.
+ * */
 AGT_agent_api void         AGT_stdcall agt_resume_coroutine(agt_agent_t receiver, void* coroutine, agt_async_t* asyncHandle) AGT_noexcept;
 
 

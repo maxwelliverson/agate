@@ -110,6 +110,14 @@ namespace agt {
 
   bool is_blocked(agt_agent_t agent) noexcept;
 
+
+
+  bool processMessage(agt::agent_instance* receiver, agt_agent_t sender, agt_agent_t realSender, agt_message_t message) noexcept;
+
+  bool dequeueAndProcessMessage(message_queue_t messageQueue, agt_timeout_t timeout) noexcept;
+
+
+
   agt_status_t wait(blocked_queue& queue, agt_async_t* async, agt_timeout_t timeout) noexcept;
 
   agt_status_t waitAny(blocked_queue& queue, agt_async_t* const * ppAsyncs, size_t asyncCount, agt_timeout_t timeout) noexcept;
@@ -118,12 +126,14 @@ namespace agt {
 }
 
 struct agt_agent_st {
-  agt_dispatch_kind_t dispatchKind;
+  /*agt_dispatch_kind_t dispatchKind;
   union {
     agt_agent_no_dispatch_proc_t   noDispatchProc;
     agt_agent_id_dispatch_proc_t   idDispatchProc;
     agt_agent_name_dispatch_proc_t nameDispatchProc;
-  };
+  };*/
+  agt::agent_instance* instance;
+  agt::message_pool_t  pool;
   agt_agent_dtor_t   destructor;
   void*              state;
   agt::blocked_queue blockedQueue;

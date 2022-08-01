@@ -13,6 +13,12 @@
 #include "core/objects.hpp"
 #include "messages/message.hpp"
 
+#include "agents/state.hpp"
+#include "agents/agents.hpp"
+
+#include "channels/message_pool.hpp"
+#include "channels/message_queue.hpp"
+
 
 using namespace agt;
 
@@ -38,6 +44,29 @@ extern "C" {
 
 
 
+AGT_agent_api agt_status_t AGT_stdcall agt_send(agt_agent_t recipientHandle, const agt_send_info_t* pSendInfo) AGT_noexcept {
+  auto sender    = agt_self();
+  auto recipient = recipientHandle->instance;
+  auto ctx       = agt::tl_state.context;
+  auto message   = agt::acquire_message(ctx, recipient->messagePool, pSendInfo->size);
+  if (!message)
+    return AGT_ERROR_MESSAGE_TOO_LARGE;
+
+  // message->
+  message->messageType = agt::AGT_CMD_SEND;
+
+  agt::enqueueMessage(recipient->messageQueue, message);
+
+  return AGT_SUCCESS;
+}
+
+AGT_agent_api agt_status_t AGT_stdcall agt_send_as(agt_agent_t spoofSender, agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept;
+
+AGT_agent_api agt_status_t AGT_stdcall agt_send_many(const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept;
+
+AGT_agent_api agt_status_t AGT_stdcall agt_send_many_as(agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept;
+
+
 
 
 }
@@ -54,6 +83,7 @@ extern "C" {
 
 
 
+/*
 
 
 AGT_api agt_status_t     AGT_stdcall agtNewContext(agt_ctx_t* pContext) AGT_noexcept {
@@ -184,7 +214,9 @@ AGT_api agt_status_t     AGT_stdcall agtGetSenderHandle(agt_message_t message, a
 
 
 
-/* ========================= [ Async ] ========================= */
+*/
+/* ========================= [ Async ] ========================= *//*
+
 
 AGT_api agt_status_t     AGT_stdcall agtNewAsync(agt_ctx_t ctx, agt_async_t* pAsync) AGT_noexcept {
 
@@ -222,7 +254,9 @@ AGT_api agt_status_t     AGT_stdcall agtWaitMany(const agt_async_t* pAsyncs, siz
 
 
 
-/* ========================= [ Signal ] ========================= */
+*/
+/* ========================= [ Signal ] ========================= *//*
+
 
 AGT_api agt_status_t     AGT_stdcall agtNewSignal(agt_ctx_t ctx, agt_signal_t* pSignal) AGT_noexcept {
 
@@ -243,6 +277,7 @@ AGT_api void          AGT_stdcall agtRaiseManySignals(agt_signal_t signal) AGT_n
 AGT_api void          AGT_stdcall agtDestroySignal(agt_signal_t signal) AGT_noexcept {
 
 }
+*/
 
 
 }
