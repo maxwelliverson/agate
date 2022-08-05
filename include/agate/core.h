@@ -268,6 +268,10 @@
 
 
 
+#define AGT_NAME(name) ((agt_name_t){ .data = name, .length = ((sizeof name) - 1) })
+
+
+
 
 /* =================[ Constants ]================= */
 
@@ -369,6 +373,12 @@ typedef enum agt_error_handler_status_t {
   AGT_ERROR_NOT_HANDLED
 } agt_error_handler_status_t;
 
+typedef enum agt_scope_t {
+  AGT_LOCAL_SCOPE,
+  AGT_SHARED_SCOPE,
+  AGT_PRIVATE_SCOPE
+} agt_scope_t;
+
 typedef enum agt_status_t {
   AGT_SUCCESS   /** < No errors */,
   AGT_NOT_READY /** < An asynchronous operation is not yet complete */,
@@ -414,6 +424,12 @@ typedef enum agt_status_t {
   AGT_ERROR_NOT_YET_IMPLEMENTED,
   AGT_ERROR_CORRUPTED_MESSAGE
 } agt_status_t;
+
+
+typedef struct agt_name_t {
+  const char* data;   ///< Name data
+  agt_size_t  length; ///< Name length; optional. If 0, data must be null terminated.
+} agt_name_t;
 
 
 typedef agt_error_handler_status_t (AGT_stdcall *agt_error_handler_t)(agt_status_t errorCode, void* errorData);

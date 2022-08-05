@@ -117,6 +117,12 @@ namespace agt {
 
   void cleanupMessage(agt_message_t message) noexcept;
 
+
+
+
+  void      setMessageTimestamp(agt_message_t message) noexcept;
+  agt_u64_t getMessageTimestamp(agt_message_t message) noexcept;
+
 }
 
 struct agt_message_st {
@@ -132,10 +138,7 @@ struct agt_message_st {
     agt::agent_instance*      receiver;
     agt_object_id_t           receiverId;
   };
-  union {
-    agt_async_data_t          asyncData;
-    agt::shared_allocation_id asyncDataAllocId;
-  };
+  agt::async_data_t           asyncData;
   agt::async_key_t            asyncDataKey;
   agt::message_flags          flags;
   agt::message_state          state;

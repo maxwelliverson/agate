@@ -10,7 +10,7 @@
 namespace agt {
 
 
-  void          enqueueMessage(message_queue_t queue, agt_message_t message) noexcept;
+  agt_status_t  enqueueMessage(message_queue_t queue, agt_message_t message) noexcept;
   agt_message_t dequeueMessage(message_queue_t queue, agt_timeout_t timeout) noexcept;
 
 

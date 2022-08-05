@@ -45,26 +45,67 @@ extern "C" {
 
 
 AGT_agent_api agt_status_t AGT_stdcall agt_send(agt_agent_t recipientHandle, const agt_send_info_t* pSendInfo) AGT_noexcept {
+
+  assert(pSendInfo != nullptr);
+  assert(recipientHandle != nullptr);
+
   auto sender    = agt_self();
   auto recipient = recipientHandle->instance;
+
+  assert(sender != nullptr);
+  assert(recipient != nullptr);
+
   auto ctx       = agt::tl_state.context;
-  auto message   = agt::acquire_message(ctx, recipient->messagePool, pSendInfo->size);
+
+  auto messageSize = pSendInfo->size;
+
+
+  auto message   = agt::acquire_message(ctx, recipient->messagePool, messageSize);
   if (!message)
     return AGT_ERROR_MESSAGE_TOO_LARGE;
 
-  // message->
-  message->messageType = agt::AGT_CMD_SEND;
 
-  agt::enqueueMessage(recipient->messageQueue, message);
+
+  message->messageType = agt::AGT_CMD_SEND;
+  message->sender      = sender;
+  message->receiver    = recipient;
+  message->payloadSize = static_cast<uint32_t>(messageSize);
+
+  std::memcpy(message->inlineBuffer, pSendInfo->buffer, messageSize);
+
+  if (pSendInfo->asyncHandle) {
+    auto& async = *pSendInfo->asyncHandle;
+    agt::asyncAttachLocal(async, 1, 1);
+    auto asyncData = agt::asyncGetData(async);
+    message->asyncData = asyncData;
+    message->asyncDataKey = agt::asyncDataGetKey(asyncData, nullptr);
+  }
+#if !defined(NDEBUG)
+  else {
+    message->asyncData    = {};
+    message->asyncDataKey = {};
+  }
+#endif
+
+  if (auto enqueueStatus = agt::enqueueMessage(recipient->messageQueue, message)) {
+    agt::release_message(ctx, recipient->messagePool, message);
+    return enqueueStatus;
+  }
 
   return AGT_SUCCESS;
 }
 
-AGT_agent_api agt_status_t AGT_stdcall agt_send_as(agt_agent_t spoofSender, agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept;
+AGT_agent_api agt_status_t AGT_stdcall agt_send_as(agt_agent_t spoofSender, agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept {
 
-AGT_agent_api agt_status_t AGT_stdcall agt_send_many(const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept;
+}
 
-AGT_agent_api agt_status_t AGT_stdcall agt_send_many_as(agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept;
+AGT_agent_api agt_status_t AGT_stdcall agt_send_many(const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept {
+
+}
+
+AGT_agent_api agt_status_t AGT_stdcall agt_send_many_as(agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept {
+
+}
 
 
 
