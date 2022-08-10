@@ -114,6 +114,7 @@ add_agate_library(
             SOURCES
                 agents.cpp
                 dispatch.cpp
+                executor.cpp
                 state.cpp
 )
 

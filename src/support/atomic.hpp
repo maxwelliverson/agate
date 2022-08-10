@@ -5,7 +5,7 @@
 #ifndef JEMSYS_AGATE2_ATOMIC_HPP
 #define JEMSYS_AGATE2_ATOMIC_HPP
 
-#include "agate2.h"
+#include "agate.h"
 
 #include "support/atomicutils.hpp"
 

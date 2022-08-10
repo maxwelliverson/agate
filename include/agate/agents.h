@@ -16,6 +16,7 @@ AGT_begin_c_namespace
 
 typedef struct agt_agent_st*      agt_agent_t;
 typedef struct agt_pinned_msg_st* agt_pinned_msg_t;
+typedef struct agt_executor_st*   agt_executor_t;
 typedef agt_u64_t                 agt_agent_handle_t; // For sending shared handles across shared channels
 typedef agt_u64_t                 agt_typeid_t;
 typedef agt_u64_t                 agt_raw_msg_t;
@@ -115,6 +116,7 @@ typedef struct agt_agent_create_info_t {
     const agt_agent_type_literal_info_t* typeLiteral; ///< Selected if flags includes AGT_AGENT_CREATE_AS_LITERAL
   };
   agt_agent_t              owner;            ///< The agent who owns the returned reference. If null and within an agent execution context, the owner defaults to agt_self(). If null and NOT within such a context, the agent has no defined owner.
+  agt_executor_t           executor;         ///< The executor responsible for executing agent actions. If null and within an agent execution context, will try to use the current executor. If that fails for some reason, or if this field is null and not within an agent execution context, a default executor will be created as per context settings.
   agt_agent_start_t        initializer;      ///< Initial callback executed in the agent's context before it starts receiving messages.
   void*                    userData;         ///< The argument passed to the agent's constructor. If the agent does not have a constructor, then this points to the agent state (NOTE: in this case, the memory pointed to by userData must remain valid for the entire lifetime of the agent. May be null if the agent type has no state).
 } agt_agent_create_info_t;

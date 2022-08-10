@@ -144,7 +144,11 @@ struct agt_message_st {
   agt::message_state          state;
   agt_u32_t                   refCount;
 
-  agt_u64_t                   extraData;
+  union {
+    agt_u64_t     id;
+    agt_message_t indirectMsg;
+    agt_u64_t     indirectMsgOffset;
+  };
 
   agt::agent_cmd_t            messageType;
   agt_u32_t                   payloadSize;

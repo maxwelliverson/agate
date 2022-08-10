@@ -5,7 +5,7 @@
 #ifndef AGATE_CONTEXT_ERROR_HPP
 #define AGATE_CONTEXT_ERROR_HPP
 
-#include "agate2.h"
+#include "agate.h"
 
 namespace agt {
 

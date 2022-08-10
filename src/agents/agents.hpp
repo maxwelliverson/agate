@@ -21,15 +21,6 @@ namespace agt {
 
   };
 
-  struct agent : handle_header {
-    local_mpsc_channel*      channel;
-    agent_group*             group;
-    agt_type_id_t            type;
-    agt_actor_message_proc_t proc;
-    agt_agent_dtor_t         dtor;
-    void*                    state;
-  };
-
 
   enum agent_kind {
     free_agent_kind,
@@ -37,44 +28,16 @@ namespace agt {
   };
 
   struct agent_instance {
-    agent_kind  kind;
-    union {
-      struct {
-        agt_free_agent_proc_t proc;
-      } free;
-      struct {
-        agt_agent_proc_t proc;
-        agt_agent_dtor_t destructor;
-        void*            state;
-      } standard;
-    };
-    message_pool_t        messagePool;
-    message_queue_t       messageQueue;
-  };
-
-
-
-
-  struct agent_header {
-    agent_kind kind;
-  };
-
-
-
-
-  struct free_agent {
-    agt_free_agent_proc_t proc;
-    message_pool_t        messagePool;
-    message_queue_t       messageQueue;
-  };
-
-  struct standard_agent {
+    agent_group*     group;
+    agt_type_id_t    type;
+    message_pool_t   messagePool;
+    message_queue_t  messageQueue;
     agt_agent_proc_t proc;
     agt_agent_dtor_t destructor;
     void*            state;
-    message_pool_t   messagePool;
-    message_queue_t  messageQueue;
   };
+
+
 
 
   enum class block_kind : agt_u32_t {
@@ -126,17 +89,11 @@ namespace agt {
 }
 
 struct agt_agent_st {
-  /*agt_dispatch_kind_t dispatchKind;
-  union {
-    agt_agent_no_dispatch_proc_t   noDispatchProc;
-    agt_agent_id_dispatch_proc_t   idDispatchProc;
-    agt_agent_name_dispatch_proc_t nameDispatchProc;
-  };*/
   agt::agent_instance* instance;
   agt::message_pool_t  pool;
-  agt_agent_dtor_t   destructor;
-  void*              state;
-  agt::blocked_queue blockedQueue;
+  agt_agent_dtor_t     destructor;
+  void*                state;
+  agt::blocked_queue   blockedQueue;
 };
 
 

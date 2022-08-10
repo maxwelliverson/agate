@@ -23,12 +23,12 @@ namespace {
 }
 
 
-bool         agt::processMessage(agt::agent_instance* receiver, agt_agent_t sender, agt_agent_t realSender, agt_message_t message) noexcept {
+bool         agt::processMessage(agt::agent_instance* receiver, agt_agent_t sender, agt_message_t message) noexcept {
   auto lastAgent = std::exchange(agt::tl_state.boundAgent, receiver);
   auto lastMessage = std::exchange(agt::tl_state.currentMessage, message);
 
   if (receiver->kind == agt::free_agent_kind)
-    (*receiver->free.proc)(message->extraData, message->inlineBuffer, message->payloadSize);
+    (*receiver->)(message->extraData, message->inlineBuffer, message->payloadSize);
   else
     (*receiver->standard.proc)(receiver->standard.state, message->extraData, message->inlineBuffer, message->payloadSize);
 

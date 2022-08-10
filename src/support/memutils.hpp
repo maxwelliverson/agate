@@ -5,10 +5,10 @@
 #ifndef JEMSYS_MEMUTILS_INTERNAL_HPP
 #define JEMSYS_MEMUTILS_INTERNAL_HPP
 
-#include "agate2.h"
+#include "agate.h"
 
 
-namespace {
+                                    namespace {
   struct memory_desc{
     jem_size_t size;
     jem_size_t alignment;

@@ -6,7 +6,7 @@
 #define JEMSYS_INTERNAL_DICTIONARY_HPP
 
 
-#include "agate2.h"
+#include "agate.h"
 
 #include "iterator.hpp"
 #include "allocator.hpp"

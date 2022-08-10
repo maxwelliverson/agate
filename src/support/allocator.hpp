@@ -5,13 +5,15 @@
 #ifndef JEMSYS_INTERNAL_ALLOCATOR_HPP
 #define JEMSYS_INTERNAL_ALLOCATOR_HPP
 
-#include "jemsys.h"
+#include "agate.h"
 
+#include <utility>
 #include <memory>
 #include <new>
 #include <vector>
+#include <concepts>
 
-namespace jem{
+namespace agt {
 
 
   class default_allocator{
@@ -22,15 +24,15 @@ namespace jem{
     default_allocator(default_allocator&&) noexcept = default;
 
     void* allocate(size_t size, size_t align = alignof(std::max_align_t)) noexcept {
-      return ::operator new(size, std::align_val_t{align}, std::nothrow);
+      return ::operator new(size, /*std::align_val_t{align},*/ std::nothrow);
     }
     void  deallocate(void* addr, size_t size, size_t align = alignof(std::max_align_t)) noexcept {
-      ::operator delete(addr, size, std::align_val_t{align});
+      ::operator delete(addr, size/*, std::align_val_t{align}*/);
     }
   };
 
   template <typename T>
-  inline T* alloc_array(jem_size_t arraySize, jem_size_t alignment) noexcept {
+  inline T*   alloc_array(agt_size_t arraySize, agt_size_t alignment) noexcept {
 #if defined(_WIN32)
     return static_cast<T*>( _aligned_malloc(arraySize * sizeof(T), std::max(alignof(T), alignment)) );
 #else
@@ -38,7 +40,7 @@ namespace jem{
 #endif
   }
   template <typename T>
-  inline void free_array(T* array, jem_size_t arraySize, jem_size_t alignment) noexcept {
+  inline void free_array(T* array, agt_size_t arraySize, agt_size_t alignment) noexcept {
 #if defined(_WIN32)
     _aligned_free(array);
 #else
@@ -46,7 +48,7 @@ namespace jem{
 #endif
   }
   template <typename T>
-  inline T* realloc_array(T* array, jem_size_t newArraySize, jem_size_t oldArraySize, jem_size_t alignment) noexcept {
+  inline T*   realloc_array(T* array, agt_size_t newArraySize, agt_size_t oldArraySize, agt_size_t alignment) noexcept {
 #if defined(_WIN32)
     return static_cast<T*>(_aligned_realloc(array, newArraySize * sizeof(T), std::max(alignof(T), alignment)));
 #else
@@ -105,7 +107,7 @@ namespace jem{
       return reinterpret_cast<slab*>(reinterpret_cast<uintptr_t>(block) & slabAlignmentMask);
     }
 
-    inline jem_size_t indexOfBlock(slab* s, block_t block) const noexcept {
+    inline agt_size_t indexOfBlock(slab* s, block_t block) const noexcept {
       return ((std::byte*)block - (std::byte*)s) / blockSize;
     }
 
@@ -122,12 +124,12 @@ namespace jem{
     inline void assertSlabIsValid(slab* s) const noexcept {
       if ( s->availableBlocks == 0 )
         return;
-      jem_size_t blockCount = 1;
+      agt_size_t blockCount = 1;
       std::vector<bool> blocks;
       blocks.resize(blocksPerSlab + 1);
       block_t currentBlock = s->nextFreeBlock;
       while (blockCount < s->availableBlocks) {
-        jem_size_t index = indexOfBlock(s, currentBlock);
+        agt_size_t index = indexOfBlock(s, currentBlock);
         assert( !blocks[index] );
         blocks[index] = true;
         ++blockCount;
@@ -159,7 +161,7 @@ namespace jem{
 
 
       *s = alloc_slab();
-      (*s)->availableBlocks = static_cast<jem_u32_t>(blocksPerSlab);
+      (*s)->availableBlocks = static_cast<agt_u32_t>(blocksPerSlab);
       (*s)->nextFreeBlock   = lookupBlock(*s, 1);
       (*s)->stackPosition = s;
 
@@ -297,7 +299,8 @@ namespace jem{
   class pool_allocator : private Fn {
   public:
     template <typename ...Args>
-    pool_allocator(Args&& ...args) noexcept : Fn(std::forward<Args>(args)...){}
+    pool_allocator(Args&& ...args) noexcept
+        : Fn(std::forward<Args>(args)...) { }
 
     void* allocate(size_t size) noexcept {
       fixed_size_pool* pool = (*this)(size);

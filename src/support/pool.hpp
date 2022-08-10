@@ -5,7 +5,7 @@
 #ifndef JEMSYS_AGATE2_POOL_HPP
 #define JEMSYS_AGATE2_POOL_HPP
 
-#include <agate.h>
+#include <agate_old.h>
 
 namespace Agt {
   

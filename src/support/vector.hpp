@@ -5,7 +5,7 @@
 #ifndef JEMSYS_INTERNAL_VECTOR_HPP
 #define JEMSYS_INTERNAL_VECTOR_HPP
 
-#include "agate2.h"
+#include "agate.h"
 
 
 #include "allocator.hpp"

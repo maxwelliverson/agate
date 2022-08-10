@@ -5,7 +5,7 @@
 #ifndef JEMSYS_AGATE2_INTERNAL_ALIGN_HPP
 #define JEMSYS_AGATE2_INTERNAL_ALIGN_HPP
 
-#include "agate2.h"
+#include "agate.h"
 
 
 namespace Agt {

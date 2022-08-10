@@ -2,7 +2,7 @@
 // Created by maxwe on 2022-06-01.
 //
 
-#include "agate2.h"
+#include "agate.h"
 
 #include <vector>
 #include <iostream>

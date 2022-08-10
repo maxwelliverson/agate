@@ -5,7 +5,7 @@
 #ifndef JEMSYS_AGATE2_FWD_HPP
 #define JEMSYS_AGATE2_FWD_HPP
 
-#include "agate2.h"
+#include "agate.h"
 
 extern "C" {
 
@@ -37,7 +37,7 @@ namespace agt {
   enum class async_key_t  : agt_u32_t;
 
 
-  using message_pool_t = void*;
+  using message_pool_t  = void*;
   using message_queue_t = void*;
 
   using message_block_t = struct message_pool_block*;
