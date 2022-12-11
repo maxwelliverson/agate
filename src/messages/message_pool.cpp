@@ -23,7 +23,7 @@ struct agt::message_pool_block {
     message_pool_t pool;
     uintptr_t      poolOffset;
   };
-  shared_allocation_id poolSharedAllocId; ///< Local pools ignore this value entirely
+  shared_handle poolSharedHandle; ///< Local pools ignore this value entirely
 };
 
 namespace {

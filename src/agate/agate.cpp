@@ -16,8 +16,8 @@
 #include "agents/state.hpp"
 #include "agents/agents.hpp"
 
-#include "channels/message_pool.hpp"
 #include "channels/message_queue.hpp"
+#include "messages/message_pool.hpp"
 
 
 using namespace agt;

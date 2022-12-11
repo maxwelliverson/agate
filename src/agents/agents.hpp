@@ -8,33 +8,19 @@
 #include "fwd.hpp"
 #include "core/objects.hpp"
 #include "channels/channel.hpp"
+#include "support/flags.hpp"
 
 #include <csetjmp>
 
 namespace agt {
 
-  struct agency {
-
-  };
-
-  struct agent_group {
-
-  };
-
-
-  enum agent_kind {
-    free_agent_kind,
-    standard_agent_kind
-  };
-
-  struct agent_instance {
-    agent_group*     group;
-    agt_type_id_t    type;
-    message_pool_t   messagePool;
-    message_queue_t  messageQueue;
-    agt_agent_proc_t proc;
-    agt_agent_dtor_t destructor;
-    void*            state;
+  AGT_BITFLAG_ENUM(agent_flags, uint32_t) {
+      isProxy    = 0x1,
+      isShared   = 0x2,
+      isBusy     = 0x4,
+      isBlocked  = 0x8,
+      isLiteral  = 0x10,
+      isImported = 0x20
   };
 
 
@@ -80,6 +66,15 @@ namespace agt {
   bool dequeueAndProcessMessage(message_queue_t messageQueue, agt_timeout_t timeout) noexcept;
 
 
+  shared_handle agentGetSharedHandle(agt_agent_t agent) noexcept;
+
+  agt_agent_t   agentGetReceiver(agt_agent_t agent) noexcept;
+
+
+
+
+  agt_agent_t   importAgent(agt_ctx_t ctx, shared_handle handle) noexcept;
+
 
   agt_status_t wait(blocked_queue& queue, agt_async_t* async, agt_timeout_t timeout) noexcept;
 
@@ -88,10 +83,12 @@ namespace agt {
   agt_status_t waitMany(blocked_queue& queue, agt_async_t* const * ppAsyncs, size_t asyncCount, size_t waitForCount, size_t& index, agt_timeout_t timeout) noexcept;
 }
 
-struct agt_agent_st {
-  agt::agent_instance* instance;
-  agt::message_pool_t  pool;
+/*struct agt_agent_st {
+  agt::agent_flags     flags;
+  agt_executor_t       executor;
+  agt_type_id_t        type;
   agt_agent_dtor_t     destructor;
+  agt_agent_proc_t     proc;
   void*                state;
   agt::blocked_queue   blockedQueue;
 };
@@ -100,6 +97,6 @@ struct agt_agent_st {
 
 inline bool agt::is_blocked(agt_agent_t agent) noexcept {
   return agent->blockedQueue.blockKind != block_kind::eNoBlock;
-}
+}*/
 
 #endif//AGATE_INTERNAL_AGENTS_HPP

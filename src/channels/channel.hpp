@@ -8,11 +8,51 @@
 #include "core/objects.hpp"
 #include "fwd.hpp"
 #include "messages/message.hpp"
+#include "messages/message_pool.hpp"
 
 // #include <ipc/offset_ptr.hpp>
 
 
 namespace agt {
+
+
+  enum channel_kind_t {
+    local_spsc_channel_kind,
+    local_mpsc_channel_kind,
+    local_spmc_channel_kind,
+    local_mpmc_channel_kind,
+    shared_spsc_channel_kind,
+    shared_mpsc_channel_kind,
+    shared_spmc_channel_kind,
+    shared_mpmc_channel_kind,
+    private_channel_kind,
+    local_spsc_fixed_size_channel_kind,
+    local_mpsc_fixed_size_channel_kind,
+    local_spmc_fixed_size_channel_kind,
+    local_mpmc_fixed_size_channel_kind,
+    shared_spsc_fixed_size_channel_kind,
+    shared_mpsc_fixed_size_channel_kind,
+    shared_spmc_fixed_size_channel_kind,
+    shared_mpmc_fixed_size_channel_kind,
+    private_fixed_size_channel_kind,
+  };
+
+  struct channel {
+    channel_kind_t kind;
+    agt_u32_t      refCount;
+    agt_ctx_t      ctx;
+    // message_pool_t msgPool;
+  };
+
+  struct dynamic_channel : channel {
+
+  };
+
+  struct fixed_channel   : channel {
+
+  };
+
+
 
   // sizeof == 64 bytes, or 1 cache line
   struct local_channel_header : handle_header {

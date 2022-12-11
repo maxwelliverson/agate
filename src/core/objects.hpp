@@ -7,56 +7,564 @@
 
 #include "fwd.hpp"
 
+#include "core/thread_state.hpp"
 #include "context/context.hpp"
+#include "context/error.hpp"
 #include "support/atomic.hpp"
 #include "support/flags.hpp"
-#include "vtable.hpp"
+
 
 namespace agt {
 
-  enum class object_type : agt_u32_t {
-    localMpScChannel,
-    localMpMcChannel,
-    localSpMcChannel,
-    localSpScChannel,
-    localMpScChannelSender,
-    localMpMcChannelSender,
-    localSpMcChannelSender,
-    localSpScChannelSender,
-    localMpScChannelReceiver,
-    localMpMcChannelReceiver,
-    localSpMcChannelReceiver,
-    localSpScChannelReceiver,
-    sharedMpScChannel,
-    sharedMpMcChannel,
-    sharedSpMcChannel,
-    sharedSpScChannel,
-    sharedMpScChannelHandle,
-    sharedMpMcChannelHandle,
-    sharedSpMcChannelHandle,
-    sharedSpScChannelHandle,
-    sharedMpScChannelSender,
-    sharedMpMcChannelSender,
-    sharedSpMcChannelSender,
-    sharedSpScChannelSender,
-    sharedMpScChannelReceiver,
-    sharedMpMcChannelReceiver,
-    sharedSpMcChannelReceiver,
-    sharedSpScChannelReceiver,
-    agent,
-    socket,
-    channelSender,
-    channelReceiver,
-    thread,
-    agency,
-    localAsyncData,
-    sharedAsyncData,
-    privateChannel,
-    localBlockingThread,
-    sharedBlockingThread
+  enum object_flags_t {
+    OBJECT_IS_PRIVATE    = 0x1,
+    OBJECT_SLOT_IS_LARGE = 0x4
   };
 
-  enum class connect_action : agt_u32_t {
+
+  struct object {
+    object_type type;            // 2 bytes
+    agt_u16_t   poolChunkOffset; // DO NOT TOUCH, internal data. Units of 16 bytes
+    agt_u32_t   flags;
+    agt_u32_t   refCount;
+    agt_u32_t   epoch;           // DO NOT TOUCH, internal data. Allows for valid "dangling pointers"
+  };
+
+
+
+  object*        alloc_obj(object_pool* pool) noexcept;
+
+  object*        retain_obj(object* obj) noexcept;
+
+  void           free_obj(object* obj, thread_state* state = get_thread_state()) noexcept;
+
+  void           release_obj(object* obj) noexcept;
+
+
+
+  [[nodiscard]] inline object*  alloc_object32(thread_state*  state = get_thread_state()) noexcept {
+    return alloc_obj(&state->poolObj32);
+  }
+
+  [[nodiscard]] inline object*  alloc_object64(thread_state*  state = get_thread_state()) noexcept {
+    return alloc_obj(&state->poolObj64);
+  }
+
+  [[nodiscard]] inline object*  alloc_object128(thread_state* state = get_thread_state()) noexcept {
+    return alloc_obj(&state->poolObj128);
+  }
+
+  [[nodiscard]] inline object*  alloc_object256(thread_state* state = get_thread_state()) noexcept {
+    return alloc_obj(&state->poolObj256);
+  }
+
+  [[nodiscard]] inline object*  alloc_object(size_t size, thread_state* state = get_thread_state()) noexcept {
+    auto num = std::numeric_limits<size_t>::digits - std::countl_zero(size - 1);
+    switch (num) {
+      // case 0:
+      // case 1:
+      // case 2:
+      // case 3:
+      // case 4:
+        // return alloc_object16(state);
+      case 5:
+        return alloc_object32(state);
+      case 6:
+        return alloc_object64(state);
+      case 7:
+        return alloc_object128(state);
+      case 8:
+        return alloc_object256(state);
+      default:
+        AGT_assert(size <= 256 && "Invalid object size");
+        return nullptr;
+    }
+  }
+
+  template <std::derived_from<object> Obj> requires(!std::same_as<std::remove_cv_t<Obj>, object>)
+  [[nodiscard]] inline Obj*     alloc_obj(thread_state* state = get_thread_state()) noexcept {
+    constexpr static size_t ObjSize = std::bit_ceil(sizeof(Obj));
+    // if constexpr (ObjSize == 16)
+      //return static_cast<Obj*>(alloc_object16(state));
+    /*else*/
+    if constexpr (ObjSize == 32)
+      return static_cast<Obj*>(alloc_object32(state));
+    else if constexpr (ObjSize == 64)
+      return static_cast<Obj*>(alloc_object64(state));
+    else if constexpr (ObjSize == 128)
+      return static_cast<Obj*>(alloc_object128(state));
+    else if constexpr (ObjSize == 256)
+      return static_cast<Obj*>(alloc_object256(state));
+    else {
+      AGT_assert(ObjSize <= 256 && "Invalid object size");
+      return nullptr;
+    }
+  }
+
+
+
+#define AGT_assert_is_a(obj, selfType) AGT_assert( obj->type == object_type::selfType )
+#define AGT_assert_is_type(obj, selfType) AGT_assert( object_type::selfType##_begin <= obj->type && obj->type <= object_type::selfType##_end )
+#define AGT_get_type_index(obj, selfType) static_cast<agt_u32_t>(static_cast<agt_u16_t>(obj->type) - static_cast<agt_u16_t>(object_type::selfType##_begin))
+
+
+
+  namespace impl {
+    template <bool IsThreadSafe>
+    class strong_ref_base {
+    public:
+
+      strong_ref_base() = default;
+      strong_ref_base(const strong_ref_base&) = delete;
+      strong_ref_base(strong_ref_base&& other) noexcept
+          : m_ptr(std::exchange(other.m_ptr, nullptr)) { }
+      explicit strong_ref_base(object* ptr) noexcept
+          : m_ptr(ptr) { }
+
+      strong_ref_base& operator=(const strong_ref_base&) = delete;
+      strong_ref_base& operator=(strong_ref_base&& other) noexcept {
+        _free();
+        m_ptr = std::exchange(other.m_ptr, nullptr);
+        return *this;
+      }
+
+      ~strong_ref_base() {
+        _free();
+      }
+
+
+      [[nodiscard]] strong_ref_base clone() const noexcept {
+        if (m_ptr) {
+          if constexpr (IsThreadSafe)
+            atomicRelaxedIncrement(m_ptr->refCount);
+          else
+            ++m_ptr->refCount;
+        }
+        return strong_ref_base{ m_ptr };
+      }
+
+      [[nodiscard]] object* get() const noexcept {
+        return m_ptr;
+      }
+
+      [[nodiscard]] object* release() noexcept {
+        return std::exchange(m_ptr, nullptr);
+      }
+
+      void reset(object* obj) noexcept {
+        if (obj != m_ptr) {
+          auto o = _acquire_or_null(obj);
+          _free();
+          m_ptr = obj;
+        }
+      }
+
+
+      static strong_ref_base load(object* obj) noexcept {
+        strong_ref_base p;
+        p.m_ptr = obj;
+        return std::move(p);
+      }
+
+    private:
+
+      [[nodiscard]] static object* _acquire(object* obj) noexcept {
+        if constexpr (IsThreadSafe)
+          atomicRelaxedIncrement(obj->refCount);
+        else
+          ++obj->refCount;
+        return obj;
+      }
+
+      [[nodiscard]] static object* _acquire_or_null(object* obj) noexcept {
+        if (obj) {
+          if constexpr (IsThreadSafe)
+            atomicRelaxedIncrement(obj->refCount);
+          else
+            ++obj->refCount;
+        }
+        return obj;
+      }
+
+      void _free() noexcept {
+        if (m_ptr) {
+          if constexpr (IsThreadSafe) {
+            if (atomicDecrement(m_ptr->refCount) == 1)
+              free_obj(m_ptr);
+          }
+          else {
+            if (--m_ptr->refCount == 0)
+              free_obj(m_ptr);
+          }
+        }
+      }
+
+
+      object* m_ptr;
+    };
+
+    template <bool IsThreadSafe>
+    class weak_ref_base {
+      static void _release(object* obj) noexcept {
+        if (obj)
+          release_obj(obj);
+      }
+      [[nodiscard]] AGT_forceinline static object*   _retain(object* obj) noexcept {
+        return obj ? retain_obj(obj) : nullptr;
+      }
+      [[nodiscard]] AGT_forceinline static agt_u32_t _get_epoch(object* obj) noexcept {
+        // Might be able to get away with a memory barrier rather than a full blown atomic load?
+        // At least one strong reference to obj is guaranteed to persist throughout the duration
+        // of the retain operation, and epoch is only updated when there are no strong references
+        // active. Thus, epoch is guaranteed to not be written to for the duration of the retain
+        // operation, and therefore the load does not need to be atomic with respect to other
+        // threads, but rather it needs only to ensure that any possible prior writes to epoch
+        // are detected.
+        // Because epoch is only ever written to with atomic operations, placing an acquire fence
+        // prior to the memory read ensures proper synchronization.
+
+        std::atomic_thread_fence(std::memory_order_acquire);
+        return obj->epoch;
+      }
+    public:
+
+      weak_ref_base() = default;
+      weak_ref_base(const weak_ref_base&) = delete;
+      explicit weak_ref_base(object* obj) noexcept
+          : m_ptr(_retain(obj)),
+            m_epoch(obj ? _get_epoch(obj) : 0)
+      { }
+      weak_ref_base(std::in_place_t, object* obj, agt_u32_t epoch) noexcept
+          : m_ptr(retain_obj(obj)),
+            m_epoch(epoch)
+      { }
+      template <typename T>
+      weak_ref_base(object* obj, T&& value) noexcept
+          : m_ptr(_retain(obj)),
+            m_epoch(obj ? _get_epoch(obj) : 0) {
+        emplace<std::remove_cvref_t<T>>(std::forward<T>(value));
+      }
+      template <typename T>
+      weak_ref_base(object* obj, agt_u32_t epoch, T&& value) noexcept
+          : m_ptr(retain_obj(obj)),
+            m_epoch(epoch) {
+        emplace<std::remove_cvref_t<T>>(std::forward<T>(value));
+      }
+
+      weak_ref_base& operator=(weak_ref_base&& other) noexcept {
+        _release(m_ptr);
+        m_ptr = std::exchange(other.m_ptr, nullptr);
+        m_epoch = other.m_epoch;
+        m_value = std::exchange(other.m_value, 0);
+        return *this;
+      }
+
+      ~weak_ref_base() {
+        _release(m_ptr);
+      }
+
+
+      [[nodiscard]] object* get() const noexcept {
+        return m_ptr;
+      }
+
+      [[nodiscard]] agt_u32_t epoch() const noexcept {
+        return m_epoch;
+      }
+
+      template <typename T>
+      void move_assign(weak_ref_base&& other, T&& val) noexcept {
+        using value_type = std::remove_cvref_t<T>;
+        _release(m_ptr);
+        m_ptr = std::exchange(other.m_ptr, nullptr);
+        m_epoch = other.m_epoch;
+        *reinterpret_cast<value_type*>(static_cast<void*>(&m_value)) = std::forward<T>(val);
+      }
+
+      [[nodiscard]] object*&         ptr()       &  noexcept {
+        return m_ptr;
+      }
+      [[nodiscard]] object* const &  ptr() const &  noexcept {
+        return m_ptr;
+      }
+      [[nodiscard]] object*&&        ptr()       && noexcept {
+        return std::move(m_ptr);
+      }
+      [[nodiscard]] object* const && ptr() const && noexcept {
+        return std::move(m_ptr);
+      }
+
+
+
+      [[nodiscard]]       agt_u32_t&  second()       &  noexcept {
+        return m_value;
+      }
+      [[nodiscard]] const agt_u32_t&  second() const &  noexcept {
+        return m_value;
+      }
+      [[nodiscard]]       agt_u32_t&& second()       && noexcept {
+        return std::move(m_value);
+      }
+      [[nodiscard]] const agt_u32_t&& second() const && noexcept {
+        return std::move(m_value);
+      }
+
+      template <typename T, typename ...Args>
+      T& emplace(Args&& ...args) noexcept {
+        static_assert(sizeof(T) <= sizeof(agt_u32_t));
+        return *new(&m_value) T(std::forward<Args>(args)...);
+      }
+
+      [[nodiscard]] object* try_load_ptr() noexcept {
+        union {
+          struct {
+            agt_u32_t refCount;
+            agt_u32_t epoch;
+          };
+          agt_u64_t field;
+        };
+
+        if constexpr (IsThreadSafe) {
+          field = atomicRelaxedIncrement(_ctl_field());
+          if (refCount == static_cast<agt_u32_t>(-1)) [[unlikely]] {
+            _reset_epoch(epoch + 1);
+            return nullptr;
+          }
+          if (epoch != m_epoch) {
+            free_obj(m_ptr);
+            return nullptr;
+          }
+        }
+        else {
+          if (m_ptr->epoch != m_epoch)
+            return nullptr;
+          ++m_ptr->refCount;
+        }
+
+        return m_ptr;
+      }
+
+    protected:
+
+      AGT_noinline void _reset_epoch(agt_u32_t badEpoch) noexcept {
+        union field {
+          struct {
+            agt_u32_t refCount;
+            agt_u32_t epoch;
+          };
+          agt_u64_t value;
+        } prev, next;
+
+        prev.refCount = 0;
+        prev.epoch    = badEpoch;
+
+        do {
+          next.refCount = prev.refCount - 1;
+          next.epoch    = prev.epoch    - 1;
+        } while (!atomicCompareExchange(_ctl_field(), prev.value, next.value));
+
+        err::internal_overflow info{
+            .obj = m_ptr,
+            .msg = "Reference count overflow",
+            .fieldBits = 32
+        };
+
+        raiseError(AGT_ERROR_INTERNAL_OVERFLOW, &info);
+      }
+
+
+
+
+
+
+    private:
+
+      [[nodiscard]] AGT_forceinline agt_u64_t& _ctl_field() noexcept {
+        return *reinterpret_cast<agt_u64_t*>(static_cast<void*>(&m_ptr->refCount));
+      }
+
+      object*   m_ptr;
+      agt_u32_t m_epoch;
+      agt_u32_t m_value;
+    };
+
+
+    extern template class strong_ref_base<true>;
+    extern template class strong_ref_base<false>;
+    extern template class weak_ref_base<true>;
+    extern template class weak_ref_base<false>;
+  }
+
+
+
+
+  template <typename T, bool IsThreadSafe>
+  class strong_ref {
+    template <typename, typename, bool>
+    friend class weak_ref;
+
+    strong_ref(impl::strong_ref_base<IsThreadSafe> val) noexcept
+        : m_val(std::move(val)) { }
+
+  public:
+
+    using pointer   = T*;
+    using reference = T&;
+
+    strong_ref() = default;
+    explicit strong_ref(pointer p) noexcept
+        : m_val(p) {
+      static_assert(std::derived_from<T, object>);
+    }
+
+
+    [[nodiscard]] inline pointer   operator->() const noexcept {
+      return m_val.get();
+    }
+    [[nodiscard]] inline reference operator*()  const noexcept {
+      return *m_val.get();
+    }
+
+
+    [[nodiscard]] inline pointer get() const noexcept {
+      return m_val.get();
+    }
+
+    [[nodiscard]] inline strong_ref clone() const noexcept {
+      return strong_ref(m_val.clone());
+    }
+
+    inline pointer release() noexcept {
+      return static_cast<pointer>(m_val.release());
+    }
+
+    inline void    reset(pointer p) noexcept {
+      m_val.reset(p);
+    }
+
+    [[nodiscard]] inline explicit operator bool() const noexcept {
+      return m_val.get() != nullptr;
+    }
+
+  private:
+    impl::strong_ref_base<IsThreadSafe> m_val;
+  };
+
+  template <typename T, bool IsThreadSafe>
+  class weak_ref<T, void, IsThreadSafe> {
+    friend strong_ref<T, IsThreadSafe>;
+  public:
+
+    using pointer   = T*;
+    using reference = T&;
+    using strong_ref_type = strong_ref<T, IsThreadSafe>;
+
+    weak_ref() noexcept : m_val(nullptr) { }
+    weak_ref(pointer p) noexcept : m_val(p) { }
+    weak_ref(pointer p, agt_u32_t epoch) noexcept : m_val(std::in_place, p, epoch) { }
+
+    weak_ref(weak_ref&& other) noexcept
+        : m_val(std::in_place,
+                std::exchange(other.m_val.ptr(), nullptr),
+                other.m_val.epoch())
+    { }
+
+    weak_ref& operator=(weak_ref&& other) noexcept {
+      m_val = std::move(other.m_val);
+      // m_val.move_assign(std::move(other.m_val), std::move(other.second()));
+      return *this;
+    }
+
+    ~weak_ref() = default;
+
+    [[nodiscard]] inline strong_ref_type     try_acquire() noexcept {
+      return { static_cast<pointer>(m_val.try_load_ptr()) };
+    }
+
+    [[nodiscard]] inline agt_u32_t           epoch() const noexcept {
+      return m_val.epoch();
+    }
+
+    [[nodiscard]] inline explicit operator bool() const noexcept {
+      return m_val.ptr() != nullptr;
+    }
+
+  private:
+    impl::weak_ref_base<IsThreadSafe> m_val;
+  };
+
+  template <typename T, typename U, bool IsThreadSafe>
+  class weak_ref {
+    friend strong_ref<T, IsThreadSafe>;
+  public:
+
+    using pointer   = T*;
+    using reference = T&;
+    using strong_ref_type = strong_ref<T, IsThreadSafe>;
+    using second_type = U;
+
+    weak_ref() noexcept requires std::default_initializable<U> : m_val(nullptr, U{}) { }
+    weak_ref(pointer p) noexcept requires std::default_initializable<U> : m_val(p, U{}) { }
+    weak_ref(pointer p, const U& val) noexcept requires std::copy_constructible<U> : m_val(p, val) { }
+    weak_ref(pointer p, U&& val) noexcept requires std::move_constructible<U> : m_val(p, std::move(val)) { }
+    weak_ref(pointer p, agt_u32_t epoch, const U& val) noexcept requires std::copy_constructible<U> : m_val(p, epoch, val) { }
+    weak_ref(pointer p, agt_u32_t epoch, U&& val) noexcept requires std::move_constructible<U> : m_val(p, epoch, std::move(val)) { }
+
+    weak_ref(weak_ref&& other) noexcept requires std::move_constructible<U>
+        : m_val(std::exchange(other.m_val.ptr(), nullptr),
+                other.m_val.epoch(),
+                std::move(other.second()))
+    { }
+
+    weak_ref& operator=(weak_ref&& other) noexcept requires std::is_move_assignable_v<U> {
+      m_val.move_assign(std::move(other.m_val), std::move(other.second()));
+      return *this;
+    }
+
+    ~weak_ref() requires std::is_trivially_destructible_v<U> = default;
+
+    ~weak_ref() {
+      m_val.second().~U();
+      // destruction of the pointer should be taken care of automatically by the compiler
+      // m_val.~impl::weak_ref_base<IsThreadSafe>();
+    }
+
+
+
+    [[nodiscard]] inline strong_ref_type     try_acquire() noexcept {
+      return { static_cast<pointer>(m_val.try_load_ptr()) };
+    }
+
+    [[nodiscard]] inline agt_u32_t           epoch() const noexcept {
+      return m_val.epoch();
+    }
+
+    [[nodiscard]] inline second_type&        second()       &  noexcept {
+      return *reinterpret_cast<second_type*>(static_cast<void*>(&m_val.second()));
+    }
+    [[nodiscard]] inline const second_type&  second() const &  noexcept {
+      return *reinterpret_cast<const second_type*>(static_cast<const void*>(&m_val.second()));
+    }
+    [[nodiscard]] inline second_type&&       second()       && noexcept {
+      return std::move(*reinterpret_cast<second_type*>(static_cast<void*>(&m_val.second())));
+    }
+    [[nodiscard]] inline const second_type&& second() const && noexcept {
+      return std::move(*reinterpret_cast<const second_type*>(static_cast<const void*>(&m_val.second())));
+    }
+
+    [[nodiscard]] inline explicit operator bool() const noexcept {
+      return m_val.ptr() != nullptr;
+    }
+
+  private:
+    impl::weak_ref_base<IsThreadSafe> m_val;
+  };
+
+
+
+
+
+  /*enum class connect_action : agt_u32_t {
     connectSender,
     disconnectSender,
     connectReceiver,
@@ -137,7 +645,7 @@ namespace agt {
 
   struct shared_handle_header : handle_header {
     shared_object_header* sharedInstance;
-  };
+  };*/
 
 
   /*class Handle {
@@ -271,7 +779,7 @@ namespace agt {
 
   };*/
 
-  template <typename Hdl>
+  /*template <typename Hdl>
   inline Hdl*      allocHandle(agt_ctx_t ctx) noexcept {
     using HandleType = typename object_info<Hdl>::handle_type;
     auto handle      = (handle_header*)ctxAllocHandle(ctx, sizeof(HandleType), alignof(HandleType));
@@ -279,7 +787,7 @@ namespace agt {
     handle->type     = object_info<Hdl>::TypeValue;
     handle->context  = ctx;
     return static_cast<Hdl*>(handle);
-  }
+  }*/
 
 
 }

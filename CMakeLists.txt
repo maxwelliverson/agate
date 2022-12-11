@@ -131,8 +131,10 @@ add_agate_library(
             PRIVATE
             SOURCES
                 channels.cpp
-                message_pool.cpp
                 message_queue.cpp
+                broadcast_queue.cpp
+                sender.cpp
+                receiver.cpp
 )
 
 add_agate_library(
@@ -144,6 +146,8 @@ add_agate_library(
                 random.cpp
                 shared.cpp
                 error.cpp
+                init.cpp
+
 )
 
 add_agate_library(
@@ -151,6 +155,8 @@ add_agate_library(
             PRIVATE
             SOURCES
                 objects.cpp
+                object_pool.cpp
+                thread_state.cpp
                 vtable.cpp
 )
 
@@ -159,6 +165,7 @@ add_agate_library(
             PRIVATE
             SOURCES
                 message.cpp
+                message_pool.cpp
 )
 
 add_agate_library(
@@ -225,6 +232,15 @@ add_agate_executable(
                 main.cpp
             DEPENDENCIES
                 agate
+)
+
+
+
+add_agate_executable(
+        alloc_benchmarks
+            TEST
+            SOURCES
+                main.cpp
 )
 
 

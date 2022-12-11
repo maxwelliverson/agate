@@ -21,13 +21,13 @@ namespace {
 
 
   struct shared_seg_descriptor {
-    agt_u32_t                 importCount;
-    agt::seg_type             type;
-    agt_flags32_t             flags;
-    agt::shared_allocation_id allocId;
-    size_t                    cellSize;
-    size_t                    cellCount;
-    char                      name[24];
+    agt_u32_t          importCount;
+    agt::seg_type      type;
+    agt_flags32_t      flags;
+    agt::shared_handle allocId;
+    size_t             cellSize;
+    size_t             cellCount;
+    char               name[24];
   };
 
 

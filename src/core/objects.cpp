@@ -5,6 +5,15 @@
 #include "objects.hpp"
 
 
+template class agt::impl::strong_ref_base<true>;
+template class agt::impl::strong_ref_base<false>;
+template class agt::impl::weak_ref_base<true>;
+template class agt::impl::weak_ref_base<false>;
+
+
+
+/*
+
 using namespace Agt;
 
 namespace {
@@ -73,4 +82,4 @@ SharedHandle::SharedHandle(SharedObject* pInstance, agt_ctx_t context, Id localI
     : Handle(pInstance->getType(), pInstance->getFlags(), context, localId),
       vptr(lookupSharedVTable(pInstance->getType())),
       instance(pInstance)
-{}
+{}*/

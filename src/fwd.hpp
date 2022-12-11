@@ -25,16 +25,106 @@ namespace agt {
    *           -                                           If the low bit is one, interpret the integer as a shared allocation handle, and convert to a local pointer using the local context
    * */
 
+  enum class object_type : agt_u16_t {
+    local_agent,
+    proxy_agent,
+    shared_agent,
+    imported_agent,
+
+    local_busy_executor,
+    local_single_thread_executor,
+    local_pool_executor,
+    local_proxy_executor,
+    shared_busy_executor,
+    shared_single_thread_executor,
+    shared_pool_executor,
+    shared_proxy_executor,
+
+    local_async_data,
+    shared_async_data,
+
+    private_message_pool,
+    private_sized_message_pool,
+    local_spsc_message_pool,
+    local_spsc_sized_message_pool,
+    local_mpsc_message_pool,
+    local_mpsc_sized_message_pool,
+    local_spmc_message_pool,
+    local_spmc_sized_message_pool,
+    local_mpmc_message_pool,
+    local_mpmc_sized_message_pool,
+    shared_spsc_message_pool,
+    shared_spsc_sized_message_pool,
+    shared_mpsc_message_pool,
+    shared_mpsc_sized_message_pool,
+    shared_spmc_message_pool,
+    shared_spmc_sized_message_pool,
+    shared_mpmc_message_pool,
+    shared_mpmc_sized_message_pool,
+
+
+    local_spsc_queue_sender,
+    local_mpsc_queue_sender,
+    local_spmc_queue_sender,
+    local_mpmc_queue_sender,
+    shared_spsc_queue_sender,
+    shared_mpsc_queue_sender,
+    shared_spmc_queue_sender,
+    shared_mpmc_queue_sender,
+    private_queue_sender,
+    local_sp_bqueue_sender,
+    local_mp_bqueue_sender,
+    shared_sp_bqueue_sender,
+    shared_mp_bqueue_sender,
+
+    local_spsc_queue_receiver,
+    local_mpsc_queue_receiver,
+    local_spmc_queue_receiver,
+    local_mpmc_queue_receiver,
+    shared_spsc_queue_receiver,
+    shared_mpsc_queue_receiver,
+    shared_spmc_queue_receiver,
+    shared_mpmc_queue_receiver,
+    private_queue_receiver,
+    local_sp_bqueue_receiver,
+    local_mp_bqueue_receiver,
+    shared_sp_bqueue_receiver,
+    shared_mp_bqueue_receiver,
+
+
+    local_mpmc_queue,
+    shared_spsc_queue,
+    shared_mpsc_queue,
+    shared_spmc_queue,
+    shared_mpmc_queue,
+    shared_sp_bqueue,
+    shared_mp_bqueue,
+
+
+    agent_begin    = local_agent,
+    agent_end      = imported_agent,
+    executor_begin = local_busy_executor,
+    executor_end   = shared_proxy_executor,
+    sender_begin   = local_spsc_queue_sender,
+    sender_end     = shared_mp_bqueue_sender,
+    receiver_begin = local_spsc_queue_receiver,
+    receiver_end   = shared_mp_bqueue_receiver,
+  };
+
   enum class shared_allocation_id : agt_u64_t;
 
-  enum class object_type : agt_u32_t;
-  enum class object_flags : agt_handle_flags_t;
+
   enum class connect_action : agt_u32_t;
 
   enum class error_state : agt_u32_t;
 
   enum class async_data_t : agt_u64_t;
   enum class async_key_t  : agt_u32_t;
+
+  enum class shared_handle : agt_u64_t;
+
+  enum class context_id    : agt_u32_t;
+  enum class name_token    : agt_u64_t;
 
 
   using message_pool_t  = void*;
@@ -43,9 +133,14 @@ namespace agt {
   using message_block_t = struct message_pool_block*;
 
 
+  struct object;
+
   struct handle_header;
   struct shared_object_header;
   struct shared_handle_header;
+
+  struct object_pool;
+  struct thread_state;
 
   struct id;
 
@@ -61,6 +156,12 @@ namespace agt {
   struct local_spmc_channel;
   struct local_mpsc_channel;
   struct local_mpmc_channel;
+
+  struct sender;
+  struct receiver;
+
+  using sender_t   = sender*;
+  using receiver_t = receiver*;
 
 
 
@@ -97,6 +198,18 @@ namespace agt {
   struct async_data;
   struct imported_async_data;
 
+
+  template <typename T, bool IsThreadSafe = true>
+  class strong_ref;
+
+  template <typename T>
+  using unsafe_strong_ref = strong_ref<T, false>;
+
+  template <typename T, typename U = void, bool IsThreadSafe = true>
+  class weak_ref;
+
+  template <typename T, typename U = void>
+  using unsafe_weak_ref = weak_ref<T, U, false>;
 
 
 

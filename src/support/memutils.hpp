@@ -10,8 +10,8 @@
 
                                     namespace {
   struct memory_desc{
-    jem_size_t size;
-    jem_size_t alignment;
+    agt_size_t size;
+    agt_size_t alignment;
   };
 
   template <typename T>

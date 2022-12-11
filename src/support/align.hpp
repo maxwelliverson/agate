@@ -8,9 +8,18 @@
 #include "agate.h"
 
 
-namespace Agt {
+namespace agt {
   AGT_forceinline size_t alignSize(size_t size, size_t align) noexcept {
     return ((size - 1) | (align - 1)) + 1;
+  }
+
+  AGT_forceinline static constexpr size_t align_to(size_t size, size_t align) noexcept {
+    return ((size - 1) | (align - 1)) + 1;
+  }
+
+  template <size_t Align>
+  AGT_forceinline static constexpr size_t align_to(size_t size) noexcept {
+    return ((size - 1) | (Align - 1)) + 1;
   }
 }
 

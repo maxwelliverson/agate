@@ -7,6 +7,8 @@
 
 #include "fwd.hpp"
 
+#include <utility>
+
 namespace agt {
 
   async_key_t  asyncDataAttach(async_data_t asyncData, agt_ctx_t ctx) noexcept;
@@ -35,9 +37,9 @@ namespace agt {
   void         asyncClear(agt_async_t& async) noexcept;
   void         asyncDestroy(agt_async_t& async, bool wipeMemory = true) noexcept;
 
-  void         asyncAttachLocal(agt_async_t& async, agt_u32_t expectedCount, agt_u32_t attachedCount) noexcept;
+  std::pair<async_data_t, async_key_t> asyncAttachLocal(agt_async_t& async, agt_u32_t expectedCount, agt_u32_t attachedCount) noexcept;
 
-  void         asyncAttachShared(agt_async_t& async, agt_u32_t expectedCount, agt_u32_t attachedCount) noexcept;
+  std::pair<async_data_t, async_key_t> asyncAttachShared(agt_async_t& async, agt_u32_t expectedCount, agt_u32_t attachedCount) noexcept;
 
   agt_status_t asyncWait(agt_async_t& async, agt_timeout_t timeout) noexcept;
 

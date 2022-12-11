@@ -294,12 +294,14 @@
 
 
 #if AGT_system_windows
-# define AGT_NATIVE_TIMEOUT_CONVERSION 10
+# define AGT_NATIVE_TIMEOUT_GRANULARITY 100ULL
 #else
-# define AGT_NATIVE_TIMEOUT_CONVERSION 1000
+# define AGT_NATIVE_TIMEOUT_GRANULARITY 1ULL
 #endif
 
-#define AGT_TIMEOUT(microseconds) ((agt_timeout_t)(microseconds * AGT_NATIVE_TIMEOUT_CONVERSION))
+#define AGT_TIMEOUT_MS(milliseconds) ((agt_timeout_t)((milliseconds) * (1000000ULL / AGT_NATIVE_TIMEOUT_GRANULARITY)))
+#define AGT_TIMEOUT_US(microseconds) ((agt_timeout_t)((microseconds) * (1000ULL / AGT_NATIVE_TIMEOUT_GRANULARITY)))
+#define AGT_TIMEOUT_NS(nanoseconds) ((agt_timeout_t)((nanoseconds) / AGT_NATIVE_TIMEOUT_GRANULARITY))
 #define AGT_DO_NOT_WAIT ((agt_timeout_t)0)
 #define AGT_WAIT ((agt_timeout_t)-1)
 
@@ -396,7 +398,7 @@ typedef enum agt_status_t {
   AGT_ERROR_FOREIGN_SENDER,
   AGT_ERROR_STATUS_NOT_SET,
   AGT_ERROR_UNKNOWN_MESSAGE_TYPE,
-  AGT_ERROR_INVALID_CMDERATION /** < The given handle does not implement the called function. eg. agt_receive_message cannot be called on a channel sender*/,
+  AGT_ERROR_INVALID_CMD /** < The given handle does not implement the called function. eg. agt_receive_message cannot be called on a channel sender*/,
   AGT_ERROR_INVALID_FLAGS,
   AGT_ERROR_INVALID_MESSAGE,
   AGT_ERROR_INVALID_SIGNAL,
@@ -422,7 +424,9 @@ typedef enum agt_status_t {
   AGT_ERROR_INITIALIZATION_FAILED,
   AGT_ERROR_CANNOT_CREATE_SHARED,
   AGT_ERROR_NOT_YET_IMPLEMENTED,
-  AGT_ERROR_CORRUPTED_MESSAGE
+  AGT_ERROR_CORRUPTED_MESSAGE,
+  AGT_ERROR_COULD_NOT_REACH_ALL_TARGETS,
+  AGT_ERROR_INTERNAL_OVERFLOW            /** < Indicates an internal overflow error that was caught and corrected but that caused the requested operation to fail. */
 } agt_status_t;
 
 
@@ -464,7 +468,7 @@ typedef agt_error_handler_status_t (AGT_stdcall *agt_error_handler_t)(agt_status
  * |                               Name |    Type   |   Default Value   | Description
  * |------------------------------------|-----------|-------------------|--------------
  * |              AGATE_PRIVATE_CONTEXT |  bool     |       false       | If true, all interprocess capabilities will be disabled for this context. Any attempt to create a shared entity from this context will result in a return code of AGT_ERROR_CANNOT_CREATE_SHARED.
- * |                   AGATE_SHARED_KEY |  string   | agate-default-key | If interprocess capabilities are enabled (as they are by default), this context will be able to communicate with any other contexts that were created with the same key.
+ * |             AGATE_SHARED_NAMESPACE |  string   | agate-default-key | If interprocess capabilities are enabled (as they are by default), this context will be able to communicate with any other contexts that were created with the same key.
  * |     AGATE_CHANNEL_DEFAULT_CAPACITY |  integer  |        255        | When creating a channel, a capacity is specified. The created channel is guaranteed to be able to concurrently store at least that many messages. If the specified capacity is 0, then the default capacity is used, as defined by this variable.
  * | AGATE_CHANNEL_DEFAULT_MESSAGE_SIZE |  integer  |        196        | When creating a channel, a message size is specified. The created channel is guaranteed to be able to send messages of up to the specified size in bytes without dynamic allocation. If the specified size is 0, then the default size is used, as defined by this variable.
  * |   AGATE_CHANNEL_DEFAULT_TIMEOUT_MS |  integer  |       30000       | When creating a channel, a timeout in milliseconds is specified. Any handles to the created channel will be disconnected if there is no activity after the duration specified in this variable. Used as a safeguard against denial of service-esque attacks.

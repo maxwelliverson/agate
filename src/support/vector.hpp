@@ -20,7 +20,7 @@
 #endif
 
 
-namespace jem{
+namespace agt {
   template <typename T, size_t N>
   class vector;
   
@@ -41,7 +41,7 @@ namespace jem{
 
       using size_type = SizeType;
 
-      static jem_u64_t get_new_capacity(jem_u64_t minimum_size, jem_u64_t old_capacity) noexcept;
+      static agt_u64_t get_new_capacity(agt_u64_t minimum_size, agt_u64_t old_capacity) noexcept;
 
     protected:
       void*     begin_;
@@ -53,12 +53,12 @@ namespace jem{
         return std::numeric_limits<size_type>::max();
       }
 
-      vector_base(void* first_element, jem_u64_t total_capacity) noexcept
+      vector_base(void* first_element, agt_u64_t total_capacity) noexcept
           : begin_(first_element), capacity_(total_capacity) {}
 
 
-      AGT_noinline void* malloc_for_grow(jem_u64_t minimum_size, jem_u64_t type_size, jem_u64_t& new_capacity, jem_u64_t alignment);
-      AGT_noinline void  grow_pod(void *first_element, jem_u64_t minimum_capacity, jem_u64_t type_size, jem_u64_t alignment);
+      AGT_noinline void* malloc_for_grow(agt_u64_t minimum_size, agt_u64_t type_size, agt_u64_t& new_capacity, agt_u64_t alignment);
+      AGT_noinline void  grow_pod(void *first_element, agt_u64_t minimum_capacity, agt_u64_t type_size, agt_u64_t alignment);
 
 
 
@@ -71,14 +71,14 @@ namespace jem{
 
       AGT_nodiscard bool empty() const noexcept { return !size_; }
 
-      void set_size(jem_u64_t new_size) noexcept {
+      void set_size(agt_u64_t new_size) noexcept {
         AGT_assert(new_size <= capacity());
         size_ = new_size;
       }
     };
 
     template <typename T>
-    using small_array_size_type = std::conditional_t<sizeof(T) <= 4, jem_u64_t, jem_u32_t>;
+    using small_array_size_type = std::conditional_t<sizeof(T) <= 4, agt_u64_t, agt_u32_t>;
 
 
 
@@ -125,9 +125,9 @@ namespace jem{
       }
 
     protected:
-      small_array_template_common(jem_u64_t size) noexcept : base(get_first_element(), size){ }
+      small_array_template_common(agt_u64_t size) noexcept : base(get_first_element(), size){ }
 
-      void grow_pod(jem_u64_t minimum_capacity, jem_u64_t size, jem_u64_t align) noexcept {
+      void grow_pod(agt_u64_t minimum_capacity, agt_u64_t size, agt_u64_t align) noexcept {
         base::grow_pod(get_first_element(), minimum_capacity, size, align);
       }
 
@@ -164,7 +164,7 @@ namespace jem{
 
       /// Return true unless element will be invalidated by resizing the vector to
       /// NewSize.
-      bool is_safe_to_reference_after_resize(const void *element, jem_u64_t NewSize) noexcept {
+      bool is_safe_to_reference_after_resize(const void *element, agt_u64_t NewSize) noexcept {
         // Past the end.
         if (!is_reference_to_storage(element)) [[likely]]
           return true;
@@ -178,7 +178,7 @@ namespace jem{
       }
 
       /// Check whether element will be invalidated by resizing the vector to NewSize.
-      void assert_safe_to_reference_after_resize(const void *element, jem_u64_t NewSize) noexcept {
+      void assert_safe_to_reference_after_resize(const void *element, agt_u64_t NewSize) noexcept {
         AGT_assert(is_safe_to_reference_after_resize(element, NewSize) &&
                   "Attempting to reference an element of the vector in an operation "
                   "that invalidates it");
@@ -186,7 +186,7 @@ namespace jem{
 
       /// Check whether element will be invalidated by increasing the size of the
       /// vector by N.
-      void assert_safe_to_add(const void *element, jem_u64_t N = 1) {
+      void assert_safe_to_add(const void *element, agt_u64_t N = 1) {
         this->assert_safe_to_reference_after_resize(element, this->size() + N);
       }
 
@@ -213,13 +213,13 @@ namespace jem{
       /// Reserve enough space to add one element, and return the updated element
       /// pointer in case it was a reference to the storage.
       template <class U>
-      static const T *reserve_for_param_and_get_address_impl(U *This, const T & element, jem_u64_t N) {
-        jem_u64_t NewSize = This->size() + N;
+      static const T *reserve_for_param_and_get_address_impl(U *This, const T & element, agt_u64_t N) {
+        agt_u64_t NewSize = This->size() + N;
         if (NewSize <= This->capacity()) [[likely]]
           return std::addressof(element);
 
         bool references_storage = false;
-        jem_u64_t Index = -1;
+        agt_u64_t Index = -1;
         if constexpr ( !U::takes_params_by_value ) {
           if (This->is_reference_to_storage(&element)) [[unlikely]] {
               references_storage = true;
@@ -231,8 +231,8 @@ namespace jem{
       }
 
     public:
-      using size_type = jem_u64_t;
-      using difference_type = jem_i64_t;
+      using size_type = agt_u64_t;
+      using difference_type = agt_i64_t;
       using value_type = T;
       using iterator   = T*;
       using const_iterator = const T *;
@@ -270,7 +270,7 @@ namespace jem{
 
       AGT_nodiscard size_type size_in_bytes() const noexcept { return size() * sizeof(T); }
       AGT_nodiscard size_type max_size() const noexcept {
-        constexpr static jem_u64_t max_elements = size_type(-1) / sizeof(T);
+        constexpr static agt_u64_t max_elements = size_type(-1) / sizeof(T);
         return std::min(base::max_size(), max_elements);
       }
 
@@ -318,7 +318,7 @@ namespace jem{
       static constexpr bool takes_param_by_value = false;
       using value_param_t = const T&;
 
-      explicit small_array_template_base(jem_u64_t size)
+      explicit small_array_template_base(agt_u64_t size)
           : small_array_template_common<T>(size){}
       
 
@@ -349,11 +349,11 @@ namespace jem{
       /// Grow the allocated memory (without initializing new elements), doubling
       /// the size of the allocated memory. Guarantees space for at least one more
       /// element, or minimum_size more elements if specified.
-      void grow(jem_u64_t minimum_size = 0);
+      void grow(agt_u64_t minimum_size = 0);
 
       /// Create a new allocation big enough for \p minimum_size and pass back its size
       /// in \p new_capacity. This is the first section of \a grow().
-      T* malloc_for_grow(jem_u64_t minimum_size, jem_u64_t& new_capacity) {
+      T* malloc_for_grow(agt_u64_t minimum_size, agt_u64_t& new_capacity) {
         return static_cast<T *>(vector_base<small_array_size_type<T>>::malloc_for_grow(
           minimum_size, 
           sizeof(T), 
@@ -366,26 +366,26 @@ namespace jem{
       void move_elements_for_grow(T *new_elements);
 
       /// Transfer ownership of the allocation, finishing up \a grow().
-      void take_allocation_for_grow(T *new_elements, jem_u64_t new_capacity);
+      void take_allocation_for_grow(T *new_elements, agt_u64_t new_capacity);
 
       /// Reserve enough space to add one element, and return the updated element
       /// pointer in case it was a reference to the storage.
-      const T* reserve_for_param_and_get_address(const T &element, jem_u64_t N = 1) {
+      const T* reserve_for_param_and_get_address(const T &element, agt_u64_t N = 1) {
         return this->reserve_for_param_and_get_address_impl(this, element, N);
       }
 
       /// Reserve enough space to add one element, and return the updated element
       /// pointer in case it was a reference to the storage.
-      T* reserve_for_param_and_get_address(T &element, jem_u64_t N = 1) {
+      T* reserve_for_param_and_get_address(T &element, agt_u64_t N = 1) {
         return const_cast<T *>(this->reserve_for_param_and_get_address_impl(this, element, N));
       }
 
       static T && forward_value_param(T &&V) { return std::move(V); }
       static const T & forward_value_param(const T &V) { return V; }
 
-      void grow_and_assign(jem_u64_t num_elements, const T & element) {
+      void grow_and_assign(agt_u64_t num_elements, const T & element) {
         // Grow manually in case element is an internal reference.
-        jem_u64_t new_capacity;
+        agt_u64_t new_capacity;
         T *new_elements = malloc_for_grow(num_elements, new_capacity);
         std::uninitialized_fill_n(new_elements, num_elements, element);
         notify_init_range(new_elements, num_elements);
@@ -397,7 +397,7 @@ namespace jem{
       template <typename... ArgTypes> 
       T& grow_and_emplace_back(ArgTypes &&... Args) {
         // Grow manually in case one of Args is an internal reference.
-        jem_u64_t new_capacity;
+        agt_u64_t new_capacity;
         T *new_elements = malloc_for_grow(0, new_capacity);
         ::new ((void *)(new_elements + this->size())) T(std::forward<ArgTypes>(Args)...);
         notify_init_object(new_elements + this->size());
@@ -427,8 +427,8 @@ namespace jem{
     };
 
     template <typename T, bool Trivial>
-    void small_array_template_base<T, Trivial>::grow(jem_u64_t minimum_size) {
-      jem_u64_t new_capacity;
+    void small_array_template_base<T, Trivial>::grow(agt_u64_t minimum_size) {
+      agt_u64_t new_capacity;
       T *new_elements = this->malloc_for_grow(minimum_size, new_capacity);
       move_elements_for_grow(new_elements);
       take_allocation_for_grow(new_elements, new_capacity);
@@ -444,7 +444,7 @@ namespace jem{
     }
 
     template <typename T, bool Trivial>
-    void small_array_template_base<T, Trivial>::take_allocation_for_grow(T *new_elements, jem_u64_t new_capacity) {
+    void small_array_template_base<T, Trivial>::take_allocation_for_grow(T *new_elements, agt_u64_t new_capacity) {
       // If this wasn't grown from the inline copy, deallocate the old space.
       if ( !this->is_small() )
         _aligned_free(this->begin()/*, this->capacity() * sizeof(T), alignof(T)*/);
@@ -467,7 +467,7 @@ namespace jem{
       using value_param_t = std::conditional_t<takes_param_by_value, T, const T&>;
 
 
-      explicit small_array_template_base(jem_u64_t Size)
+      explicit small_array_template_base(agt_u64_t Size)
           : small_array_template_common<T>(Size){}
       
 
@@ -500,17 +500,17 @@ namespace jem{
 
       /// Double the size of the allocated memory, guaranteeing space for at
       /// least one more element or minimum_size if specified.
-      void grow(jem_u64_t minimum_size = 0) { this->grow_pod(minimum_size, sizeof(T), alignof(T)); }
+      void grow(agt_u64_t minimum_size = 0) { this->grow_pod(minimum_size, sizeof(T), alignof(T)); }
 
       /// Reserve enough space to add one element, and return the updated element
       /// pointer in case it was a reference to the storage.
-      const T *reserve_for_param_and_get_address(const T &element, jem_u64_t N = 1) {
+      const T *reserve_for_param_and_get_address(const T &element, agt_u64_t N = 1) {
         return this->reserve_for_param_and_get_address_impl(this, element, N);
       }
 
       /// Reserve enough space to add one element, and return the updated element
       /// pointer in case it was a reference to the storage.
-      T *reserve_for_param_and_get_address(T &element, jem_u64_t N = 1) {
+      T *reserve_for_param_and_get_address(T &element, agt_u64_t N = 1) {
         return const_cast<T *>(
           this->reserve_for_param_and_get_address_impl(this, element, N));
       }
@@ -518,7 +518,7 @@ namespace jem{
       /// Copy \p V or return a reference, depending on \a value_param_t.
       static value_param_t forward_value_param(value_param_t V) { return V; }
 
-      void grow_and_assign(jem_u64_t num_elements, T element) {
+      void grow_and_assign(agt_u64_t num_elements, T element) {
         // element has been copied in case it's an internal reference, side-stepping
         // reference invalidation problems without losing the realloc optimization.
         this->set_size(0);
@@ -557,7 +557,7 @@ namespace jem{
 
     template <typename T>
     struct small_array_default_inline_elements{
-      inline constexpr static jem_u64_t preferred_small_array_sizeof = 64;
+      inline constexpr static agt_u64_t preferred_small_array_sizeof = 64;
       static_assert(
         sizeof(T) <= 256,
         "You are trying to use a default number of inlined elements for "
@@ -587,6 +587,12 @@ namespace jem{
 
     // Default ctor - Initialize to empty.
     explicit any_vector(unsigned N) : supertype(N) {}
+
+
+
+    void notify_init_range(void*, size_t) const noexcept {}
+
+    void notify_init_object(void*) const noexcept {}
 
   public:
     any_vector(const any_vector&) = delete;
@@ -1174,8 +1180,8 @@ namespace jem{
 
 
 
-  extern template class impl::vector_base<jem_u32_t>;
-  extern template class impl::vector_base<jem_u64_t>;
+  extern template class impl::vector_base<agt_u32_t>;
+  extern template class impl::vector_base<agt_u64_t>;
 }
 
 #endif//JEMSYS_INTERNAL_VECTOR_HPP

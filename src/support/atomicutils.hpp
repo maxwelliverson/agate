@@ -65,49 +65,9 @@ namespace {
   };
 
 
-  void spin_sleep_until(deadline_t deadline) noexcept {
-    agt_u32_t backoff = 0;
-    while ( deadline.has_not_passed() ) {
-      switch (backoff) {
-        default:
-          PAUSE_x32();
-          [[fallthrough]];
-        case 5:
-          PAUSE_x16();
-          [[fallthrough]];
-        case 4:
-          PAUSE_x8();
-          [[fallthrough]];
-        case 3:
-          PAUSE_x4();
-          [[fallthrough]];
-        case 2:
-          PAUSE_x2();
-          [[fallthrough]];
-        case 1:
-          PAUSE_x1();
-          [[fallthrough]];
-        case 0:
-          PAUSE_x1();
-      }
-      ++backoff;
-    }
-  }
 
-  void sleep(agt_u64_t ms) noexcept {
-    if ( ms > 20 )
-      Sleep((DWORD)ms);
-    else
-      spin_sleep_until(deadline_t::from_timeout_us(ms * 1000));
-  }
-  void usleep(agt_u64_t us) noexcept {
-    spin_sleep_until(deadline_t::from_timeout_us(us));
-  }
-  void nanosleep(agt_u64_t ns) noexcept {
 
-  }
-
-  template <typename T>
+  /*template <typename T>
   bool atomic_wait(const std::atomic<T>& target, std::type_identity_t<T> value, deadline_t deadline) noexcept {
     agt_u32_t backoff = 0;
     bool matchesValue = target.load() == value;
@@ -140,7 +100,7 @@ namespace {
       matchesValue = target.load() == value;
     }
     return true;
-  }
+  }*/
   /*template <typename T>
   bool atomic_wait_for(const std::atomic<T>& target, std::type_identity_t<T> value, agt_u64_t timeout_us) noexcept {
     if ( timeout_us >= TIMEOUT_US_LONG_WAIT_THRESHOLD ) [[unlikely]] {
@@ -154,7 +114,7 @@ namespace {
 
 
   // FIXME: I think these atomic_wait implementations are fairly slow.... :(
-  template <typename T, typename F>
+  /*template <typename T, typename F>
   bool atomic_wait(const std::atomic<T>& target, deadline_t deadline, F&& func) noexcept {
     T capturedValue = target.load(std::memory_order_acquire);
     if ( func(capturedValue) )
@@ -178,7 +138,7 @@ namespace {
       _mm_pause();
     }
     return false;
-  }
+  }*/
   /*template <typename T>
   bool atomic_wait(const std::atomic<T>& target, std::type_identity_t<T> value, deadline_t deadline) noexcept {
     agt_u32_t remainingTimeout = deadline.to_timeout_ms();
@@ -240,7 +200,7 @@ namespace {
     }
   };
 
-  class atomic_flag_t {
+  /*class atomic_flag_t {
     std::atomic<agt_u32_t> value_;
   public:
     atomic_flag_t() = default;
@@ -270,7 +230,7 @@ namespace {
     bool wait_until(deadline_t deadline) const noexcept {
       return atomic_wait(value_, 0, deadline);
     }
-  };
+  };*/
 
   template <typename IntType>
   class atomic_flags{
@@ -444,7 +404,7 @@ namespace {
     std::atomic<agt_u32_t> value_ = 0;
   };*/
 
-  class mpsc_counter_t{
+  /*class mpsc_counter_t{
 
   public:
 
@@ -515,20 +475,20 @@ namespace {
 
     std::atomic<agt_u32_t> mp_value_ = 0;
     agt_u32_t              sc_value_ = 0;
-  };
+  };*/
 
   using atomic_flags8_t  = atomic_flags<agt_u8_t>;
   using atomic_flags16_t = atomic_flags<agt_u16_t>;
   using atomic_flags32_t = atomic_flags<agt_u32_t>;
   using atomic_flags64_t = atomic_flags<agt_u64_t>;
 
-  using atomic_u8_t  = std::atomic_uint8_t;
+  /*using atomic_u8_t  = std::atomic_uint8_t;
   using atomic_u16_t = std::atomic_uint16_t;
   using atomic_u32_t = std::atomic_uint32_t;
   using atomic_u64_t = std::atomic_uint64_t;
 
   using atomic_size_t    = std::atomic_size_t;
-  using atomic_ptrdiff_t = std::atomic_ptrdiff_t;
+  using atomic_ptrdiff_t = std::atomic_ptrdiff_t;*/
 
 
 }

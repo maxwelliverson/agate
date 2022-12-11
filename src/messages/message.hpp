@@ -7,6 +7,9 @@
 
 #include "fwd.hpp"
 #include "support/flags.hpp"
+#include "support/epoch_ptr.hpp"
+
+#include <utility>
 
 namespace agt {
 
@@ -22,6 +25,8 @@ namespace agt {
     AGT_CMD_SEND_MANY,               ///< Process message sent with agt_send_many
 
     AGT_CMD_SEND_MANY_AS,            ///< Process message sent with agt_send_many_as
+
+    AGT_CMD_ATTACH_AGENT,            ///< Attach agent
 
     AGT_CMD_PROC_MESSAGE_SHARED,     ///< Process shared message
 
@@ -64,6 +69,22 @@ namespace agt {
   };
 
 
+  enum msg_layout_t {
+    AGT_MSG_LAYOUT_BASIC,
+    AGT_MSG_LAYOUT_INDIRECT,
+    AGT_MSG_LAYOUT_AGENT_CMD,
+    AGT_MSG_LAYOUT_AGENT_INDIRECT_CMD,
+    AGT_MSG_LAYOUT_RPC_INVOCATION,
+    AGT_MSG_LAYOUT_PACKET
+  };
+
+
+  struct message_header_common {
+    agt_u64_t    padding;
+    msg_layout_t layout;
+  };
+
+
 
   struct AGT_cache_aligned inline_buffer {};
 
@@ -88,6 +109,7 @@ namespace agt {
     isAgentInvocation   = 0x80,
     isShared            = 0x100,
     shouldDoFastCleanup = 0x200,
+    indirectMsgIsShared = 0x400
   };
 
   AGT_BITFLAG_ENUM(message_state, agt_u32_t) {
@@ -108,48 +130,64 @@ namespace agt {
    * */
   void* initMessageArray(shared_handle_header* owner, shared_channel_header* channel) noexcept;
 
-
   void initMessage(agt_message_t message) noexcept;
 
   void setMessageId(agt_message_t message, agt_message_id_t id) noexcept;
-  void setMessageReturnHandle(agt_message_t message, Handle* returnHandle) noexcept;
-  void setMessageAsyncHandle(agt_message_t message, agt_async_t async) noexcept;
 
   void cleanupMessage(agt_message_t message) noexcept;
 
 
+  std::pair<agt_agent_t, shared_handle> getMessageSender(agt_message_t message) noexcept;
+
+  agt_agent_t getRecipientFromRaw(agt_raw_msg_t msg) noexcept;
 
 
-  void      setMessageTimestamp(agt_message_t message) noexcept;
-  agt_u64_t getMessageTimestamp(agt_message_t message) noexcept;
+  void returnMessage(agt_message_t message) noexcept;
 
+  void prepareLocalMessage(agt_message_t message, agt_agent_t receiver, agt_agent_t sender, agt_async_t* async, agent_cmd_t msgCmd) noexcept;
+
+  void prepareSharedMessage(agt_message_t message, agt_ctx_t ctx, agt_agent_t receiver, agt_agent_t sender, agt_async_t* async, agent_cmd_t msgCmd) noexcept;
+
+  void prepareLocalIndirectMessage(agt_message_t message, agt_agent_t sender, agt_async_t* async, agt_u32_t expectedCount, agent_cmd_t msgCmd) noexcept;
+
+  void prepareSharedIndirectMessage(agt_message_t message, agt_ctx_t ctx, agt_agent_t sender, agt_async_t* async, agt_u32_t expectedCount, agent_cmd_t msgCmd) noexcept;
+
+  void writeUserMessage(agt_message_t message, const agt_send_info_t& sendInfo) noexcept;
+
+  void writeIndirectUserMessage(agt_message_t message, agt_message_t indirectMsg) noexcept;
 }
 
 struct agt_message_st {
   union {
-    agt_message_t             next;
-    size_t                    nextOffset;
+    agt::epoch_ptr<agt_message_st>        next;
+    agt::tagged_value<size_t, agt_u32_t>  nextOffset;
+    agt::atomic_epoch_ptr<agt_message_st> epochNext;
+    agt::tagged_atomic<size_t, agt_u32_t> epochNextOffset;
+    agt::shared_handle                    selfSharedHandle;
   };
   union {
     agt_agent_t               sender;
-    agt_object_id_t           senderId;
+    agt::shared_handle        senderHandle;
   };
   union {
-    agt::agent_instance*      receiver;
-    agt_object_id_t           receiverId;
+    agt_agent_t               receiver;
+    agt::shared_handle        receiverHandle;
+    struct {
+      agt_u32_t               refCount;
+    };
   };
   agt::async_data_t           asyncData;
   agt::async_key_t            asyncDataKey;
   agt::message_flags          flags;
-  agt::message_state          state;
-  agt_u32_t                   refCount;
-
+  /*agt_u32_t                   poolChunkOffset;
   union {
-    agt_u64_t     id;
-    agt_message_t indirectMsg;
-    agt_u64_t     indirectMsgOffset;
+    agt::context_id           senderContextId;
+  };*/
+  union {
+    agt_u64_t          id;
+    agt_message_t      indirectMsg;
+    agt::shared_handle indirectMsgHandle;
   };
-
   agt::agent_cmd_t            messageType;
   agt_u32_t                   payloadSize;
   agt::inline_buffer          inlineBuffer[];

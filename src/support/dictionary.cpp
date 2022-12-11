@@ -4,34 +4,34 @@
 
 #include "dictionary.hpp"
 
-using namespace jem;
+using namespace agt;
 
 namespace {
-  inline constexpr jem_u32_t default_bucket_count = 16;
-  inline jem_u32_t get_min_bucket_to_reserve_for_entries(jem_u32_t entries) noexcept {
+  inline constexpr agt_u32_t default_bucket_count = 16;
+  inline agt_u32_t get_min_bucket_to_reserve_for_entries(agt_u32_t entries) noexcept {
     if ( entries == 0 )
       return 0;
     return std::bit_ceil(entries * 4 / 3 + 1);
   }
   
-  inline constexpr jem_u32_t hash_offset32_v = 5381;
+  inline constexpr agt_u32_t hash_offset32_v = 5381;
   
   template <typename T> requires (std::has_unique_object_representations_v<T>)
-  inline constexpr jem_u32_t hash_append_bytes32(const T* address, size_t length, jem_u32_t val = hash_offset32_v) noexcept {
+  inline constexpr agt_u32_t hash_append_bytes32(const T* address, size_t length, agt_u32_t val = hash_offset32_v) noexcept {
     for (const T* const end = address + length; address != end; ++address) {
       if constexpr ( sizeof(T) != 1 ) {
-        for (const jem_u8_t b : std::bit_cast<std::array<jem_u8_t, sizeof(T)>>(*address)) {
+        for (const agt_u8_t b : std::bit_cast<std::array<agt_u8_t, sizeof(T)>>(*address)) {
           val = (val << 5) + val + b;
         }
       }
       else {
-        val = (val << 5) + val + std::bit_cast<jem_u8_t>(*address);
+        val = (val << 5) + val + std::bit_cast<agt_u8_t>(*address);
       }
     }
     return val;
   }
 
-  inline constexpr jem_u32_t hash_string(std::string_view str) noexcept {
+  inline constexpr agt_u32_t hash_string(std::string_view str) noexcept {
     return hash_append_bytes32(str.data(), str.size());
   }
 
@@ -40,8 +40,8 @@ namespace {
     return (x & (x - 1)) == 0;
   }
 
-  impl::dictionary_entry_base** alloc_table(jem_u32_t count) noexcept {
-    return static_cast<impl::dictionary_entry_base**>(_aligned_malloc((sizeof(void*) + sizeof(jem_u32_t)) * (count + 1), alignof(void*)));
+  impl::dictionary_entry_base** alloc_table(agt_u32_t count) noexcept {
+    return static_cast<impl::dictionary_entry_base**>(_aligned_malloc((sizeof(void*) + sizeof(agt_u32_t)) * (count + 1), alignof(void*)));
   }
 }
 
@@ -64,7 +64,7 @@ void impl::dictionary::init(unsigned Size) noexcept {
   TheTable[NumBuckets] = (impl::dictionary_entry_base *)2;
 }
 
-jem_u32_t impl::dictionary::rehash_table(unsigned int BucketNo) noexcept {
+agt_u32_t impl::dictionary::rehash_table(unsigned int BucketNo) noexcept {
   unsigned NewSize;
   unsigned *HashTable = (unsigned *)(TheTable + NumBuckets + 1);
 
@@ -128,15 +128,15 @@ jem_u32_t impl::dictionary::rehash_table(unsigned int BucketNo) noexcept {
   return NewBucketNo;
 }
 
-jem_u32_t impl::dictionary::lookup_bucket_for(std::string_view Key) noexcept {
-  jem_u32_t HTSize = NumBuckets;
+agt_u32_t impl::dictionary::lookup_bucket_for(std::string_view Key) noexcept {
+  agt_u32_t HTSize = NumBuckets;
   if (HTSize == 0) { // Hash table unallocated so far?
     init(default_bucket_count);
     HTSize = NumBuckets;
   }
-  jem_u32_t FullHashValue = hash_string(Key);
-  jem_u32_t BucketNo = FullHashValue & (HTSize - 1);
-  auto* HashTable = (jem_u32_t*)(TheTable + NumBuckets + 1);
+  agt_u32_t FullHashValue = hash_string(Key);
+  agt_u32_t BucketNo = FullHashValue & (HTSize - 1);
+  auto* HashTable = (agt_u32_t*)(TheTable + NumBuckets + 1);
 
   unsigned ProbeAmt = 1;
   int FirstTombstone = -1;
@@ -183,7 +183,7 @@ jem_u32_t impl::dictionary::lookup_bucket_for(std::string_view Key) noexcept {
   }
 }
 
-void impl::dictionary::explicit_init(jem_u32_t initSize) noexcept {
+void impl::dictionary::explicit_init(agt_u32_t initSize) noexcept {
 
   // If a size is specified, initialize the table with that many buckets.
   if (initSize) {
@@ -205,9 +205,9 @@ int impl::dictionary::find_key(std::string_view Key) const noexcept {
   unsigned HTSize = NumBuckets;
   if (HTSize == 0)
     return -1; // Really empty table?
-  jem_u32_t FullHashValue = hash_string(Key);
-  jem_u32_t BucketNo = FullHashValue & (HTSize - 1);
-  auto* HashTable = (jem_u32_t*)(TheTable + NumBuckets + 1);
+  agt_u32_t FullHashValue = hash_string(Key);
+  agt_u32_t BucketNo = FullHashValue & (HTSize - 1);
+  auto* HashTable = (agt_u32_t*)(TheTable + NumBuckets + 1);
 
   unsigned ProbeAmt = 1;
   while (true) {

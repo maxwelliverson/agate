@@ -7,14 +7,15 @@
 
 #include "fwd.hpp"
 
+#define AGT_assert_valid_aec(msg) assert(::agt::tl_state.context != nullptr && msg)
 
 namespace agt {
 
   struct thread_cache_data {
-    agt_ctx_t       context;
-    agent_instance* boundAgent;
-    agt_message_t   currentMessage;
-    agt_agent_t     proxyAgent;
+    agt_ctx_t      context;
+    agt_executor_t executor;
+    agt_agent_t    boundAgent;
+    agt_message_t  currentMessage;
   };
 
   extern constinit thread_local thread_cache_data tl_state;

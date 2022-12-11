@@ -5,15 +5,120 @@
 #include "context.hpp"
 #include "core/objects.hpp"
 #include "support/pool.hpp"
-#include "ipc_block.hpp"
+#include "shared.hpp"
 
 #include <cstdlib>
 #include <memory>
 #include <mutex>
 
+
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#pragma comment(lib, "mincore")
+
+
+
 using namespace agt;
 
 namespace {
+
+  enum class shared_handle_kind : agt_u32_t {
+    internal,
+    internal_transient,
+    async_data,
+    agent,
+    message,
+    message_pool,
+    alloc,
+    invalid
+  };
+
+
+  AGT_forceinline agt::shared_handle make_shared_handle(shared_handle_kind kind, agt_u32_t epoch, agt_u32_t segmentId, agt_u32_t pageId, agt_u32_t pageOffset) noexcept;
+
+  AGT_forceinline shared_handle_kind kind(agt::shared_handle handle) noexcept;
+  AGT_forceinline agt_u16_t          epoch(agt::shared_handle handle) noexcept;
+  AGT_forceinline agt_u32_t          segment_id(agt::shared_handle handle)noexcept;
+  AGT_forceinline agt_u32_t          page_id(agt::shared_handle handle) noexcept;
+  AGT_forceinline agt_u32_t          page_offset(agt::shared_handle handle) noexcept;
+
+  class _shared_handle {
+  public:
+
+    inline constexpr static agt_u64_t KindBits       = 3;
+    inline constexpr static agt_u64_t PageIdBits     = 14;
+    inline constexpr static agt_u64_t PageOffsetBits = 15;
+    inline constexpr static agt_u64_t EpochBits      = 10;
+    inline constexpr static agt_u64_t SegmentIdBits  = 22;
+
+    [[nodiscard]] AGT_forceinline shared_handle_kind kind() const noexcept {
+      return static_cast<shared_handle_kind>(m_kind);
+    }
+    [[nodiscard]] AGT_forceinline agt_u16_t   epoch() const noexcept {
+      return m_epoch;
+    }
+    [[nodiscard]] AGT_forceinline agt_u32_t   segment_id() const noexcept {
+      return m_segmentId;
+    }
+    [[nodiscard]] AGT_forceinline agt_u32_t   page_id() const noexcept {
+      return m_pageId;
+    }
+    [[nodiscard]] AGT_forceinline agt_u32_t   page_offset() const noexcept {
+      return m_pageOffset;
+    }
+
+    [[nodiscard]] AGT_forceinline agt::shared_handle as_handle() const noexcept {
+      return static_cast<agt::shared_handle>(m_bits);
+    }
+
+    AGT_forceinline friend agt::shared_handle make_shared_handle(shared_handle_kind kind, agt_u32_t epoch, agt_u32_t segmentId, agt_u32_t pageId, agt_u32_t pageOffset) noexcept;
+    AGT_forceinline friend shared_handle_kind kind(agt::shared_handle handle) noexcept;
+    AGT_forceinline friend agt_u16_t          epoch(agt::shared_handle handle) noexcept;
+    AGT_forceinline friend agt_u32_t          segment_id(agt::shared_handle handle)noexcept;
+    AGT_forceinline friend agt_u32_t          page_id(agt::shared_handle handle) noexcept;
+    AGT_forceinline friend agt_u32_t          page_offset(agt::shared_handle handle) noexcept;
+
+  private:
+    union {
+      struct {
+        agt_u64_t m_kind       : KindBits;
+        agt_u64_t m_pageId     : PageIdBits;
+        agt_u64_t m_pageOffset : PageOffsetBits;
+        agt_u64_t m_epoch      : EpochBits;
+        agt_u64_t m_segmentId  : SegmentIdBits;
+      };
+      agt_u64_t m_bits;
+    };
+  };
+
+  AGT_forceinline agt::shared_handle make_shared_handle(shared_handle_kind kind, agt_u32_t epoch, agt_u32_t segmentId, agt_u32_t pageId, agt_u32_t pageOffset) noexcept {
+    _shared_handle id;
+    id.m_kind       = static_cast<agt_u32_t>(kind);
+    id.m_epoch      = epoch;
+    id.m_segmentId  = segmentId;
+    id.m_pageId     = pageId;
+    id.m_pageOffset = pageOffset;
+    return id.as_handle();
+  }
+
+  AGT_forceinline shared_handle_kind kind(agt::shared_handle handle) noexcept {
+    return ((_shared_handle&)handle).kind();
+  }
+  AGT_forceinline agt_u16_t          epoch(agt::shared_handle handle) noexcept {
+    return ((_shared_handle&)handle).epoch();
+  }
+  AGT_forceinline agt_u32_t          segment_id(agt::shared_handle handle) noexcept {
+    return ((_shared_handle&)handle).segment_id();
+  }
+  AGT_forceinline agt_u32_t          page_id(agt::shared_handle handle) noexcept {
+    return ((_shared_handle&)handle).page_id();
+  }
+  AGT_forceinline agt_u32_t          page_offset(agt::shared_handle handle) noexcept {
+    return ((_shared_handle&)handle).page_offset();
+  }
+
 
 
   inline constexpr size_t LocalCellSize      = 32;
@@ -48,29 +153,29 @@ namespace {
     inline constexpr static agt_u64_t ProcessIdBits  = 22;
     inline constexpr static agt_u64_t SegmentIdBits  = ProcessIdBits;
 
-    AGT_forceinline ObjectKind  getKind() const noexcept {
+    [[nodiscard]] AGT_forceinline ObjectKind  getKind() const noexcept {
       return static_cast<ObjectKind>(local.kind);
     }
-    AGT_forceinline agt_u16_t   getEpoch() const noexcept {
+    [[nodiscard]] AGT_forceinline agt_u16_t   getEpoch() const noexcept {
       return local.epoch;
     }
-    AGT_forceinline agt_u32_t   getProcessId() const noexcept {
+    [[nodiscard]] AGT_forceinline agt_u32_t   getProcessId() const noexcept {
       return local.processId;
     }
-    AGT_forceinline agt_u32_t   getSegmentId() const noexcept {
+    [[nodiscard]] AGT_forceinline agt_u32_t   getSegmentId() const noexcept {
       return shared.segmentId;
     }
-    AGT_forceinline bool        isShared() const noexcept {
+    [[nodiscard]] AGT_forceinline bool        isShared() const noexcept {
       return local.isShared;
     }
-    AGT_forceinline agt_u32_t   getPageId() const noexcept {
+    [[nodiscard]] AGT_forceinline agt_u32_t   getPageId() const noexcept {
       return local.pageId;
     }
-    AGT_forceinline agt_u32_t   getPageOffset() const noexcept {
+    [[nodiscard]] AGT_forceinline agt_u32_t   getPageOffset() const noexcept {
       return local.pageOffset;
     }
 
-    AGT_forceinline agt_object_id_t toRaw() const noexcept {
+    [[nodiscard]] AGT_forceinline agt_object_id_t toRaw() const noexcept {
       return bits;
     }
 
@@ -490,14 +595,100 @@ namespace {
   using SharedHandlePool = ObjectPool<SharedHandle, (0x1 << 14) / sizeof(SharedHandle)>;
 }
 
+
+/// Shared Systems
+
+namespace {
+  inline constexpr wchar_t SharedControlBlockName[] = L"agate-scb"; // NOTE: Might need to make a more complex name to avoid accidental clashes.
+
+  inline constexpr size_t SharedControlBlockMinLength = AGT_VIRTUAL_PAGE_SIZE;
+
+  inline constexpr size_t SharedControlBlockDefaultLength = SharedControlBlockMinLength;
+
+  inline constexpr size_t SharedControlBlockAlignment = AGT_VIRTUAL_PAGE_SIZE;
+
+  // Arbitrary, should probably change after profiling. Currently 64 MB.
+  inline constexpr size_t SharedControlBlockVirtualSize = (0x1 << 26);
+
+  inline constexpr size_t SharedControlBlockMaxNameLength = 64;
+
+  inline constexpr size_t SharedSegmentMaxNameLength = 32;
+
+  struct shared_segment {
+    agt_u32_t id;
+    agt_u32_t next;
+    agt_u32_t prev;
+    agt_u32_t refCount;
+    size_t    size;
+    size_t    blockSize;
+    char      name[SharedSegmentMaxNameLength];
+  };
+
+  struct shared_registry_entry {
+
+  };
+
+
+  struct shared_cb {
+    agt_u32_t initialized;
+    agt_u32_t initializingLock;
+    agt_u32_t initializationLock;
+    size_t    cbSize;
+    size_t    virtualSize;
+    agt_u32_t abiVersion;
+    agt_u32_t flags;
+    size_t    registryOffset;
+    size_t    processesOffset;
+    size_t    allocatorOffset;
+  };
+  struct shared_registry {};
+  struct shared_processes {
+    size_t descriptorCount;
+    size_t tableOffset;
+    size_t tableBucketCount;
+  };
+  struct shared_allocator {};
+  struct shared_segment_descriptor {
+    void*                      handle;
+    agt_u32_t                  refCount;
+    size_t                     size;
+    void*                      address;
+    shared_segment_descriptor* parent;
+  };
+  struct shared_allocation_descriptor {
+    agt::shared_handle         handle;
+    size_t                     size;
+    void*                      address;
+    shared_segment_descriptor* segment;
+  };
+  struct process_descriptor {};
+
+  class shared_allocation_lut {
+    shared_allocation_descriptor** allocTable;
+    shared_segment_descriptor**    segTable;
+
+    agt_u32_t                      allocBucketCount;
+    agt_u32_t                      allocEntryCount;
+    agt_u32_t                      allocTombstoneCount;
+
+    agt_u32_t                      segBucketCount;
+    agt_u32_t                      segEntryCount;
+    agt_u32_t                      segTombstoneCount;
+  public:
+    shared_allocation_lut() noexcept
+        : {}
+  };
+
+
+
+
+
+}
+
 extern "C" {
 
-struct AgtSharedContext_st {
-
-};
-
 struct agt_ctx_st {
-
+  agt_u32_t        contextId;
   agt_u32_t        processId;
 
   SharedPageMap    sharedPageMap;
@@ -507,9 +698,19 @@ struct agt_ctx_st {
   size_t          localPageSize;
   size_t          localEntryCount;
 
-  SharedHandlePool handlePool;
 
-  IpcBlock         ipcBlock;
+
+
+  shared_cb*            sharedCb;
+  process_descriptor*   self;
+  shared_registry*      sharedRegistry;
+  shared_processes*     sharedProcesses;
+  shared_allocator*     sharedAllocator;
+  shared_allocation_lut sharedAllocations;
+
+  /*SharedHandlePool handlePool;
+
+  IpcBlock         ipcBlock;*/
 
 };
 
@@ -522,6 +723,224 @@ namespace {
   std::mutex g_cleanupMtx;
 
 
+  struct file {
+    using handle_type = void*;
+
+    using handle_type = void*;
+
+    static size_t getSize(handle_type hdl) noexcept {
+      LARGE_INTEGER size;
+      if (!GetFileSizeEx(hdl, &size)) {
+        // TODO: Find some fix? Should only fail here if the file was created without FILE_READ_ATTRIBUTES access, which shuoldn't happen...
+        return 0;
+      }
+      return size.QuadPart;
+    }
+
+    static void   destroy(handle_type hdl, size_t siz) noexcept {
+      CloseHandle(hdl);
+    }
+  };
+
+  struct placeholder_address {
+
+    using handle_type = void*;
+
+    static size_t getSize(handle_type hdl) noexcept {
+      return 0;
+    }
+
+    static void   destroy(handle_type hdl, size_t siz) noexcept {
+      VirtualFree(hdl, siz, 0);
+    }
+
+  };
+
+  struct mapping {
+
+    using handle_type = void*;
+
+    static size_t getSize(handle_type hdl) noexcept {
+      return 0;
+    }
+
+    static void   destroy(handle_type hdl, size_t siz) noexcept {
+      UnmapViewOfFile2(INVALID_HANDLE_VALUE, hdl, 0);
+    }
+  };
+
+  template <typename T>
+  class scoped {
+  public:
+    using value_type = typename T::handle_type;
+
+    scoped(value_type val) noexcept : scoped(val, T::getSize(val)) {}
+    scoped(value_type val, size_t siz) noexcept : value_(val), size_(siz), hasOwnership_(true) {}
+
+    ~scoped() {
+      if (hasOwnership_) {
+        T::destroy(value_, size_);
+      }
+    }
+
+
+    [[nodiscard]] size_t size() const noexcept {
+      return size_;
+    }
+
+    value_type value() const noexcept {
+      return value_;
+    }
+
+    value_type consume() noexcept {
+      hasOwnership_ = false;
+      return value_;
+    }
+
+    void invalidate() noexcept {
+      hasOwnership_ = false;
+    }
+
+    void setSize(size_t size) noexcept {
+      size_ = size;
+    }
+
+    void setValue(value_type val) noexcept {
+      value_ = val;
+    }
+
+    void setOwnership(bool owns) noexcept {
+      hasOwnership_ = owns;
+    }
+
+  private:
+    value_type value_;
+    size_t     size_;
+    bool       hasOwnership_;
+  };
+
+  void doInitSharedCb(shared_cb* cb) {
+
+  }
+
+  void initializeSharedCb(shared_cb* cb) {
+    if (cb->initialized)
+      return;
+
+    agt_u32_t lockValue;
+
+    do {
+      lockValue = 0;
+      if (agt::impl::atomicCompareExchange(cb->initializingLock, lockValue, 1))
+        break;
+      agt::impl::atomicWait(cb->initializingLock, lockValue);
+    } while (true);
+
+    if (!cb->initialized) {
+      doInitSharedCb(cb);
+      cb->initialized = true;
+    }
+
+    agt::impl::atomicStore(cb->initializingLock, 0);
+    agt::impl::atomicNotifyOne(cb->initializingLock);
+  }
+
+  agt_status_t initSharedAllocationLookupTable(agt_ctx_t ctx) noexcept {
+
+  }
+
+  agt_status_t sharedControlBlockInit(agt_ctx_t ctx) noexcept {
+
+    MEM_ADDRESS_REQUIREMENTS addressRequirements{
+        .LowestStartingAddress = nullptr,
+        .HighestEndingAddress = nullptr,
+        .Alignment = SharedControlBlockAlignment
+    };
+
+    MEM_EXTENDED_PARAMETER extParams[] = {
+        {
+            .Type = MemExtendedParameterAddressRequirements,
+            .Pointer = &addressRequirements
+        }
+    };
+
+    scoped<file> fileMapping = CreateFileMapping2(
+        INVALID_HANDLE_VALUE,
+        nullptr,
+        FILE_MAP_ALL_ACCESS,
+        PAGE_READWRITE,
+        0,
+        SharedControlBlockDefaultLength,
+        SharedControlBlockName,
+        extParams,
+        sizeof(extParams) / sizeof(MEM_EXTENDED_PARAMETER)
+    );
+
+    if (!fileMapping.value())
+      return AGT_ERROR_UNKNOWN;
+
+    scoped<placeholder_address> baseAddress = VirtualAlloc2(
+        INVALID_HANDLE_VALUE,
+        nullptr,
+        SharedControlBlockVirtualSize,
+        MEM_RESERVE | MEM_RESERVE_PLACEHOLDER,
+        PAGE_NOACCESS,
+        extParams,
+        sizeof(extParams) / sizeof(MEM_EXTENDED_PARAMETER)
+    );
+
+    if (!baseAddress.value())
+      return AGT_ERROR_BAD_ALLOC;
+
+    baseAddress.setSize(SharedControlBlockVirtualSize);
+
+    if (!VirtualFree(baseAddress.value(), fileMapping.size(), MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER))
+      return AGT_ERROR_BAD_ALLOC;
+
+    scoped<placeholder_address> controlBlockAddr{ baseAddress.value(), fileMapping.size() };
+    baseAddress.setValue(((char*)baseAddress.value()) + fileMapping.size());
+    baseAddress.setSize(baseAddress.size() - fileMapping.size());
+
+    scoped<mapping> cbMapping {
+        MapViewOfFile3(
+            fileMapping.value(),
+            INVALID_HANDLE_VALUE,
+            controlBlockAddr.value(),
+            0,
+            fileMapping.size(),
+            MEM_REPLACE_PLACEHOLDER,
+            PAGE_READWRITE,
+            nullptr,
+            0),
+        fileMapping.size()
+    };
+
+    if (!cbMapping.value())
+      return AGT_ERROR_BAD_ALLOC;
+
+    auto cb = static_cast<shared_cb*>(cbMapping.value());
+
+    initializeSharedCb(cb);
+
+
+    ctx->sharedCb = cb;
+    ctx->self     = nullptr; // TODO: Implement
+    ctx->sharedRegistry = static_cast<shared_registry*>(static_cast<void*>((static_cast<char*>(cbMapping.value()) + cb->registryOffset)));
+    ctx->sharedProcesses = static_cast<shared_processes*>(static_cast<void*>((static_cast<char*>(cbMapping.value()) + cb->processesOffset)));
+    ctx->sharedAllocator = static_cast<shared_allocator*>(static_cast<void*>((static_cast<char*>(cbMapping.value()) + cb->allocatorOffset)));
+
+    if (auto status = initSharedAllocationLookupTable(ctx))
+      return status;
+
+    cbMapping.setOwnership(false);
+    baseAddress.setOwnership(false);
+    controlBlockAddr.setOwnership(false);
+
+    return AGT_SUCCESS;
+  }
+
+
+  void         sharedControlBlockClose(agt_ctx_t ctx) noexcept {}
 
 }
 
@@ -529,7 +948,7 @@ namespace {
 agt_status_t agt::createCtx(agt_ctx_t& pCtx) noexcept {
   return AGT_ERROR_NOT_YET_IMPLEMENTED;
 }
-void      agt::destroyCtx(agt_ctx_t ctx) noexcept { }
+void         agt::destroyCtx(agt_ctx_t ctx) noexcept { }
 
 
 /** ========= [ Memory Management ] ========= */
@@ -590,7 +1009,6 @@ void      agt::ctxLocalFree(agt_ctx_t ctx, void* memory, size_t size, size_t ali
  *
  * */
 
-using ay = struct lmao;
 /**
  * @fn ctxClaimLocalName
  * @brief Atomically acquires the specified name for use, and returns a token referring to the acquired name.

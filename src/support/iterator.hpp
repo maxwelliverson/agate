@@ -10,7 +10,7 @@
 #include <iterator>
 
 
-namespace jem{
+namespace agt{
   template <typename BeginIter, typename EndIter = BeginIter>
   class range_view{
   public:

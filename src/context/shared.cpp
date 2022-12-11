@@ -5,6 +5,8 @@
 #include "shared.hpp"
 #include "support/atomic.hpp"
 
+#include "init.hpp"
+
 
 #include <utility>
 
@@ -32,7 +34,7 @@ namespace {
 
   inline constexpr size_t SharedControlBlockMaxNameLength = 64;
 
-  inline constexpr size_t SharedSegmentMaxNameLength = 40;
+  inline constexpr size_t SharedSegmentMaxNameLength = 32;
 
   struct shared_segment {
     agt_u32_t id;
@@ -40,53 +42,87 @@ namespace {
     agt_u32_t prev;
     agt_u32_t refCount;
     size_t    size;
+    size_t    blockSize;
     char      name[SharedSegmentMaxNameLength];
   };
+
+  struct shared_registry_entry {
+
+  };
+
+
+  struct shared_cb {
+    agt_u32_t initialized;
+    agt_u32_t initializingLock;
+    agt_u32_t initializationLock;
+    size_t    cbSize;
+    size_t    virtualSize;
+    agt_u32_t abiVersion;
+    agt_u32_t flags;
+    size_t    registryOffset;
+    size_t    processesOffset;
+    size_t    allocatorOffset;
+  };
+  struct shared_registry {};
+  struct shared_processes {
+    size_t descriptorCount;
+    size_t tableOffset;
+    size_t tableBucketCount;
+  };
+  struct shared_allocator {};
+  struct shared_segment_descriptor {
+    void*                      handle;
+    agt_u32_t                  refCount;
+    size_t                     size;
+    void*                      address;
+    shared_segment_descriptor* parent;
+  };
+  struct shared_allocation_descriptor {
+    agt::shared_handle         handle;
+    size_t                     size;
+    void*                      address;
+    shared_segment_descriptor* segment;
+  };
+  struct process_descriptor {};
+
+  struct shared_allocation_lut {
+    shared_allocation_descriptor** allocTable;
+    shared_segment_descriptor**    segTable;
+
+    agt_u32_t                      allocBucketCount;
+    agt_u32_t                      allocEntryCount;
+    agt_u32_t                      allocTombstoneCount;
+
+    agt_u32_t                      segBucketCount;
+    agt_u32_t                      segEntryCount;
+    agt_u32_t                      segTombstoneCount;
+  };
+
 }
 
 
-struct agt::process_descriptor {
-
+struct agt::shared_ctx {
+  shared_cb*            cb;
+  process_descriptor*   self;
+  shared_registry*      registry;
+  shared_processes*     processes;
+  shared_allocator*     allocator;
+  shared_allocation_lut allocations;
 };
 
-struct agt::shared_registry {
 
-};
 
-struct agt::shared_cb {
-  agt_u32_t initialized;
-  agt_u32_t initializingLock;
-  agt_u32_t initializationLock;
-  size_t    cbSize;
-  size_t    virtualSize;
-  agt_u32_t abiVersion;
-  agt_u32_t flags;
-  size_t    registryOffset;
-  size_t    processesOffset;
-  size_t    allocatorOffset;
-};
 
-struct agt::shared_segment_descriptor {
-  agt_u32_t                  refCount;
-  size_t                     size;
-  void*                      address;
-  shared_segment_descriptor* parent;
-};
 
-struct agt::shared_allocation_descriptor {
-  shared_allocation_id       id;
-  size_t                     size;
-  void*                      address;
-  shared_segment_descriptor* segment;
-};
+
 
 namespace {
 
-  void doInitSharedCb(agt::shared_cb* cb) {
+  void doInitSharedCb(shared_cb* cb) {
 
   }
 
-  void initializeSharedCb(agt::shared_cb* cb) {
+  void initializeSharedCb(shared_cb* cb) {
     if (cb->initialized)
       return;
 
@@ -111,6 +147,38 @@ namespace {
   agt_status_t initSharedAllocationLookupTable(agt::shared_ctx* ctx) noexcept {
 
   }
+
+
+
+  // Used internally by shalloc routines; creates a new shared allocation without relying on any of the internals.
+  agt::shared_handle shallocRaw(agt::shared_ctx* ctx, void** ppVoid) noexcept {
+
+  }
+
+  // Used internally by shalloc routines; creates a new shared allocation without relying on any of the internals.
+  // Specifically creates an allocation that can be moved at any point, and as such, processes cannot cache its address.
+  agt::shared_handle shallocRawTransient(agt::shared_ctx* ctx, void** ppVoid) noexcept {
+
+  }
+
+
+
+  struct physical_memory {
+    void*  handle;
+    size_t offset;
+  };
+
+  void* shallocPhysicalMemory(shared_allocator* alloc, agt::shared_handle& handle) noexcept {
+
+  }
+
+
+  std::pair<shared_allocation_descriptor*, bool> lookupOrImportSharedMemory(agt::shared_ctx& ctx, agt::shared_handle handle) noexcept {
+
+  }
+
+
+
 
 
   struct file {
@@ -158,9 +226,6 @@ namespace {
       UnmapViewOfFile2(INVALID_HANDLE_VALUE, hdl, 0);
     }
   };
-
-
-
 
   template <typename T>
   class scoped {
@@ -214,6 +279,9 @@ namespace {
 }
 
 
+void* agt::shalloc(agt::shared_ctx &sharedCtx, size_t size, size_t alignment, agt::shared_handle &sharedHandle) noexcept {
+
+}
 
 
 agt_status_t agt::sharedControlBlockInit(shared_ctx* pSharedCtx) noexcept {

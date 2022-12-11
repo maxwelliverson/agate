@@ -15,7 +15,7 @@
 #include <memory>
 #include <bit>
 
-namespace jem {
+namespace agt {
 
   struct nothing_t{};
   inline constexpr static nothing_t nothing{};

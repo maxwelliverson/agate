@@ -13,6 +13,8 @@ AGT_begin_c_namespace
 
 typedef struct agt_channel_st* agt_channel_t;
 typedef struct agt_message_st* agt_message_t;
+typedef struct agt_pool_st*    agt_pool_t;
+typedef struct agt_queue_st*   agt_queue_t;
 
 
 

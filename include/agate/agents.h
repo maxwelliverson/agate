@@ -64,7 +64,9 @@ typedef enum agt_agent_flag_bits_t {
 typedef agt_flags32_t agt_agent_flags_t;
 
 
-typedef enum agt_send_flag_bits_t {} agt_send_flag_bits_t;
+typedef enum agt_send_flag_bits_t {
+
+} agt_send_flag_bits_t;
 typedef agt_flags32_t agt_send_flags_t;
 
 
@@ -85,11 +87,6 @@ typedef struct agt_raw_send_info_t {
 
 
 
-
-
-
-
-// typedef struct agt_agent_
 
 typedef struct agt_agent_type_create_info_t {
   agt_scope_t      scope;        ///< Scope; optional. If not set, scope is local.
@@ -180,7 +177,7 @@ AGT_agent_api agt_ctx_t    AGT_stdcall agt_current_context() AGT_noexcept;
 
 AGT_agent_api agt_agent_t  AGT_stdcall agt_self() AGT_noexcept;
 
-AGT_agent_api agt_agent_t  AGT_stdcall agt_sender() AGT_noexcept;
+AGT_agent_api agt_agent_t  AGT_stdcall agt_retain_sender() AGT_noexcept;
 
 AGT_agent_api agt_status_t AGT_stdcall agt_retain(agt_agent_t* pNewAgent, agt_agent_t agent) AGT_noexcept;
 
@@ -194,9 +191,9 @@ AGT_agent_api agt_status_t AGT_stdcall agt_send_many(const agt_agent_t* recipien
 
 AGT_agent_api agt_status_t AGT_stdcall agt_send_many_as(agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept;
 
-AGT_agent_api void         AGT_stdcall agt_reply(const agt_send_info_t* pSendInfo) AGT_noexcept;
+AGT_agent_api agt_status_t AGT_stdcall agt_reply(const agt_send_info_t* pSendInfo) AGT_noexcept;
 
-AGT_agent_api void         AGT_stdcall agt_reply_as(agt_agent_t spoofReplier, const agt_send_info_t* pSendInfo) AGT_noexcept;
+AGT_agent_api agt_status_t AGT_stdcall agt_reply_as(agt_agent_t spoofReplier, const agt_send_info_t* pSendInfo) AGT_noexcept;
 
 
 
@@ -229,10 +226,10 @@ AGT_agent_api void         AGT_stdcall agt_reply_as(agt_agent_t spoofReplier, co
 AGT_agent_api agt_status_t AGT_stdcall agt_raw_acquire(agt_agent_t recipient, size_t desiredMessageSize, agt_raw_msg_t* pRawMsg, void** ppRawBuffer) AGT_noexcept;
 
 /***/
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_send(const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+AGT_agent_api agt_status_t AGT_stdcall agt_raw_send(agt_agent_t recipient, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
 
 /***/
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_send_as(agt_agent_t spoofSender, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+AGT_agent_api agt_status_t AGT_stdcall agt_raw_send_as(agt_agent_t spoofSender, agt_agent_t recipient, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
 
 /***/
 AGT_agent_api agt_status_t AGT_stdcall agt_raw_send_many(const agt_agent_t* recipients, agt_size_t agentCount, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;

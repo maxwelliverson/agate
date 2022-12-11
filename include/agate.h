@@ -300,12 +300,12 @@
 //
 //
 //#if AGT_system_windows
-//# define AGT_NATIVE_TIMEOUT_CONVERSION 10
+//# define AGT_NATIVE_TIMEOUT_RATIO 10
 //#else
-//# define AGT_NATIVE_TIMEOUT_CONVERSION 1000
+//# define AGT_NATIVE_TIMEOUT_RATIO 1000
 //#endif
 //
-//#define AGT_TIMEOUT(microseconds) ((agt_timeout_t)(microseconds * AGT_NATIVE_TIMEOUT_CONVERSION))
+//#define AGT_TIMEOUT(microseconds) ((agt_timeout_t)(microseconds * AGT_NATIVE_TIMEOUT_RATIO))
 //#define AGT_DO_NOT_WAIT ((agt_timeout_t)0)
 //#define AGT_WAIT ((agt_timeout_t)-1)
 //

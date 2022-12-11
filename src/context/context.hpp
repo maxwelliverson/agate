@@ -10,7 +10,7 @@
 
 namespace agt {
 
-  enum class name_token : agt_u64_t;
+
 
   enum class builtin_value : agt_u32_t {
     processName,
@@ -25,14 +25,28 @@ namespace agt {
   };
 
 
+  void*        ctxAllocPages(agt_ctx_t ctx, size_t totalSize) noexcept;
+  void         ctxFreePages(agt_ctx_t ctx, void* addr, size_t totalSize) noexcept;
+
+
+
+  object*       ctxAllocObject32(agt_ctx_t ctx)  noexcept;
+  object*       ctxAllocObject64(agt_ctx_t ctx)  noexcept;
+  object*       ctxAllocObject128(agt_ctx_t ctx) noexcept;
+  object*       ctxAllocObject256(agt_ctx_t ctx) noexcept;
+
+
+
+  context_id    ctxId(agt_ctx_t ctx) noexcept;
+
   bool          ctxMayIgnoreErrors(agt_ctx_t ctx) noexcept;
 
 
   void*         ctxLocalAlloc(agt_ctx_t ctx, size_t size, size_t alignment) noexcept;
   void          ctxLocalFree(agt_ctx_t ctx, void* memory, size_t size, size_t alignment) noexcept;
 
-  void*         ctxSharedAlloc(agt_ctx_t ctx, size_t size, size_t alignment, shared_allocation_id& allocationId) noexcept;
-  void          ctxSharedFree(agt_ctx_t ctx, shared_allocation_id allocId) noexcept;
+  void*         ctxSharedAlloc(agt_ctx_t ctx, size_t size, size_t alignment, shared_handle& allocationId) noexcept;
+  void          ctxSharedFree(agt_ctx_t ctx, shared_handle allocId) noexcept;
   void          ctxSharedFree(agt_ctx_t ctx, void* memory, size_t size, size_t alignment) noexcept;
 
   HandleHeader* ctxAllocHandle(agt_ctx_t ctx, size_t size, size_t alignment) noexcept;
@@ -41,13 +55,11 @@ namespace agt {
   SharedObjectHeader* ctxAllocSharedObject(agt_ctx_t context, size_t size, size_t alignment) noexcept;
   void                ctxFreeSharedObject(agt_ctx_t ctx, SharedObjectHeader* object, size_t size, size_t alignment) noexcept;
 
-  // void*         ctxAllocAsyncData(agt_ctx_t context, agt_object_id_t& id) noexcept;
-  // void          ctxFreeAsyncData(agt_ctx_t context, void* memory) noexcept;
+
+  shared_handle ctxExportSharedHandle(agt_ctx_t ctx, const void* sharedObject) noexcept;
+  void*         ctxImportSharedHandle(agt_ctx_t ctx, shared_handle sharedHandle) noexcept;
 
 
-
-
-  void*        ctxGetLocalAddress(shared_allocation_id allocId) noexcept;
 
   agt_status_t ctxOpenHandleById(agt_ctx_t ctx, agt_object_id_t id, HandleHeader*& handle) noexcept;
   agt_status_t ctxOpenHandleByName(agt_ctx_t ctx, const char* name, HandleHeader*& handle) noexcept;
@@ -74,7 +86,7 @@ namespace agt {
   uintptr_t        ctxGetBuiltin(agt_ctx_t ctx, builtin_value value) noexcept;
 
 
-  agt_status_t     createCtx(agt_ctx_t& pCtx) noexcept;
+  agt_status_t  createCtx(agt_ctx_t& pCtx) noexcept;
   void          destroyCtx(agt_ctx_t ctx) noexcept;
 
 

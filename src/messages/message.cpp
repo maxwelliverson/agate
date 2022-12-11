@@ -3,16 +3,24 @@
 //
 
 #include "message.hpp"
+
+#include "async/async.hpp"
+#include "agents/agents.hpp"
+
 #include "context/context.hpp"
 #include "channels/channel.hpp"
 #include "support/atomic.hpp"
 #include "support/flags.hpp"
 
+#include <tuple>
+#include <utility>
 
 using namespace agt;
 
 namespace {
-
+  bool messageIsShared(agt_message_t message) noexcept {
+    return test(message->flags & agt::message_flags::isShared);
+  }
 }
 
 extern "C" {
@@ -95,3 +103,71 @@ void* agt::initMessageArray(shared_handle_header* owner, shared_channel_header* 
   return messageSlots;
 
 }
+
+
+agt_agent_t agt::getRecipientFromRaw(agt_raw_msg_t msg) noexcept {
+  return reinterpret_cast<agt_message_t>(msg)->receiver;
+}
+
+std::pair<agt_agent_t, shared_handle> agt::getMessageSender(agt_message_t message) noexcept {
+  if (messageIsShared(message)) [[unlikely]]
+    return { nullptr, message->senderHandle };
+  return { message->sender, {} };
+}
+
+
+void agt::prepareLocalMessage(agt_message_t message, agt_agent_t receiver, agt_agent_t sender, agt_async_t* async, agent_cmd_t msgCmd) noexcept {
+  assert(!messageIsShared(message));
+  message->receiver = receiver;
+  message->sender   = sender;
+  std::tie(message->asyncData, message->asyncDataKey) = async != nullptr ? agt::asyncAttachLocal(*async, 1, 1) : std::pair<async_data_t, async_key_t>{};
+  message->messageType = msgCmd;
+}
+
+void agt::prepareSharedMessage(agt_message_t message, agt_ctx_t ctx, agt_agent_t receiver, agt_agent_t sender, agt_async_t* async, agent_cmd_t msgCmd) noexcept {
+  assert(messageIsShared(message));
+  message->receiver       = agt::agentGetReceiver(receiver);
+  message->senderHandle   = agt::agentGetSharedHandle(sender);
+  std::tie(message->asyncData, message->asyncDataKey) = async != nullptr ? agt::asyncAttachShared(*async, 1, 1) : std::pair<async_data_t, async_key_t>{};
+  message->messageType = msgCmd;
+  message->senderContextId = ctxId(ctx);
+}
+
+void agt::prepareLocalIndirectMessage(agt_message_t message, agt_agent_t sender, agt_async_t *async, agt_u32_t expectedCount, agt::agent_cmd_t msgCmd) noexcept {
+  assert(!messageIsShared(message));
+  message->refCount = expectedCount;
+  message->sender   = sender;
+  std::tie(message->asyncData, message->asyncDataKey) = async != nullptr ? agt::asyncAttachLocal(*async, expectedCount, 1) : std::pair<async_data_t, async_key_t>{};
+  message->messageType = msgCmd;
+}
+
+void agt::prepareSharedIndirectMessage(agt_message_t message, agt_ctx_t ctx, agt_agent_t sender, agt_async_t *async, agt_u32_t expectedCount, agt::agent_cmd_t msgCmd) noexcept {
+  assert(messageIsShared(message));
+  message->refCount     = expectedCount;
+  message->senderHandle = agt::agentGetSharedHandle(sender);
+  std::tie(message->asyncData, message->asyncDataKey) = async != nullptr ? agt::asyncAttachShared(*async, expectedCount, 1) : std::pair<async_data_t, async_key_t>{};
+  message->messageType = msgCmd;
+  message->senderContextId = ctxId(ctx);
+}
+
+
+void agt::writeUserMessage(agt_message_t message, const agt_send_info_t& sendInfo) noexcept {
+  assert(sendInfo.size <= UINT32_MAX);
+  assert(sendInfo.flags == 0);
+  message->payloadSize = static_cast<agt_u32_t>(sendInfo.size);
+  message->id          = sendInfo.id;
+  std::memcpy(message->inlineBuffer, sendInfo.buffer, sendInfo.size);
+}
+
+void agt::writeIndirectUserMessage(agt_message_t message, agt_message_t indirectMsg) noexcept {
+  if (messageIsShared(message)) {
+    assert(messageIsShared(indirectMsg));
+    message->flags             = message->flags | message_flags::indirectMsgIsShared;
+    message->indirectMsgHandle = indirectMsg->selfSharedHandle;
+  }
+  else {
+    message->flags       = message->flags & ~message_flags::indirectMsgIsShared;
+    message->indirectMsg = indirectMsg;
+  }
+}
+

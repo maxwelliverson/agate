@@ -15,7 +15,7 @@ can be allocated and reallocated with an optimized allocation algorithm, all whi
 Vulkan's guarantee of maintaining no shared state by storing allocator state in the command pool 
 object. For the sake of flexibility of use, simplicity of driver implementation, and efficiency, 
 Vulkan also seeks to be as thread agnostic as possible. To my understanding, most (if not all) of 
-Vulkan's thread safe API calls are safe by virtue of a lack of object state modification, rather 
+Vulkan's thread tagged_atomic API calls are tagged_atomic by virtue of a lack of object state modification, rather 
 than through the use of synchronization primitives. As such, synchronization of the command buffer 
 allocator is left entirely up to callers. 
 
@@ -77,9 +77,9 @@ As such, I figured there was need for a small, fast, low-level message passing l
  - Handle based API
  - Dedicated "async" type that can be attached to any asynchronous operaiton
  - Each object has a **scope**, which is one of the following:
-    - **Private**: Not thread safe, process local.
-    - **Local**:   Thread safe, process local.
-    - **Shared**:  Thread safe, shared between processes.
+    - **Private**: Not thread tagged_atomic, process local.
+    - **Local**:   Thread tagged_atomic, process local.
+    - **Shared**:  Thread tagged_atomic, shared between processes.
  - Proper API use requires handles to be "attached" and "detatched".
    Handle users must attach successfully before use, and must detach when done. Scope/user limits are enforced only during attachment
 

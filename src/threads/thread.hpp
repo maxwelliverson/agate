@@ -10,7 +10,9 @@
 
 namespace agt {
 
-  namespace impl {
+  agt_u32_t currentThreadId() noexcept;
+
+  /*namespace impl {
     struct system_thread {
       void* handle_;
       int   id_;
@@ -42,7 +44,7 @@ namespace agt {
 
 
   agt_status_t createInstance(local_blocking_thread*& handle, agt_ctx_t ctx, const agt_blocking_thread_create_info_t& createInfo) noexcept;
-  agt_status_t createInstance(shared_blocking_thread*& handle, agt_ctx_t ctx, const agt_blocking_thread_create_info_t& createInfo) noexcept;
+  agt_status_t createInstance(shared_blocking_thread*& handle, agt_ctx_t ctx, const agt_blocking_thread_create_info_t& createInfo) noexcept;*/
 }
 
 #endif//JEMSYS_AGATE2_INTERNAL_THREAD_HPP

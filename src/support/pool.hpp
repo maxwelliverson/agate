@@ -10,7 +10,7 @@
 namespace Agt {
   
   template <typename T>
-  inline T* allocArray(jem_size_t arraySize, jem_size_t alignment) noexcept {
+  inline T* allocArray(agt_size_t arraySize, agt_size_t alignment) noexcept {
 #if defined(_WIN32)
     return static_cast<T*>( _aligned_malloc(arraySize * sizeof(T), std::max(alignof(T), alignment)) );
 #else
@@ -18,7 +18,7 @@ namespace Agt {
 #endif
   }
   template <typename T>
-  inline void freeArray(T* array, jem_size_t arraySize, jem_size_t alignment) noexcept {
+  inline void freeArray(T* array, agt_size_t arraySize, agt_size_t alignment) noexcept {
 #if defined(_WIN32)
     _aligned_free(array);
 #else
@@ -26,7 +26,7 @@ namespace Agt {
 #endif
   }
   template <typename T>
-  inline T* reallocArray(T* array, jem_size_t newArraySize, jem_size_t oldArraySize, jem_size_t alignment) noexcept {
+  inline T* reallocArray(T* array, agt_size_t newArraySize, agt_size_t oldArraySize, agt_size_t alignment) noexcept {
 #if defined(_WIN32)
     return static_cast<T*>(_aligned_realloc(array, newArraySize * sizeof(T), std::max(alignof(T), alignment)));
 #else
@@ -135,7 +135,7 @@ namespace Agt {
 
 
       *s = alloc_slab();
-      (*s)->availableBlocks = static_cast<jem_u32_t>(blocksPerSlab);
+      (*s)->availableBlocks = static_cast<agt_u32_t>(blocksPerSlab);
       (*s)->nextFreeBlock   = lookupBlock(*s, 1);
       (*s)->stackPosition = s;
 
@@ -370,7 +370,7 @@ namespace Agt {
 
 
       *s = new_slab();
-      (*s)->availableBlocks = static_cast<jem_u32_t>(BlocksPerSlab);
+      (*s)->availableBlocks = static_cast<agt_u32_t>(BlocksPerSlab);
       (*s)->nextFreeBlock   = lookupBlock(*s, 1);
       (*s)->stackPosition = s;
 

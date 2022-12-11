@@ -4,7 +4,7 @@
 
 #include "vector.hpp"
 
-using namespace jem;
+using namespace agt;
 
 #include <string>
 #include <iostream>
@@ -37,7 +37,7 @@ static_assert(sizeof(vector<char, 0>) == sizeof(void *) * 2 + sizeof(void *),
 
 /// Report that minimum_size doesn't fit into this vector's size type. Throws
 /// std::length_error or calls report_fatal_error.
-AGT_noreturn static void report_size_overflow(jem_u64_t minimum_size, jem_u64_t maximum_size)  {
+AGT_noreturn static void report_size_overflow(agt_u64_t minimum_size, agt_u64_t maximum_size)  {
   std::string Reason = "valkyrie::small_vector unable to grow. Requested capacity (" +
                        std::to_string(minimum_size) +
                        ") is larger than maximum value for size type (" +
@@ -55,7 +55,7 @@ AGT_noreturn static void report_size_overflow(jem_u64_t minimum_size, jem_u64_t 
 
 /// Report that this vector is already at maximum capacity. Throws
 /// std::length_error or calls report_fatal_error.
-AGT_noreturn static void report_at_maximum_capacity(jem_u64_t maximum_size)  {
+AGT_noreturn static void report_at_maximum_capacity(agt_u64_t maximum_size)  {
   std::string Reason =
     "valkyrie::small_vector capacity unable to grow. Already at maximum size " +
     std::to_string(maximum_size);
@@ -70,13 +70,13 @@ AGT_noreturn static void report_at_maximum_capacity(jem_u64_t maximum_size)  {
 
 
 template <class Size_T>
-void* impl::vector_base<Size_T>::malloc_for_grow(jem_u64_t minimum_size, jem_u64_t type_size, jem_u64_t& new_capacity, jem_u64_t alignment) {
+void* impl::vector_base<Size_T>::malloc_for_grow(agt_u64_t minimum_size, agt_u64_t type_size, agt_u64_t& new_capacity, agt_u64_t alignment) {
   new_capacity = get_new_capacity(minimum_size, this->capacity());
   return _aligned_malloc(new_capacity * type_size, alignment);
 }
 template <class Size_T>
-void  impl::vector_base<Size_T>::grow_pod(void *first_element, jem_u64_t minimum_capacity, jem_u64_t type_size, jem_u64_t alignment) {
-  jem_u64_t new_capacity = get_new_capacity(minimum_capacity, this->capacity());
+void  impl::vector_base<Size_T>::grow_pod(void *first_element, agt_u64_t minimum_capacity, agt_u64_t type_size, agt_u64_t alignment) {
+  agt_u64_t new_capacity = get_new_capacity(minimum_capacity, this->capacity());
   void* new_elements;
   if (begin_ == first_element) {
     new_elements = _aligned_malloc(new_capacity * type_size, alignment);
@@ -95,8 +95,8 @@ void  impl::vector_base<Size_T>::grow_pod(void *first_element, jem_u64_t minimum
 
 
 template <class Size_T>
-jem_u64_t impl::vector_base<Size_T>::get_new_capacity(jem_u64_t minimum_size, jem_u64_t old_capacity) noexcept {
-  constexpr jem_u64_t maximum_size = std::numeric_limits<Size_T>::max();
+agt_u64_t impl::vector_base<Size_T>::get_new_capacity(agt_u64_t minimum_size, agt_u64_t old_capacity) noexcept {
+  constexpr agt_u64_t maximum_size = std::numeric_limits<Size_T>::max();
 
   // Ensure we can fit the new capacity.
   // This is only going to be applicable when the capacity is 32 bit.
@@ -112,9 +112,9 @@ jem_u64_t impl::vector_base<Size_T>::get_new_capacity(jem_u64_t minimum_size, je
 
   // In theory 2*capacity can overflow if the capacity is 64 bit, but the
   // original capacity would never be large enough for this to be a problem.
-  const jem_u64_t new_capacity = 2 * old_capacity + 1; // Always grow.
+  const agt_u64_t new_capacity = 2 * old_capacity + 1; // Always grow.
   return std::min(std::max(new_capacity, minimum_size), maximum_size);
 }
 
-template class impl::vector_base<jem_u32_t>;
-template class impl::vector_base<jem_u64_t>;
+template class impl::vector_base<agt_u32_t>;
+template class impl::vector_base<agt_u64_t>;
