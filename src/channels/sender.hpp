@@ -5,8 +5,8 @@
 #ifndef AGATE_SENDER_HPP
 #define AGATE_SENDER_HPP
 
-#include "fwd.hpp"
-#include "core/objects.hpp"
+#include "config.hpp"
+#include "core/object.hpp"
 
 namespace agt {
 

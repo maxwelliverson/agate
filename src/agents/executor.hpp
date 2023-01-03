@@ -5,12 +5,12 @@
 #ifndef AGATE_AGENT_EXECUTOR_HPP
 #define AGATE_AGENT_EXECUTOR_HPP
 
-#include "fwd.hpp"
+#include "config.hpp"
 
+#include "channels/message_pool.hpp"
 #include "channels/message_queue.hpp"
-#include "messages/message_pool.hpp"
 
-#include "support/set.hpp"
+#include "agate/set.hpp"
 
 namespace agt {
 

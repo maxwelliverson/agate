@@ -3,12 +3,12 @@
 //
 
 #include "async.hpp"
-#include "support/atomic.hpp"
+#include "agate/atomic.hpp"
 
-#include "context/context.hpp"
-#include "core/objects.hpp"
-#include "messages/message.hpp"
-#include "support/flags.hpp"
+#include "agate/flags.hpp"
+#include "channels/message.hpp"
+#include "core/context.hpp"
+#include "core/object.hpp"
 
 
 #include <utility>
@@ -48,12 +48,12 @@ namespace agt {
 
   struct async {
     agt_ctx_t         context;
-    agt_u32_t         asyncStructSize;
+    agt_status_t      status;
     agt_async_flags_t flags;
     agt_u32_t         desiredResponseCount;
-    agt_status_t      status;
     async_key_t       dataKey;
     async_data_t      data;
+    // agt_u32_t         asyncStructSize;
     // void* asyncDependents
     // Version 1.0 end
   };
@@ -519,3 +519,108 @@ void         agt::initAsync(agt_ctx_t context, agt_async_t& async_, agt_async_fl
   async.status               = AGT_ERROR_NOT_BOUND;
   async.desiredResponseCount = 0;
 }
+
+
+
+#define AGT_return_type agt_status_t
+
+#undef AGT_exported_function_name
+#define AGT_exported_function_name new_async
+
+AGT_export_family {
+
+  AGT_function_entry(pa40)(agt_ctx_t ctx, agt_async_t* pAsync, agt_async_flags_t flags) {
+
+    AGT_assert(ctx != nullptr);
+
+    if (pAsync == nullptr) [[unlikely]]
+      return AGT_ERROR_INVALID_ARGUMENT;
+
+
+
+    auto&& async = (agt::async&)*pAsync;
+    auto data    = createAsyncData(context, IncNonWaiterRef);
+
+    async.context              = context;
+    async.asyncStructSize      = ctxGetBuiltin(context, builtin_value::asyncStructSize);
+    async.data                 = asHandle(data);
+    async.dataKey              = data->currentKey;
+    async.status               = AGT_ERROR_NOT_BOUND;
+    async.desiredResponseCount = 0;
+  }
+
+
+
+
+}
+
+
+#undef AGT_return_type
+#define AGT_return_type void
+
+#undef AGT_exported_function_name
+#define AGT_exported_function_name copy_async
+
+
+AGT_export_family {
+
+  AGT_function_entry(pa40)(const agt_async_t* pFrom, agt_async_t* pTo) {
+
+  }
+
+
+
+
+}
+
+
+
+#undef AGT_exported_function_name
+#define AGT_exported_function_name move_async
+
+
+AGT_export_family {
+
+  AGT_function_entry(pa40)(agt_async_t* pFrom, agt_async_t* pTo) {
+
+  }
+
+
+
+
+}
+
+
+
+#undef AGT_exported_function_name
+#define AGT_exported_function_name clear_async
+
+
+AGT_export_family {
+
+  AGT_function_entry(pa40)(agt_async_t* async) {
+
+  }
+
+
+
+
+}
+
+
+
+#undef AGT_exported_function_name
+#define AGT_exported_function_name destroy_async
+
+
+AGT_export_family {
+
+  AGT_function_entry(pa40)(agt_async_t* async) {
+
+  }
+
+
+
+
+}
+

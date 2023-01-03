@@ -5,7 +5,7 @@
 #ifndef JEMSYS_AGATE2_SIGNAL_HPP
 #define JEMSYS_AGATE2_SIGNAL_HPP
 
-#include "fwd.hpp"
+#include "config.hpp"
 
 namespace Agt {
 

@@ -5,14 +5,14 @@
 #include "agents.hpp"
 #include "executor.hpp"
 
-#include "context/error.hpp"
 #include "async/async.hpp"
 #include "channels/message_queue.hpp"
+#include "core/error.hpp"
 
 #include "state.hpp"
 
 
-#include "support/vector.hpp"
+#include "agate/vector.hpp"
 
 
 #include <span>

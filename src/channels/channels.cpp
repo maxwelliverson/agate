@@ -3,10 +3,10 @@
 //
 
 // #include "internal.hpp"
+#include "agate/align.hpp"
 #include "async/async.hpp"
-#include "messages/message.hpp"
-#include "support/align.hpp"
 #include "channel.hpp"
+#include "message.hpp"
 
 #include <cstring>
 
@@ -368,7 +368,7 @@ void      object_info<private_channel>::releaseRef(handle_header* object) noexce
 agt_status_t Agt::createInstance(private_channel*& outHandle, agt_ctx_t ctx, const agt_channel_create_info_t& createInfo, private_channel_sender* sender, private_channel_receiver* receiver) noexcept {
 
   const size_t messageSize = createInfo.maxMessageSize
-                                ? alignSize(createInfo.maxMessageSize, AGT_CACHE_LINE)
+                                ? align_to(createInfo.maxMessageSize, AGT_CACHE_LINE)
                                 : getDefaultPrivateChannelMessageSize(ctx);
   const size_t slotCount   = createInfo.minCapacity
                                 ? createInfo.minCapacity
@@ -485,7 +485,7 @@ void      object_info<local_spsc_channel>::releaseRef(handle_header* object) noe
 
 agt_status_t Agt::createInstance(local_spsc_channel*& outHandle, agt_ctx_t ctx, const agt_channel_create_info_t& createInfo, local_spsc_channel_sender* sender, local_spsc_channel_receiver* receiver) noexcept {
   const size_t messageSize = createInfo.maxMessageSize
-                                ? alignSize(createInfo.maxMessageSize, AGT_CACHE_LINE)
+                                ? align_to(createInfo.maxMessageSize, AGT_CACHE_LINE)
                                 : getDefaultLocalChannelMessageSize(ctx);
   const size_t slotCount   = createInfo.minCapacity
                               ? createInfo.minCapacity
@@ -607,7 +607,7 @@ void      object_info<local_spmc_channel>::releaseRef(handle_header* object) noe
 
 agt_status_t Agt::createInstance(local_spmc_channel*& outHandle, agt_ctx_t ctx, const agt_channel_create_info_t& createInfo, local_spmc_channel_sender* sender, local_spmc_channel_receiver* receiver) noexcept {
   const size_t messageSize = createInfo.maxMessageSize
-                                ? alignSize(createInfo.maxMessageSize, AGT_CACHE_LINE)
+                                ? align_to(createInfo.maxMessageSize, AGT_CACHE_LINE)
                                 : getDefaultLocalChannelMessageSize(ctx);
   const size_t slotCount   = createInfo.minCapacity
                               ? createInfo.minCapacity
@@ -736,7 +736,7 @@ void      object_info<local_mpmc_channel>::releaseRef(handle_header* object) noe
 
 agt_status_t Agt::createInstance(local_mpmc_channel*& outHandle, agt_ctx_t ctx, const agt_channel_create_info_t& createInfo, local_mpmc_channel_sender* sender, local_mpmc_channel_receiver* receiver) noexcept {
   const size_t messageSize = createInfo.maxMessageSize
-                                ? alignSize(createInfo.maxMessageSize, AGT_CACHE_LINE)
+                                ? align_to(createInfo.maxMessageSize, AGT_CACHE_LINE)
                                 : getDefaultLocalChannelMessageSize(ctx);
   const size_t slotCount   = createInfo.minCapacity
                               ? createInfo.minCapacity
@@ -874,7 +874,7 @@ void      object_info<local_mpsc_channel>::releaseRef(handle_header* object) noe
 
 agt_status_t Agt::createInstance(local_mpsc_channel*& outHandle, agt_ctx_t ctx, const agt_channel_create_info_t& createInfo, local_mpsc_channel_sender* sender, local_mpsc_channel_receiver* receiver) noexcept {
   const size_t messageSize = createInfo.maxMessageSize
-                                ? alignSize(createInfo.maxMessageSize, AGT_CACHE_LINE)
+                                ? align_to(createInfo.maxMessageSize, AGT_CACHE_LINE)
                                 : getDefaultLocalChannelMessageSize(ctx);
   const size_t slotCount   = createInfo.minCapacity
                               ? createInfo.minCapacity

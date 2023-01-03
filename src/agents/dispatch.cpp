@@ -4,7 +4,7 @@
 
 
 #include "agents.hpp"
-#include "messages/message.hpp"
+#include "channels/message.hpp"
 
 
 #include <cstring>

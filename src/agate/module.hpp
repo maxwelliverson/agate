@@ -1,0 +1,232 @@
+//
+// Created by maxwe on 2022-12-18.
+//
+
+#ifndef AGATE_INTERNAL_MODULE_HPP
+#define AGATE_INTERNAL_MODULE_HPP
+
+#include "config.hpp"
+
+#include "sys_string.hpp"
+#include "version.hpp"
+#include "align.hpp"
+
+#include "dictionary.hpp"
+
+namespace agt {
+
+  using function_ptr = void(*)();
+
+  // Make sure this is in sync with the module bits of agt_init_flag_bits_t in core.h
+  enum module_id : agt_u32_t {
+    AGT_CORE_MODULE     = 0x0,
+    AGT_AGENTS_MODULE   = 0x1,
+    AGT_ASYNC_MODULE    = 0x2,
+    AGT_CHANNELS_MODULE = 0x4,
+    AGT_MODULE_MAX_ENUM_PLUS_ONE,
+  };
+
+  inline constexpr const char* module_names[] = {
+      "core",
+      "agents",
+      "async",
+      "channels"
+  };
+
+  static_assert( is_pow2(AGT_MODULE_MAX_ENUM_PLUS_ONE - 1) );
+
+  inline constexpr size_t MaxModuleCount = std::countr_zero(AGT_MODULE_MAX_ENUM_PLUS_ONE - 1) + 2;
+
+  inline constexpr size_t module_index(module_id id) noexcept {
+    if !consteval {
+      AGT_assert( std::has_single_bit(static_cast<std::underlying_type_t<module_id>>(id)) && id < AGT_MODULE_MAX_ENUM_PLUS_ONE );
+    }
+    if (id == AGT_CORE_MODULE)
+      return 0;
+    return std::countr_zero(static_cast<std::underlying_type_t<module_id>>(id)) + 1;
+  }
+
+  struct function_info {
+    function_ptr     address       = {};
+    std::string_view dispatchFlags = {};
+  };
+
+  class agate_module {
+
+    inline constexpr static size_t MaxNameLength = 20;
+    inline constexpr static size_t MaxPathLength = 260;
+
+    void*                                  m_handle              = nullptr;
+    version                                m_version             = {};
+    dictionary<std::vector<function_info>> m_exports             = {};
+    sys_char                               m_name[MaxNameLength] = {};
+    sys_char                               m_path[MaxPathLength] = {};
+
+
+    class module_walker {
+      char*                           imageBase;
+      PIMAGE_NT_HEADERS               header;
+      std::span<IMAGE_SECTION_HEADER> sections;
+
+      static PIMAGE_NT_HEADERS               get_nt_headers(void* base) noexcept {
+        WORD signature;
+        std::memcpy(&signature, base, 2);
+        if (signature == 0x5A4D) {
+          auto dosHeader = static_cast<PIMAGE_DOS_HEADER>(base);
+          auto ntHeaderOffset = dosHeader->e_lfanew;
+          return reinterpret_cast<PIMAGE_NT_HEADERS>(static_cast<char*>(base) + ntHeaderOffset);
+        }
+        else {
+          DWORD ntSignature;
+          std::memcpy(&ntSignature, base, 4);
+          if (ntSignature == 0x50450000)
+            return static_cast<PIMAGE_NT_HEADERS>(base);
+          AGT_assert(ntSignature == 0x50450000);
+          return nullptr; // Uh oh...
+        }
+      }
+
+      static std::span<IMAGE_SECTION_HEADER> get_sections(PIMAGE_NT_HEADERS ntHeader) noexcept {
+        WORD sectionCount;
+        sectionCount = ntHeader->FileHeader.NumberOfSections;
+        constexpr static size_t ImageSize = sizeof(IMAGE_NT_HEADERS);
+        constexpr static size_t OImageSIze = 0x18 + 0x60 + (16*8);
+        return { (PIMAGE_SECTION_HEADER)(((char*)ntHeader) + sizeof(IMAGE_NT_HEADERS)), sectionCount };
+      }
+
+      [[nodiscard]] DWORD                    translate_offset(DWORD addr) const noexcept {
+        for (auto& section : sections) {
+          DWORD sectionVAddr = section.VirtualAddress;
+          if (addr >= sectionVAddr && addr < (sectionVAddr + section.SizeOfRawData))
+            return addr - sectionVAddr + section.PointerToRawData;
+        }
+
+        return 0;
+      }
+
+    public:
+      explicit module_walker(void* handle)
+          : imageBase((char*)handle),
+            header(get_nt_headers(handle)),
+            sections(get_sections(header))
+      { }
+
+      [[nodiscard]] void* directory_entry(DWORD dirEntry) const noexcept {
+        return at_offset(header->OptionalHeader.DataDirectory[dirEntry].VirtualAddress);
+      }
+
+      template <typename T = void>
+      [[nodiscard]] T*    at_offset(DWORD virtualOffset) const noexcept {
+        auto offset = translate_offset(virtualOffset);
+        return offset ? reinterpret_cast<T*>(imageBase + offset) : nullptr;
+      }
+    };
+
+
+    void load_exported_functions() noexcept {
+
+      constexpr static std::string_view ApiPrefixString = "_agate_api_";
+
+      module_walker walker{m_handle};
+
+      auto exportDirectory = static_cast<PIMAGE_EXPORT_DIRECTORY>(walker.directory_entry(IMAGE_DIRECTORY_ENTRY_EXPORT));
+
+      auto exportedNameCount     = exportDirectory->NumberOfNames;
+      // auto exportedFunctionCount = exportDirectory->NumberOfFunctions;
+
+      auto pOrdinalTable = walker.at_offset<WORD>(exportDirectory->AddressOfNameOrdinals);
+      auto pNameTable    = walker.at_offset<DWORD>(exportDirectory->AddressOfNames);
+      auto pFuncTable    = walker.at_offset<DWORD>(exportDirectory->AddressOfFunctions);
+
+
+      auto funcNames = std::span{ pNameTable, exportedNameCount };
+
+      for (size_t i = 0; i < exportedNameCount; ++i) {
+        auto pName = walker.at_offset<const char>(pNameTable[i]);
+        std::string_view name{pName};
+        if (name.starts_with(ApiPrefixString)) {
+          name.remove_prefix(ApiPrefixString.size());
+          size_t pos = name.find("__");
+          if (pos != std::string_view::npos) {
+            std::string_view firstNamePart = name.substr(0, pos);
+
+            auto& fam = m_exports[firstNamePart];
+            auto& func = fam.emplace_back();
+
+            WORD ordinal = pOrdinalTable[i];
+
+            func.address       = walker.at_offset<void()>(pFuncTable[ordinal]);
+            func.dispatchFlags = name.substr(pos + 2);
+          }
+        }
+      }
+
+    }
+
+
+  public:
+
+
+
+    static std::unique_ptr<agate_module> load(sys_cstring libName) noexcept {
+
+      using pfn_get_module_version = agt_u32_t(*)();
+
+      HMODULE handle;
+
+      if (!(handle = LoadLibraryW(libName)))
+        return nullptr;
+
+      auto m = std::make_unique<agate_module>();
+
+      m->m_handle = handle;
+
+      auto copyResult = ::wcscpy_s(m->m_name, libName);
+      AGT_assert(copyResult == 0);
+
+      auto pfnGetModuleVersion = (pfn_get_module_version) GetProcAddress(handle, AGT_GET_MODULE_VERSION_NAME);
+
+      if (!pfnGetModuleVersion) {
+        FreeLibrary(handle);
+        return nullptr;
+      }
+
+      m->m_version = version::from_integer(pfnGetModuleVersion());
+
+      auto libPathBufferLength = (DWORD)std::size(m->m_path);
+      auto pathResult = GetModuleFileNameW(handle, m->m_path, libPathBufferLength);
+      AGT_assert(pathResult <= libPathBufferLength);
+
+
+      // auto& exports = m->m_exports;
+
+      m->load_exported_functions();
+
+
+      return std::move(m);
+    }
+
+
+
+    [[nodiscard]] std::span<const function_info> lookup(std::string_view name) const noexcept {
+      auto result = m_exports.find(name);
+      if (result == m_exports.end())
+        return {};
+      return result->get();
+    }
+
+    [[nodiscard]] version         version() const noexcept {
+      return m_version;
+    }
+
+    [[nodiscard]] sys_string_view name() const noexcept {
+      return { (sys_cstring)m_name };
+    }
+
+    [[nodiscard]] sys_string_view path() const noexcept {
+      return { (sys_cstring)m_path };
+    }
+  };
+}
+
+#endif//AGATE_INTERNAL_MODULE_HPP

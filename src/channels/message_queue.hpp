@@ -5,13 +5,13 @@
 #ifndef AGATE_MESSAGE_QUEUE_HPP
 #define AGATE_MESSAGE_QUEUE_HPP
 
-#include "fwd.hpp"
+#include "config.hpp"
 
-#include "sender.hpp"
+#include "agate/epoch_ptr.hpp"
+#include "agate/tagged_value.hpp"
+#include "message.hpp"
 #include "receiver.hpp"
-#include "messages/message.hpp"
-#include "support/tagged_value.hpp"
-#include "support/epoch_ptr.hpp"
+#include "sender.hpp"
 
 namespace agt {
 

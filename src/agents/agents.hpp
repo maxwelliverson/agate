@@ -5,10 +5,10 @@
 #ifndef AGATE_INTERNAL_AGENTS_HPP
 #define AGATE_INTERNAL_AGENTS_HPP
 
-#include "fwd.hpp"
-#include "core/objects.hpp"
+#include "agate/flags.hpp"
 #include "channels/channel.hpp"
-#include "support/flags.hpp"
+#include "config.hpp"
+#include "core/object.hpp"
 
 #include <csetjmp>
 

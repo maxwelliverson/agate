@@ -2,7 +2,7 @@
 // Created by maxwe on 2022-05-28.
 //
 
-#include "support/atomic.hpp"
+#include "agate/atomic.hpp"
 
 #include "message_queue.hpp"
 

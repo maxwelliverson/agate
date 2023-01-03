@@ -6,7 +6,7 @@
 #define JEMSYS_AGATE2_VTABLE_HPP
 
 
-#include "fwd.hpp"
+#include "config.hpp"
 
 #include <concepts>
 

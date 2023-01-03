@@ -5,8 +5,8 @@
 #ifndef AGATE_RECEIVER_HPP
 #define AGATE_RECEIVER_HPP
 
-#include "fwd.hpp"
-#include "core/objects.hpp"
+#include "config.hpp"
+#include "core/object.hpp"
 
 namespace agt {
 

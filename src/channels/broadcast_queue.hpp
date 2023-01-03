@@ -5,7 +5,7 @@
 #ifndef AGATE_BROADCAST_QUEUE_HPP
 #define AGATE_BROADCAST_QUEUE_HPP
 
-#include "fwd.hpp"
+#include "config.hpp"
 
 namespace agt {
 

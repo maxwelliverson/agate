@@ -4,8 +4,8 @@
 
 #include "thread.hpp"
 #include "../channels/channel.hpp"
-#include "../context/context.hpp"
-#include "../support/error.hpp"
+#include "agate/error.hpp"
+#include "core/context.hpp"
 
 
 #define NOMINMAX

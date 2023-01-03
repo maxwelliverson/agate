@@ -288,6 +288,7 @@ AGT_agent_api void         AGT_stdcall agt_abort() AGT_noexcept;
  *       unix-like systems, the choice between libstdc++ and libc++ is a meaningful one, and I'd have to double check but I'm virtually
  *       certain they're totally incompatible at the ABI level. At the very least there's no guarantee of compatibility.
  * */
+
 AGT_agent_api void         AGT_stdcall agt_resume_coroutine(agt_agent_t receiver, void* coroutine, agt_async_t* asyncHandle) AGT_noexcept;
 
 

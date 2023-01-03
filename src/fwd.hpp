@@ -5,7 +5,7 @@
 #ifndef JEMSYS_AGATE2_FWD_HPP
 #define JEMSYS_AGATE2_FWD_HPP
 
-#include "agate.h"
+
 
 extern "C" {
 
@@ -25,93 +25,11 @@ namespace agt {
    *           -                                           If the low bit is one, interpret the integer as a shared allocation handle, and convert to a local pointer using the local context
    * */
 
-  enum class object_type : agt_u16_t {
-    local_agent,
-    proxy_agent,
-    shared_agent,
-    imported_agent,
-
-    local_busy_executor,
-    local_single_thread_executor,
-    local_pool_executor,
-    local_proxy_executor,
-    shared_busy_executor,
-    shared_single_thread_executor,
-    shared_pool_executor,
-    shared_proxy_executor,
-
-    local_async_data,
-    shared_async_data,
-
-    private_message_pool,
-    private_sized_message_pool,
-    local_spsc_message_pool,
-    local_spsc_sized_message_pool,
-    local_mpsc_message_pool,
-    local_mpsc_sized_message_pool,
-    local_spmc_message_pool,
-    local_spmc_sized_message_pool,
-    local_mpmc_message_pool,
-    local_mpmc_sized_message_pool,
-    shared_spsc_message_pool,
-    shared_spsc_sized_message_pool,
-    shared_mpsc_message_pool,
-    shared_mpsc_sized_message_pool,
-    shared_spmc_message_pool,
-    shared_spmc_sized_message_pool,
-    shared_mpmc_message_pool,
-    shared_mpmc_sized_message_pool,
-
-
-    local_spsc_queue_sender,
-    local_mpsc_queue_sender,
-    local_spmc_queue_sender,
-    local_mpmc_queue_sender,
-    shared_spsc_queue_sender,
-    shared_mpsc_queue_sender,
-    shared_spmc_queue_sender,
-    shared_mpmc_queue_sender,
-    private_queue_sender,
-    local_sp_bqueue_sender,
-    local_mp_bqueue_sender,
-    shared_sp_bqueue_sender,
-    shared_mp_bqueue_sender,
-
-    local_spsc_queue_receiver,
-    local_mpsc_queue_receiver,
-    local_spmc_queue_receiver,
-    local_mpmc_queue_receiver,
-    shared_spsc_queue_receiver,
-    shared_mpsc_queue_receiver,
-    shared_spmc_queue_receiver,
-    shared_mpmc_queue_receiver,
-    private_queue_receiver,
-    local_sp_bqueue_receiver,
-    local_mp_bqueue_receiver,
-    shared_sp_bqueue_receiver,
-    shared_mp_bqueue_receiver,
-
-
-    local_mpmc_queue,
-    shared_spsc_queue,
-    shared_mpsc_queue,
-    shared_spmc_queue,
-    shared_mpmc_queue,
-    shared_sp_bqueue,
-    shared_mp_bqueue,
-
-
-    agent_begin    = local_agent,
-    agent_end      = imported_agent,
-    executor_begin = local_busy_executor,
-    executor_end   = shared_proxy_executor,
-    sender_begin   = local_spsc_queue_sender,
-    sender_end     = shared_mp_bqueue_sender,
-    receiver_begin = local_spsc_queue_receiver,
-    receiver_end   = shared_mp_bqueue_receiver,
-  };
+  enum class object_type : agt_u16_t;
 
   enum class shared_allocation_id : agt_u64_t;
+
+  enum class object_handle : uintptr_t;
 
 
   enum class connect_action : agt_u32_t;
@@ -134,19 +52,14 @@ namespace agt {
 
 
   struct object;
-
-  struct handle_header;
-  struct shared_object_header;
-  struct shared_handle_header;
+  struct rc_object;
 
   struct object_pool;
   struct thread_state;
 
+  struct export_table;
+
   struct id;
-
-  struct vtable;
-  using  vpointer = const vtable*;
-
 
   struct local_channel_header;
   struct shared_channel_header;
@@ -199,55 +112,89 @@ namespace agt {
   struct imported_async_data;
 
 
-  template <typename T, bool IsThreadSafe = true>
-  class strong_ref;
+  AGT_BITFLAG_ENUM(thread_safety, agt_u32_t) {
+    unsafe        = 0x0,
+    producer_safe = 0x1,
+    consumer_safe = 0x2,
+    safe          = consumer_safe | producer_safe,
+    dynamic       = 0x4
+  };
 
-  template <typename T>
-  using unsafe_strong_ref = strong_ref<T, false>;
+  inline constexpr static thread_safety thread_unsafe        = thread_safety::unsafe;
+  inline constexpr static thread_safety thread_consumer_safe = thread_safety::consumer_safe;
+  inline constexpr static thread_safety thread_owner_safe    = thread_consumer_safe;
+  inline constexpr static thread_safety thread_producer_safe = thread_safety::producer_safe;
+  inline constexpr static thread_safety thread_user_safe     = thread_producer_safe;
+  inline constexpr static thread_safety thread_safe          = thread_safety::safe;
 
-  template <typename T, typename U = void, bool IsThreadSafe = true>
-  class weak_ref;
-
-  template <typename T, typename U = void>
-  using unsafe_weak_ref = weak_ref<T, U, false>;
-
-
-
-  enum class SharedAllocationId : agt_u64_t;
-
-  enum class ObjectType : agt_u32_t;
-  enum class ObjectFlags : agt_handle_flags_t;
-  enum class ConnectAction : agt_u32_t;
-
-  enum class ErrorState : agt_u32_t;
+  inline constexpr static thread_safety default_safety_model(bool threadsAreEnabled) noexcept {
+    return threadsAreEnabled ? thread_safe : thread_unsafe;
+  }
 
 
-  struct HandleHeader;
-  struct SharedObjectHeader;
-
-  class Id;
-
-  class Object;
-
-  class Handle;
-  class LocalHandle;
-  class SharedHandle;
-  class SharedObject;
-  using LocalObject = LocalHandle;
-
-  struct LocalChannel;
-  struct SharedChannel;
-
-  struct VTable;
-  using  VPointer = const VTable*;
-
-  struct SharedVTable;
-
-  using  SharedVPtr = const SharedVTable*;
+  namespace impl {
+    template <typename T>
+    struct default_destroy {
+      AGT_forceinline constexpr void operator()(T* value) const noexcept {
+        AGT_invariant(value != nullptr);
+        if constexpr (!std::is_trivially_destructible_v<T>)
+          std::destroy_at(value);
+      }
+    };
+  }
 
 
-  struct LocalMpScChannel;
-  struct SharedMpScChannelSender;
+
+  template <typename T,
+            typename Dtor = impl::default_destroy<T>,
+            thread_safety SafetyModel = thread_user_safe>
+  class owner_ref;
+
+  template <typename T, typename Dtor = impl::default_destroy<T>>
+  using safe_owner_ref = owner_ref<T, Dtor, thread_safe>;
+
+  template <typename T, typename Dtor = impl::default_destroy<T>>
+  using unsafe_owner_ref = owner_ref<T, Dtor, thread_unsafe>;
+
+  template <typename T,
+            typename U = void,
+            typename Dtor = impl::default_destroy<T>,
+            thread_safety SafetyModel = thread_user_safe>
+  class maybe_ref;
+
+  template <typename T, typename U = void,
+            typename Dtor = impl::default_destroy<T>>
+  using unsafe_maybe_ref = maybe_ref<T, U, Dtor, thread_unsafe>;
+
+  template <typename T,
+            typename U = void,
+            typename Dtor = impl::default_destroy<T>>
+  using safe_maybe_ref = maybe_ref<T, U, Dtor, thread_safe>;
+}
+
+extern "C" {
+
+struct agt_ctx_st {
+  agt_u32_t                flags;
+  agt_u32_t                id;
+  agt::version             version;
+  agt_u32_t                refCount; // How many times has agate been loaded with this context; only relevant when linking to external libraries that also use agate
+  const agt::export_table* exports;
+  agt_u32_t                asyncStructSize;
+  agt_u32_t                signalStructSize;
+  agt_error_handler_t      errorHandler;
+  void*                    errorHandlerUserData;
+  agt_u32_t                processNameOffset;
+
+  // local name registry
+  // page allocator
+  // thread descriptors (unless context is single threaded)
+  // shared context
+  // shared memory allocator
+  // shared name registry
+  // shared processes
+};
+
 }
 
 #endif//JEMSYS_AGATE2_FWD_HPP

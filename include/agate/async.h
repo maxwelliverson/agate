@@ -12,11 +12,17 @@ AGT_begin_c_namespace
 
 /* =================[ Types ]================= */
 
-typedef struct agt_async_t {
+
+// typedef enum agt_async_flag_bits_t {} agt_async_flag_bits_t;
+
+typedef agt_flags32_t agt_async_flags_t;
+typedef agt_flags32_t agt_signal_flags_t;
+
+typedef struct AGT_alignas(AGT_ASYNC_STRUCT_ALIGNMENT) agt_async_t {
   agt_u8_t reserved[AGT_ASYNC_STRUCT_SIZE];
 } agt_async_t;
 
-typedef struct agt_signal_t {
+typedef struct AGT_alignas(AGT_SIGNAL_STRUCT_ALIGNMENT)agt_signal_t {
   agt_u8_t reserved[AGT_SIGNAL_STRUCT_SIZE];
 } agt_signal_t;
 

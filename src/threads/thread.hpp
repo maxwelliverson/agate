@@ -5,7 +5,7 @@
 #ifndef JEMSYS_AGATE2_INTERNAL_THREAD_HPP
 #define JEMSYS_AGATE2_INTERNAL_THREAD_HPP
 
-#include "../core/objects.hpp"
+#include "../core/object.hpp"
 #include "../fwd.hpp"
 
 namespace agt {

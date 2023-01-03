@@ -15,7 +15,7 @@ endif()
 function(add_agate_library target_)
     set(optionalArgs PRIVATE EXPORT)
     set(singleValueArgs)
-    set(multiValueArgs SOURCES DEPENDENCIES)
+    set(multiValueArgs SOURCES DEPENDENCIES DEFINES)
     cmake_parse_arguments(AGATE_LIB "${optionalArgs}" "${singleValueArgs}" "${multiValueArgs}" ${ARGN})
     list(TRANSFORM AGATE_LIB_SOURCES PREPEND src/${target_}/)
     if(AGATE_LIB_PRIVATE)
@@ -56,6 +56,50 @@ function(add_agate_library target_)
         target_include_directories(${AGATE_LIB_STATIC_NAME} PRIVATE include src)
         target_compile_definitions(${AGATE_LIB_SHARED_NAME} PUBLIC AGT_SHARED_LIB PRIVATE AGT_SHARED_LIB_EXPORT)
     endif()
+endfunction()
+
+
+function(add_agate_module target_)
+    set(optionalArgs EXPORT)
+    set(singleValueArgs)
+    set(multiValueArgs SOURCES DEPENDENCIES DEFINES)
+    cmake_parse_arguments(AGATE_MODULE "${optionalArgs}" "${singleValueArgs}" "${multiValueArgs}" ${ARGN})
+    list(TRANSFORM AGATE_MODULE_SOURCES PREPEND src/${target_}/)
+
+    add_library(agate.${target_}        SHARED src/agate/module.cpp ${AGATE_MODULE_SOURCES})
+    add_library(agate-static.${target_} OBJECT ${AGATE_MODULE_SOURCES})
+
+    string(TOUPPER ${target_} MODULE_NAME_DEF)
+    string(PREPEND MODULE_NAME_DEF AGT_BUILDING_)
+    string(APPEND MODULE_NAME_DEF _MODULE)
+
+
+
+    target_compile_definitions(agate.${target_}        PRIVATE
+            AGT_BUILD_SHARED
+            AGT_BUILDING_MODULE
+            ${MODULE_NAME_DEF}
+            AGT_MODULE_VERSION_MAJOR=${AGATE_VERSION_MAJOR}
+            AGT_MODULE_VERSION_MINOR=${AGATE_VERSION_MINOR}
+            AGT_MODULE_VERSION_PATCH=${AGATE_VERSION_PATCH})
+    target_compile_definitions(agate-static.${target_} PRIVATE
+            AGT_BUILD_STATIC
+            AGT_BUILDING_MODULE
+            ${MODULE_NAME_DEF})
+
+
+    target_include_directories(agate.${target_} PRIVATE include src)
+    target_include_directories(agate-static.${target_} PRIVATE include src)
+
+    if(DEFINED AGATE_LIB_DEPENDENCIES)
+        target_link_libraries(agate.${target_} PRIVATE agate-support ${AGATE_LIB_DEPENDENCIES})
+        target_link_libraries(agate-static.${target_} PRIVATE agate-support ${AGATE_LIB_DEPENDENCIES})
+    else()
+        target_link_libraries(agate.${target_}        PRIVATE agate-support)
+        target_link_libraries(agate-static.${target_} PRIVATE agate-support)
+    endif()
+
+    set_target_properties(agate.${target_} PROPERTIES OUTPUT_NAME agate-${target_})
 endfunction()
 
 
@@ -108,7 +152,20 @@ function(add_agate_executable target_)
 endfunction()
 
 
-add_agate_library(
+set(AGATE_VERSION_MAJOR 0)
+set(AGATE_VERSION_MINOR 1)
+set(AGATE_VERSION_PATCH 0)
+
+
+
+
+add_library(agate-support
+        src/agate/atomic.cpp
+        src/agate/dictionary.cpp
+        src/agate/vector.cpp)
+
+
+add_agate_module(
         agents
             PRIVATE
             SOURCES
@@ -116,17 +173,19 @@ add_agate_library(
                 dispatch.cpp
                 executor.cpp
                 state.cpp
+                send.cpp
 )
 
-add_agate_library(
+add_agate_module(
         async
             PRIVATE
             SOURCES
                 async.cpp
                 signal.cpp
+                wait.cpp
 )
 
-add_agate_library(
+add_agate_module(
         channels
             PRIVATE
             SOURCES
@@ -135,49 +194,30 @@ add_agate_library(
                 broadcast_queue.cpp
                 sender.cpp
                 receiver.cpp
-)
-
-add_agate_library(
-        context
-            PRIVATE
-            SOURCES
-                context.cpp
-                segment.cpp
-                random.cpp
-                shared.cpp
-                error.cpp
-                init.cpp
-
-)
-
-add_agate_library(
-        core
-            PRIVATE
-            SOURCES
-                objects.cpp
-                object_pool.cpp
-                thread_state.cpp
-                vtable.cpp
-)
-
-add_agate_library(
-        messages
-            PRIVATE
-            SOURCES
                 message.cpp
                 message_pool.cpp
 )
 
-add_agate_library(
-        support
+
+add_agate_module(
+        core
             PRIVATE
             SOURCES
-                vector.cpp
-                dictionary.cpp
-                atomic.cpp
+                context.cpp
+                error.cpp
+                init.cpp
+                object_allocator.cpp
+                random.cpp
+                segment.cpp
+                shared.cpp
+                thread_state.cpp
+                rcpool.cpp
+                rcmem.cpp
+                rcweak.cpp
 )
 
-add_agate_library(
+
+add_agate_module(
         threads
             PRIVATE
             SOURCES
@@ -186,7 +226,7 @@ add_agate_library(
 
 
 
-add_agate_library(
+#[[add_agate_library(
         agate
             SOURCES
                 agate.cpp
@@ -194,12 +234,34 @@ add_agate_library(
                 agents
                 async
                 channels
-                context
                 core
-                messages
                 support
                 threads
-)
+)]]
+
+
+add_library(agate STATIC src/agate/agate.cpp)
+target_include_directories(agate PRIVATE src include)
+target_link_libraries(agate PRIVATE agate-support)
+target_compile_definitions(agate PRIVATE AGT_BUILD_SHARED)
+
+
+add_library(agate-static STATIC src/agate/agate.cpp)
+target_include_directories(agate-static PRIVATE src include)
+target_link_libraries(agate-static PRIVATE
+        agate-support
+        $<TARGET_OBJECTS:agate-static.core>
+        $<TARGET_OBJECTS:agate-static.agents>
+        $<TARGET_OBJECTS:agate-static.async>
+        $<TARGET_OBJECTS:agate-static.channels>
+        $<TARGET_OBJECTS:agate-static.threads>)
+target_compile_definitions(agate-static PRIVATE AGT_BUILD_STATIC)
+
+
+
+
+
+
 
 
 add_agate_executable(

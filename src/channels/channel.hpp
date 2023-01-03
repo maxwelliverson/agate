@@ -5,10 +5,10 @@
 #ifndef JEMSYS_AGATE2_CHANNEL_HPP
 #define JEMSYS_AGATE2_CHANNEL_HPP
 
-#include "core/objects.hpp"
-#include "fwd.hpp"
-#include "messages/message.hpp"
-#include "messages/message_pool.hpp"
+#include "config.hpp"
+#include "core/object.hpp"
+#include "message.hpp"
+#include "message_pool.hpp"
 
 // #include <ipc/offset_ptr.hpp>
 

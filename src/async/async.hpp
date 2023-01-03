@@ -5,7 +5,7 @@
 #ifndef JEMSYS_AGATE2_ASYNC_HPP
 #define JEMSYS_AGATE2_ASYNC_HPP
 
-#include "fwd.hpp"
+#include "config.hpp"
 
 #include <utility>
 

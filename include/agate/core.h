@@ -285,7 +285,9 @@
 
 
 #define AGT_ASYNC_STRUCT_SIZE 40
+#define AGT_ASYNC_STRUCT_ALIGNMENT 8
 #define AGT_SIGNAL_STRUCT_SIZE 24
+#define AGT_SIGNAL_STRUCT_ALIGNMENT 8
 
 
 #define AGT_INVALID_OBJECT_ID ((agt_object_id_t)-1)
@@ -305,10 +307,15 @@
 #define AGT_DO_NOT_WAIT ((agt_timeout_t)0)
 #define AGT_WAIT ((agt_timeout_t)-1)
 
+
+#define AGT_NULL_WEAK_REF ((agt_weak_ref_t)0)
+
+
 #define AGT_VERSION_MAJOR 0
 #define AGT_VERSION_MINOR 1
 #define AGT_VERSION_PATCH 0
-#define AGT_API_VERSION ((AGT_VERSION_MAJOR << 22) | (AGT_VERSION_MINOR << 12) | AGT_VERSION_PATCH)
+#define AGT_MAKE_VERSION(major, minor, patch) (((major) << 22) | ((minor) << 12) | (patch))
+#define AGT_API_VERSION AGT_MAKE_VERSION(AGT_VERSION_MAJOR, AGT_VERSION_MINOR, AGT_VERSION_PATCH)
 
 // Version format:
 //                 [    Major   ][    Minor   ][    Patch     ]
@@ -324,48 +331,48 @@
 AGT_begin_c_namespace
 
 
-typedef unsigned char      agt_u8_t;
-typedef   signed char      agt_i8_t;
-typedef          char      agt_char_t;
-typedef unsigned short     agt_u16_t;
-typedef   signed short     agt_i16_t;
-typedef unsigned int       agt_u32_t;
-typedef   signed int       agt_i32_t;
-typedef unsigned long long agt_u64_t;
-typedef   signed long long agt_i64_t;
+typedef unsigned char       agt_u8_t;
+typedef   signed char       agt_i8_t;
+typedef          char       agt_char_t;
+typedef unsigned short      agt_u16_t;
+typedef   signed short      agt_i16_t;
+typedef unsigned int        agt_u32_t;
+typedef   signed int        agt_i32_t;
+typedef unsigned long long  agt_u64_t;
+typedef   signed long long  agt_i64_t;
 
 
 
-typedef size_t             agt_size_t;
-typedef uintptr_t          agt_address_t;
-typedef ptrdiff_t          agt_ptrdiff_t;
+typedef size_t              agt_size_t;
+typedef uintptr_t           agt_address_t;
+typedef ptrdiff_t           agt_ptrdiff_t;
 
 
-typedef agt_u32_t          agt_flags32_t;
-typedef agt_u64_t          agt_flags64_t;
+typedef agt_u32_t           agt_flags32_t;
+typedef agt_u64_t           agt_flags64_t;
 
 
-typedef agt_i32_t agt_bool_t;
+typedef agt_i32_t           agt_bool_t;
 
-typedef agt_u64_t agt_timeout_t;
+typedef agt_u64_t           agt_timeout_t;
 
-typedef agt_u64_t agt_message_id_t;
-typedef agt_u64_t agt_type_id_t;
-typedef agt_u64_t agt_object_id_t;
+typedef agt_u64_t           agt_message_id_t;
+typedef agt_u64_t           agt_type_id_t;
+typedef agt_u64_t           agt_object_id_t;
 
-typedef agt_u64_t agt_send_token_t;
-typedef agt_u64_t agt_name_token_t;
-
-
-typedef agt_u64_t agt_deptok_t;
-
-
-typedef agt_u32_t agt_local_id_t;
-typedef agt_u64_t agt_global_id_t;
+typedef agt_u64_t           agt_send_token_t;
+typedef agt_u64_t           agt_name_token_t;
 
 typedef struct agt_ctx_st*  agt_ctx_t;
 typedef struct agt_async_t  agt_async_t;
 typedef struct agt_signal_t agt_signal_t;
+
+
+typedef struct agt_pool_st*   agt_pool_t;
+typedef struct agt_rcpool_st* agt_rcpool_t;
+
+typedef agt_u64_t agt_weak_ref_t;
+typedef agt_u32_t agt_epoch_t;
 
 
 
@@ -426,7 +433,15 @@ typedef enum agt_status_t {
   AGT_ERROR_NOT_YET_IMPLEMENTED,
   AGT_ERROR_CORRUPTED_MESSAGE,
   AGT_ERROR_COULD_NOT_REACH_ALL_TARGETS,
-  AGT_ERROR_INTERNAL_OVERFLOW            /** < Indicates an internal overflow error that was caught and corrected but that caused the requested operation to fail. */
+  AGT_ERROR_INTERNAL_OVERFLOW,            /** < Indicates an internal overflow error that was caught and corrected but that caused the requested operation to fail. */
+
+  AGT_ERROR_INVALID_ATTRIBUTE_VALUE,
+  AGT_ERROR_INVALID_ENVVAR_VALUE,
+  AGT_ERROR_MODULE_NOT_FOUND,
+  AGT_ERROR_NOT_A_DIRECTORY,
+  AGT_ERROR_CORRUPT_MODULE,
+  AGT_ERROR_BAD_MODULE_VERSION
+
 } agt_status_t;
 
 
@@ -437,6 +452,80 @@ typedef struct agt_name_t {
 
 
 typedef agt_error_handler_status_t (AGT_stdcall *agt_error_handler_t)(agt_status_t errorCode, void* errorData);
+
+
+
+typedef enum agt_pool_flag_bits_t {
+  AGT_POOL_IS_THREAD_SAFE = 0x1
+} agt_pool_flag_bits_t;
+typedef agt_flags32_t agt_pool_flags_t;
+
+typedef enum agt_weak_ref_flag_bits_t {
+  AGT_WEAK_REF_RETAIN_IF_ACQUIRED = 0x1
+} agt_weak_ref_flag_bits_t;
+typedef agt_flags32_t agt_weak_ref_flags_t;
+
+
+/*typedef enum agt_init_flag_bits_t {
+  AGT_INIT_AGENTS_MODULE   = 0x1,
+  AGT_INIT_ASYNC_MODULE    = 0x2,
+  AGT_INIT_CHANNELS_MODULE = 0x4,
+  AGT_INIT_ALL_MODULES     = AGT_INIT_AGENTS_MODULE | AGT_INIT_ASYNC_MODULE | AGT_INIT_CHANNELS_MODULE,
+  AGT_INIT_SINGLE_THREADED = 0x100000000ULL
+} agt_init_flag_bits_t;*/
+
+typedef agt_flags64_t agt_init_flag_bits_t;
+
+static const agt_init_flag_bits_t AGT_INIT_AGENTS_MODULE = 0x1;
+static const agt_init_flag_bits_t AGT_INIT_ASYNC_MODULE  = 0x2;
+static const agt_init_flag_bits_t AGT_INIT_CHANNELS_MODULE = 0x4;
+static const agt_init_flag_bits_t AGT_INIT_ALL_MODULES     = AGT_INIT_AGENTS_MODULE | AGT_INIT_ASYNC_MODULE | AGT_INIT_CHANNELS_MODULE;
+static const agt_init_flag_bits_t AGT_INIT_SINGLE_THREADED = 0x100000000;
+
+#define AGT_MODULE_BITMASK 0x00000000FFFFFFFF
+
+typedef agt_flags64_t agt_init_flags_t;
+
+typedef enum agt_attr_type_t {
+  AGT_ATTR_TYPE_BOOLEAN,
+  AGT_ATTR_TYPE_STRING,
+  AGT_ATTR_TYPE_WIDE_STRING,
+  AGT_ATTR_TYPE_UINT32,
+  AGT_ATTR_TYPE_INT32,
+  AGT_ATTR_TYPE_UINT64,
+  AGT_ATTR_TYPE_INT64
+} agt_attr_type_t;
+
+typedef enum agt_attr_id_t {
+  AGT_ATTR_LIBRARY_PATH,                 //< type: STRING or WIDE_STRING
+  AGT_ATTR_MIN_LIBRARY_VERSION,          //< type: INT32
+  AGT_ATTR_SHARED_CONTEXT,               //< type: BOOLEAN
+  AGT_ATTR_SHARED_NAMESPACE,             //< type: STRING or WIDE_STRING
+  AGT_ATTR_CHANNEL_DEFAULT_CAPACITY,     //> type: UINT32
+  AGT_ATTR_CHANNEL_DEFAULT_MESSAGE_SIZE, //> type: UINT32
+  AGT_ATTR_CHANNEL_DEFAULT_TIMEOUT_MS    //> type: UINT32
+} agt_attr_id_t;
+
+typedef struct agt_attr_t {
+  agt_attr_id_t   id;
+  agt_attr_type_t type;
+  agt_bool_t      allowEnvironmentOverride;
+  union {
+    const void* ptr;
+    agt_bool_t  boolean;
+    agt_u32_t   u32;
+    agt_i32_t   i32;
+    agt_u64_t   u64;
+    agt_i64_t   i64;
+  } value;
+} agt_attr_t;
+
+typedef struct agt_init_info_t {
+  const agt_attr_t* attributes;
+  agt_size_t        attributeCount;
+  agt_init_flags_t  flags;
+  int               headerVersion;  //< must be set to AGT_API_VERSION
+} agt_init_info_t;
 
 
 
@@ -475,9 +564,12 @@ typedef agt_error_handler_status_t (AGT_stdcall *agt_error_handler_t)(agt_status
  *
  * TODO: Decide whether or not to allow customized initialization via function parameters
  * */
-AGT_api agt_status_t AGT_stdcall agt_init_(agt_ctx_t* pContext, int apiVersion) AGT_noexcept;
+AGT_api agt_status_t        AGT_stdcall agt_init_(agt_ctx_t* pContext, int apiVersion) AGT_noexcept;
 
-#define agt_init(...) (agt_init_(__VA_ARGS__, AGT_API_VERSION))
+// #define agt_init(...) (agt_init_(__VA_ARGS__, AGT_API_VERSION))
+
+AGT_api agt_status_t        AGT_stdcall agt_init(agt_ctx_t* pContext, const agt_init_info_t* pInitInfo) AGT_noexcept;
+
 
 
 /**
@@ -486,18 +578,157 @@ AGT_api agt_status_t AGT_stdcall agt_init_(agt_ctx_t* pContext, int apiVersion) 
  * TODO: Decide whether to provide another API call with differing behaviour depending on whether or not
  *       one wishes to wait for processing to finish.
  * */
-AGT_api agt_status_t AGT_stdcall agt_finalize(agt_ctx_t context) AGT_noexcept;
+AGT_api agt_status_t        AGT_stdcall agt_finalize(agt_ctx_t context) AGT_noexcept;
 
 /**
  * Returns the API version of the linked library.
  * */
-AGT_api int          AGT_stdcall agt_get_library_version() AGT_noexcept;
+AGT_api int                 AGT_stdcall agt_get_library_version() AGT_noexcept;
 
 
 
 AGT_api agt_error_handler_t AGT_stdcall agt_get_error_handler(agt_ctx_t context) AGT_noexcept;
 
 AGT_api agt_error_handler_t AGT_stdcall agt_set_error_handler(agt_ctx_t context, agt_error_handler_t errorHandlerCallback) AGT_noexcept;
+
+
+
+
+
+/* ============[ Fixed Size Memory Pool ]============ */
+
+
+AGT_api agt_status_t        AGT_stdcall agt_new_pool(agt_ctx_t ctx, agt_pool_t* pPool, agt_size_t fixedSize, agt_pool_flags_t flags) AGT_noexcept;
+AGT_api agt_status_t        AGT_stdcall agt_reset_pool(agt_pool_t pool) AGT_noexcept;
+AGT_api void                AGT_stdcall agt_destroy_pool(agt_pool_t pool) AGT_noexcept;
+
+AGT_api void*               AGT_stdcall agt_pool_alloc(agt_pool_t pool) AGT_noexcept;
+AGT_api void                AGT_stdcall agt_pool_free(agt_pool_t pool, void* allocation) AGT_noexcept;
+
+
+
+
+
+/* ============[ Reference Counted Memory Pool ]============ */
+
+/*
+ * Reference Counted Memory Pool API Guide
+ *
+ * agt_rcpool_t is a memory pool similar to agt_pool_t,
+ * but where allocations are flexibly reference counted.
+ *
+ * The ability to reset the memory pool en-mass is lost in exchange
+ * for reference counting with both strong and weak reference semantics.
+ *
+ * A weak reference consists of a pair of opaque values;
+ *    - agt_weak_ref_t: an opaque reference token; refers to a reference
+ *                      counted allocation that may or may not be valid.
+ *    - agt_epoch_t:    an opaque epoch value; acts as a verifier for
+ *                      the token.
+ *
+ *
+ * agt_rc_alloc(pool, initialCount):
+ *      Creates a new allocation from pool with an
+ *      initial reference count of $initialCount.
+ *
+ * agt_rc_retain($alloc, $count):
+ *      Increases the reference count of $alloc by $count
+ *
+ * agt_rc_release($alloc, $count):
+ *      Decreases the reference count of $alloc by $count,
+ *      releasing the allocation back to the pool from
+ *      which it was allocated if the reference count has
+ *      been reduced to zero.
+ *
+ * agt_rc_recycle($alloc, $releaseCount, $initialCount):
+ *      Releases $releaseCounts references, and returns a
+ *      new allocation from the same pool if the count was
+ *      reduced to zero. This is an optimization primarily
+ *      intended for the case where it is expected that
+ *      the reference count will be reduced to zero, in
+ *      which case the allocation may be reused without
+ *      any interaction with the underlying pool. In
+ *      either case, the reference count of the returned
+ *      allocation is $initialCount.
+ *
+ * agt_weak_ref_take($alloc, $pEpoch, $count):
+ *      Returns $count weak references referring to $alloc.
+ *      This does not increase the reference count at all,
+ *      and the returned weak reference must be
+ *      successfully reacquired with
+ *      agt_acquire_from_weak_ref to be accessed. $pEpoch
+ *      must not be null, as the weak references' epoch
+ *      is returned by writing to the memory pointed to
+ *      by $pEpoch.
+ *      NOTE: Despite "returning" $count weak references,
+ *      only a single token/epoch pair is actually
+ *      returned. In effect, each weak reference shares
+ *      the same values for the token and epoch.
+ *
+ * agt_weak_ref_retain($ref, $epoch, $count):
+ *      Acquires $count more weak references to the same
+ *      allocation referred to by $ref and $epoch. If
+ *      AGT_NULL_WEAK_REF is returned, the underlying
+ *      allocation has already been invalidated, and the
+ *      weak reference is dropped (otherwise it'd be
+ *      necessary to call agt_weak_ref_drop immediately
+ *      after anyways). As such, the return value should
+ *      always be checked.
+ *
+ * agt_weak_ref_drop($ref, $epoch, $count):
+ *      Drops $count weak references to the allocation
+ *      referred to by $ref and $epoch. Take note that
+ *      other API calls may cause a weak reference to be
+ *      dropped, so only call when the owner of a weak
+ *      reference no longer needs to reacquire it, or when
+ *      multiple weak references are to be dropped at once.
+ *
+ * agt_acquire_from_weak_ref($ref, $epoch, $count, $flags):
+ *      Try to reacquire a strong reference to a ref
+ *      counted allocation referred to by $ref and $epoch.
+ *      If successful, a pointer to the allocation is
+ *      returned, and its reference count is increased by
+ *      $count. Also if successful, one weak reference is
+ *      dropped unless AGT_WEAK_REF_RETAIN_IF_ACQUIRED is
+ *      specified in $flags. If unsuccessful, NULL is
+ *      returned, and one weak reference is dropped.
+ *      NOTE: While the reference count on success is
+ *      incremented by $count, only one weak reference is
+ *      dropped in either case.
+ *
+ *
+ * */
+
+
+
+
+AGT_api agt_status_t        AGT_stdcall agt_new_rcpool(agt_ctx_t ctx, agt_rcpool_t* pPool, agt_size_t fixedSize, agt_pool_flags_t flags) AGT_noexcept;
+AGT_api void                AGT_stdcall agt_destroy_rcpool(agt_rcpool_t pool) AGT_noexcept;
+
+/**
+ * Acquire ownership over a new rc allocation from the specified pool.
+ * */
+AGT_api void*               AGT_stdcall agt_rc_alloc(agt_rcpool_t pool, agt_u32_t initialRefCount) AGT_noexcept;
+/**
+ * Release ownership of the specified allocation, and acquire another from the pool from which it was allocated
+ *
+ * Semantically equivalent to calling
+ *
+ * In many cases, this is much more efficient than calling
+ * agt_rc_release(allocation);
+ * result = agt_rc_alloc(pool);
+ * */
+AGT_api void*               AGT_stdcall agt_rc_recycle(void* allocation, agt_u32_t releasedCount, agt_u32_t acquiredCount) AGT_noexcept;
+AGT_api void*               AGT_stdcall agt_rc_retain(void* allocation, agt_u32_t count) AGT_noexcept;
+AGT_api void                AGT_stdcall agt_rc_release(void* allocation, agt_u32_t count) AGT_noexcept;
+
+
+AGT_api agt_weak_ref_t      AGT_stdcall agt_weak_ref_take(void* rcObj, agt_epoch_t* pEpoch, agt_u32_t count) AGT_noexcept;
+AGT_api agt_weak_ref_t      AGT_stdcall agt_weak_ref_retain(agt_weak_ref_t ref, agt_epoch_t epoch, agt_u32_t count) AGT_noexcept;
+AGT_api void                AGT_stdcall agt_weak_ref_drop(agt_weak_ref_t token, agt_u32_t count) AGT_noexcept;
+AGT_api void*               AGT_stdcall agt_acquire_from_weak_ref(agt_weak_ref_t token, agt_epoch_t epoch, agt_weak_ref_flags_t flags) AGT_noexcept;
+
+
 
 
 AGT_end_c_namespace

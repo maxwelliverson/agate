@@ -5,7 +5,7 @@
 #ifndef AGATE_AGENTS_STATE_HPP
 #define AGATE_AGENTS_STATE_HPP
 
-#include "fwd.hpp"
+#include "config.hpp"
 
 #define AGT_assert_valid_aec(msg) assert(::agt::tl_state.context != nullptr && msg)
 
