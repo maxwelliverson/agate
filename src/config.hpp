@@ -36,7 +36,13 @@
 #endif
 
 
-
+extern "C" {
+#if defined(AGT_USE_NATIVE_WCHAR_TYPE)
+using agt_char_t = wchar_t;
+#else
+using agt_char_t = char;
+#endif
+}
 
 #define AGT_MODULE_VERSION_FUNCTION        _agate_module_get_version
 #define AGT_MODULE_SET_PUBLIC_API_FUNCTION _agate_module_set_api
@@ -107,9 +113,17 @@
     inline constexpr static object_type value = object_type::objType; \
   }
 
+#define PP_AGT_impl_SPECIALIZE_OBJECT_ENUM_RANGE(objType) \
+  template <> \
+  struct ::agt::impl::obj_types::object_type_range<objType> { \
+    inline constexpr static object_type minValue = object_type::objType##_begin; \
+    inline constexpr static object_type maxValue = object_type::objType##_end;   \
+  }
 
 
-
+#define AGT_type_id_of(objType)  ::agt::impl::obj_types::object_type_id<objType>::value
+#define AGT_type_id_min(objType) ::agt::impl::obj_types::object_type_range<objType>::minValue
+#define AGT_type_id_max(objType) ::agt::impl::obj_types::object_type_range<objType>::maxValue
 
 #include "agate/flags.hpp"
 #include "fwd.hpp"

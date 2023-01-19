@@ -16,7 +16,7 @@
 #include "async/async.hpp"
 #include "async/signal.hpp"
 #include "channels/message.hpp"
-#include "core/context.hpp"
+#include "core/instance.hpp"
 #include "core/object.hpp"
 
 #include "agents/state.hpp"

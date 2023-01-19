@@ -10,6 +10,7 @@
 #include <compare>
 
 namespace agt {
+
   class version {
     agt_u32_t m_value = 0;
 
@@ -56,6 +57,8 @@ namespace agt {
       return a.m_value <=> b.m_value;
     }
   };
+
+
 }
 
 #endif//AGATE_INTERNAL_VERSION_HPP

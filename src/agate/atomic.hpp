@@ -2316,7 +2316,7 @@ namespace agt {
 
   public:
 
-    write_lock() = delete;
+    write_lock() = default;
     write_lock(const write_lock&) = delete;
     write_lock(write_lock&& other) noexcept
         : m_mut(other.m_mut), m_readLock(other.m_readLock) {
@@ -2354,9 +2354,20 @@ namespace agt {
         m_mut = lock.m_mut;
     }
 
+    write_lock& operator=(const write_lock&) = delete;
+    write_lock& operator=(write_lock&& lock) noexcept {
+      release();
+      new (this) write_lock(std::move(lock));
+      return *this;
+    }
+
+
     ~write_lock() {
       release();
     }
+
+
+
 
     void release() noexcept {
       if (*this) {

@@ -25,6 +25,19 @@ namespace agt {
    *           -                                           If the low bit is one, interpret the integer as a shared allocation handle, and convert to a local pointer using the local context
    * */
 
+  // handle layout:
+  //       epoch      segmentId    segmentOffset     segmentSizeClass    flags   isShared
+  //   [   63:48    |        |   2:1   |      0      ]
+
+  /**
+   * isShared      = 0:0
+   * isTransient   = 1:1
+   * reservedFlags = 3:2
+   * segmentOffset = 23:4
+   *
+   * */
+
+
   enum class object_type : agt_u16_t;
 
   enum class shared_allocation_id : agt_u64_t;
@@ -144,6 +157,14 @@ namespace agt {
   }
 
 
+  namespace impl::obj_types {
+    template <typename T>
+    struct object_type_id;
+    template <typename T>
+    struct object_type_range;
+  }
+
+
 
   template <typename T,
             typename Dtor = impl::default_destroy<T>,
@@ -172,29 +193,6 @@ namespace agt {
   using safe_maybe_ref = maybe_ref<T, U, Dtor, thread_safe>;
 }
 
-extern "C" {
 
-struct agt_ctx_st {
-  agt_u32_t                flags;
-  agt_u32_t                id;
-  agt::version             version;
-  agt_u32_t                refCount; // How many times has agate been loaded with this context; only relevant when linking to external libraries that also use agate
-  const agt::export_table* exports;
-  agt_u32_t                asyncStructSize;
-  agt_u32_t                signalStructSize;
-  agt_error_handler_t      errorHandler;
-  void*                    errorHandlerUserData;
-  agt_u32_t                processNameOffset;
-
-  // local name registry
-  // page allocator
-  // thread descriptors (unless context is single threaded)
-  // shared context
-  // shared memory allocator
-  // shared name registry
-  // shared processes
-};
-
-}
 
 #endif//JEMSYS_AGATE2_FWD_HPP

@@ -5,6 +5,7 @@
 #ifndef AGATE_CORE_H
 #define AGATE_CORE_H
 
+
 /* ====================[ Portability Config ]================== */
 
 
@@ -283,11 +284,15 @@
 #define AGT_PHYSICAL_PAGE_SIZE ((agt_size_t)1 << 12)
 #define AGT_VIRTUAL_PAGE_SIZE  ((agt_size_t)(1 << 16))
 
+#define AGT_INVALID_NAME_TOKEN ((agt_name_token_t)0)
 
-#define AGT_ASYNC_STRUCT_SIZE 40
-#define AGT_ASYNC_STRUCT_ALIGNMENT 8
-#define AGT_SIGNAL_STRUCT_SIZE 24
-#define AGT_SIGNAL_STRUCT_ALIGNMENT 8
+
+#if !defined(AGT_DISABLE_STATIC_STRUCT_SIZES)
+# define AGT_ASYNC_STRUCT_SIZE 40
+# define AGT_ASYNC_STRUCT_ALIGNMENT 8
+# define AGT_SIGNAL_STRUCT_SIZE 24
+# define AGT_SIGNAL_STRUCT_ALIGNMENT 8
+#endif
 
 
 #define AGT_INVALID_OBJECT_ID ((agt_object_id_t)-1)
@@ -317,6 +322,10 @@
 #define AGT_MAKE_VERSION(major, minor, patch) (((major) << 22) | ((minor) << 12) | (patch))
 #define AGT_API_VERSION AGT_MAKE_VERSION(AGT_VERSION_MAJOR, AGT_VERSION_MINOR, AGT_VERSION_PATCH)
 
+#define AGT_MIN_VERSION_DONT_CARE 0
+#define AGT_MAX_VERSION_DONT_CARE 0xFFFFFFFFu
+
+
 // Version format:
 //                 [    Major   ][    Minor   ][    Patch     ]
 //                 [   10 bits  ][   10 bits  ][    12 bits   ]
@@ -325,68 +334,62 @@
 
 
 
-
-/* =================[ Types ]================= */
-
 AGT_begin_c_namespace
 
 
-typedef unsigned char       agt_u8_t;
-typedef   signed char       agt_i8_t;
-typedef          char       agt_char_t;
-typedef unsigned short      agt_u16_t;
-typedef   signed short      agt_i16_t;
-typedef unsigned int        agt_u32_t;
-typedef   signed int        agt_i32_t;
-typedef unsigned long long  agt_u64_t;
-typedef   signed long long  agt_i64_t;
+typedef unsigned char            agt_u8_t;
+typedef   signed char            agt_i8_t;
+typedef          char            agt_char_t;
+typedef unsigned short           agt_u16_t;
+typedef   signed short           agt_i16_t;
+typedef unsigned int             agt_u32_t;
+typedef   signed int             agt_i32_t;
+typedef unsigned long long       agt_u64_t;
+typedef   signed long long       agt_i64_t;
 
 
 
-typedef size_t              agt_size_t;
-typedef uintptr_t           agt_address_t;
-typedef ptrdiff_t           agt_ptrdiff_t;
+typedef size_t                   agt_size_t;
+typedef uintptr_t                agt_address_t;
+typedef ptrdiff_t                agt_ptrdiff_t;
 
 
-typedef agt_u32_t           agt_flags32_t;
-typedef agt_u64_t           agt_flags64_t;
+typedef agt_u32_t                agt_flags32_t;
+typedef agt_u64_t                agt_flags64_t;
 
 
-typedef agt_i32_t           agt_bool_t;
-
-typedef agt_u64_t           agt_timeout_t;
-
-typedef agt_u64_t           agt_message_id_t;
-typedef agt_u64_t           agt_type_id_t;
-typedef agt_u64_t           agt_object_id_t;
-
-typedef agt_u64_t           agt_send_token_t;
-typedef agt_u64_t           agt_name_token_t;
-
-typedef struct agt_ctx_st*  agt_ctx_t;
-typedef struct agt_async_t  agt_async_t;
-typedef struct agt_signal_t agt_signal_t;
-
-
-typedef struct agt_pool_st*   agt_pool_t;
-typedef struct agt_rcpool_st* agt_rcpool_t;
-
-typedef agt_u64_t agt_weak_ref_t;
-typedef agt_u32_t agt_epoch_t;
+typedef agt_i32_t                agt_bool_t;
 
 
 
-typedef enum agt_error_handler_status_t {
-  AGT_ERROR_HANDLED,
-  AGT_ERROR_IGNORED,
-  AGT_ERROR_NOT_HANDLED
-} agt_error_handler_status_t;
+typedef agt_u64_t                agt_message_id_t;
+typedef agt_u64_t                agt_type_id_t;
+typedef agt_u64_t                agt_object_id_t;
 
-typedef enum agt_scope_t {
-  AGT_LOCAL_SCOPE,
-  AGT_SHARED_SCOPE,
-  AGT_PRIVATE_SCOPE
-} agt_scope_t;
+typedef agt_u64_t                agt_send_token_t;
+
+
+typedef struct agt_instance_st*  agt_instance_t;
+typedef struct agt_ctx_st*       agt_ctx_t;
+
+typedef struct agt_async_t       agt_async_t;
+typedef struct agt_signal_t      agt_signal_t;
+
+typedef struct agt_agent_st*     agt_agent_t;
+
+typedef struct agt_namespace_st* agt_namespace_t;
+
+
+
+
+typedef agt_u64_t               agt_duration_t;
+typedef agt_duration_t          agt_timeout_t;
+typedef agt_u64_t               agt_timestamp_t;
+
+
+
+
+
 
 typedef enum agt_status_t {
   AGT_SUCCESS   /** < No errors */,
@@ -415,7 +418,9 @@ typedef enum agt_status_t {
   AGT_ERROR_NOT_MULTIFRAME,
   AGT_ERROR_BAD_SIZE,
   AGT_ERROR_INVALID_ARGUMENT,
-  AGT_ERROR_BAD_ENCODING_IN_NAME,
+  AGT_ERROR_RESERVATION_FAILED,
+  AGT_ERROR_BAD_UTF8_ENCODING,
+  AGT_ERROR_BAD_NAME,
   AGT_ERROR_NAME_TOO_LONG,
   AGT_ERROR_NAME_ALREADY_IN_USE,
   AGT_ERROR_BAD_DISPATCH_KIND,
@@ -444,15 +449,127 @@ typedef enum agt_status_t {
 
 } agt_status_t;
 
+typedef enum agt_error_handler_status_t {
+  AGT_ERROR_HANDLED,
+  AGT_ERROR_IGNORED,
+  AGT_ERROR_NOT_HANDLED
+} agt_error_handler_status_t;
+
+typedef enum agt_scope_t {
+  AGT_CTX_SCOPE,       ///< Visible to (and intended for use by) only the current context. Generally implies the total absence of any concurrency protection (ie no locks, no atomic operations, etc). Roughly analogous to "thread local" scope.
+  AGT_INSTANCE_SCOPE,  ///< Visible to any context created by the current instance. Roughly analogous to "process local" scope.
+  AGT_SHARED_SCOPE     ///< Visible to any context created by any instance attached to the same shared instance as the current instance. Roughly analogous to "system" scope.
+} agt_scope_t;
+
+typedef enum agt_object_type_t {
+  AGT_AGENT_TYPE,
+  AGT_QUEUE_TYPE,
+  AGT_BQUEUE_TYPE,
+  AGT_SENDER_TYPE,
+  AGT_RECEIVER_TYPE,
+  AGT_POOL_TYPE,
+  AGT_RCPOOL_TYPE,
+  AGT_SIGNAL_TYPE,
+  AGT_USER_ALLOCATION_TYPE,
+  AGT_UNKNOWN_TYPE
+} agt_object_type_t;
+
+
+
+
+typedef agt_error_handler_status_t (AGT_stdcall *agt_error_handler_t)(agt_status_t errorCode, void* errorData);
+
+typedef void (AGT_stdcall* agt_internal_log_handler_t)(const struct agt_internal_log_info_t* logInfo);
+
+
+
+/// Attribute Types
+
+typedef enum agt_attr_type_t {
+  AGT_ATTR_TYPE_BOOLEAN,
+  AGT_ATTR_TYPE_STRING,
+  AGT_ATTR_TYPE_WIDE_STRING,
+  AGT_ATTR_TYPE_UINT32,
+  AGT_ATTR_TYPE_INT32,
+  AGT_ATTR_TYPE_UINT64,
+  AGT_ATTR_TYPE_INT64
+} agt_attr_type_t;
+
+typedef enum agt_attr_id_t {
+  AGT_ATTR_ASYNC_STRUCT_SIZE,                  ///< type: UINT32
+  AGT_ATTR_SIGNAL_STRUCT_SIZE,                 ///< type: UINT32
+  AGT_ATTR_LIBRARY_PATH,                       ///< type: STRING or WIDE_STRING
+  AGT_ATTR_LIBRARY_VERSION,                    ///< type: INT32 or INT32_RANGE
+  AGT_ATTR_SHARED_CONTEXT,                     ///< type: BOOLEAN
+  AGT_ATTR_SHARED_NAMESPACE,                   ///< type: STRING or WIDE_STRING
+  AGT_ATTR_CHANNEL_DEFAULT_CAPACITY,           ///< type: UINT32
+  AGT_ATTR_CHANNEL_DEFAULT_MESSAGE_SIZE,       ///< type: UINT32
+  AGT_ATTR_CHANNEL_DEFAULT_TIMEOUT_MS,         ///< type: UINT32
+  AGT_ATTR_DURATION_UNIT_SIZE_NS,              ///< type: UINT64
+  AGT_ATTR_MIN_FIXED_CHANNEL_SIZE_GRANULARITY, ///< type: UINT64
+} agt_attr_id_t;
+
+typedef struct agt_attr_t {
+  agt_attr_id_t   id;
+  agt_attr_type_t type;
+  union {
+    const void*  ptr;
+    agt_bool_t   boolean;
+    agt_u32_t    u32;
+    agt_i32_t    i32;
+    agt_u64_t    u64;
+    agt_i64_t    i64;
+    struct {
+      agt_i32_t min;
+      agt_i32_t max;
+    } i32range;
+    struct {
+      agt_u32_t min;
+      agt_u32_t max;
+    } u32range;
+  };
+} agt_attr_t;
+
+
+
+/// Naming Types
+
+typedef agt_u64_t               agt_name_token_t;
 
 typedef struct agt_name_t {
   const char* data;   ///< Name data
   agt_size_t  length; ///< Name length; optional. If 0, data must be null terminated.
 } agt_name_t;
 
+typedef struct agt_name_binding_info_t {
+  void*             object;
+  agt_object_type_t type;
+  agt_scope_t       scope;
+  const void*       params;
+} agt_name_binding_info_t;
 
-typedef agt_error_handler_status_t (AGT_stdcall *agt_error_handler_t)(agt_status_t errorCode, void* errorData);
+typedef struct agt_reservation_desc_t {
+  agt_name_t      name;      ///< Encoded in utf8
+  agt_scope_t     scope;     ///< As always, AGT_SHARED_SCOPE is only valid if AGT_ATTR_SHARED_CONTEXT is true
+  agt_namespace_t nameSpace; ///< [optional] "namespace" is a reserved identifier in C++, so we abuse camelCase.
+  agt_async_t*    async;     ///< [optional]
+} agt_reservation_desc_t;
 
+typedef union agt_reserve_name_result_t {
+  agt_name_token_t               token;
+  const agt_name_binding_info_t* bindingInfo;
+} agt_reserve_name_result_t;
+
+
+/// Pool Types
+
+
+typedef struct agt_pool_st*     agt_pool_t;
+typedef struct agt_rcpool_st*   agt_rcpool_t;
+
+
+typedef agt_u64_t               agt_weak_ref_t;
+typedef agt_u32_t               agt_epoch_t;
 
 
 typedef enum agt_pool_flag_bits_t {
@@ -466,271 +583,108 @@ typedef enum agt_weak_ref_flag_bits_t {
 typedef agt_flags32_t agt_weak_ref_flags_t;
 
 
-/*typedef enum agt_init_flag_bits_t {
-  AGT_INIT_AGENTS_MODULE   = 0x1,
-  AGT_INIT_ASYNC_MODULE    = 0x2,
-  AGT_INIT_CHANNELS_MODULE = 0x4,
-  AGT_INIT_ALL_MODULES     = AGT_INIT_AGENTS_MODULE | AGT_INIT_ASYNC_MODULE | AGT_INIT_CHANNELS_MODULE,
-  AGT_INIT_SINGLE_THREADED = 0x100000000ULL
-} agt_init_flag_bits_t;*/
-
-typedef agt_flags64_t agt_init_flag_bits_t;
-
-static const agt_init_flag_bits_t AGT_INIT_AGENTS_MODULE = 0x1;
-static const agt_init_flag_bits_t AGT_INIT_ASYNC_MODULE  = 0x2;
-static const agt_init_flag_bits_t AGT_INIT_CHANNELS_MODULE = 0x4;
-static const agt_init_flag_bits_t AGT_INIT_ALL_MODULES     = AGT_INIT_AGENTS_MODULE | AGT_INIT_ASYNC_MODULE | AGT_INIT_CHANNELS_MODULE;
-static const agt_init_flag_bits_t AGT_INIT_SINGLE_THREADED = 0x100000000;
-
-#define AGT_MODULE_BITMASK 0x00000000FFFFFFFF
-
-typedef agt_flags64_t agt_init_flags_t;
-
-typedef enum agt_attr_type_t {
-  AGT_ATTR_TYPE_BOOLEAN,
-  AGT_ATTR_TYPE_STRING,
-  AGT_ATTR_TYPE_WIDE_STRING,
-  AGT_ATTR_TYPE_UINT32,
-  AGT_ATTR_TYPE_INT32,
-  AGT_ATTR_TYPE_UINT64,
-  AGT_ATTR_TYPE_INT64
-} agt_attr_type_t;
-
-typedef enum agt_attr_id_t {
-  AGT_ATTR_LIBRARY_PATH,                 //< type: STRING or WIDE_STRING
-  AGT_ATTR_MIN_LIBRARY_VERSION,          //< type: INT32
-  AGT_ATTR_SHARED_CONTEXT,               //< type: BOOLEAN
-  AGT_ATTR_SHARED_NAMESPACE,             //< type: STRING or WIDE_STRING
-  AGT_ATTR_CHANNEL_DEFAULT_CAPACITY,     //> type: UINT32
-  AGT_ATTR_CHANNEL_DEFAULT_MESSAGE_SIZE, //> type: UINT32
-  AGT_ATTR_CHANNEL_DEFAULT_TIMEOUT_MS    //> type: UINT32
-} agt_attr_id_t;
-
-typedef struct agt_attr_t {
-  agt_attr_id_t   id;
-  agt_attr_type_t type;
-  agt_bool_t      allowEnvironmentOverride;
-  union {
-    const void* ptr;
-    agt_bool_t  boolean;
-    agt_u32_t   u32;
-    agt_i32_t   i32;
-    agt_u64_t   u64;
-    agt_i64_t   i64;
-  } value;
-} agt_attr_t;
-
-typedef struct agt_init_info_t {
-  const agt_attr_t* attributes;
-  agt_size_t        attributeCount;
-  agt_init_flags_t  flags;
-  int               headerVersion;  //< must be set to AGT_API_VERSION
-} agt_init_info_t;
 
 
 
-/* =================[ Functions ]================= */
 
+/** ===============[ Core API Functions ]=================== **/
 
-/**
- * Initializes a library context.
- *
- * Can be configured via environment variables.
- *
- * @param apiVersion Must be AGT_API_VERSION
- *
- *
- * Initialization Variables:
- *
- * Types:
- *      - bool: value is parsed as being either true or false, with "true", "1", "yes", or "on" interpreted as true,
- *              and "false", "0", "no", or "off" interpreted as false. Not case sensitive.
- *              If the variable is defined, but has no value, this is interpreted as true.
- *              If the variable is not defined at all, this is interpreted as false.
- *      - integer: value is parsed as an integer. With no prefix, value is parsed in base 10.
- *                 The prefix "0x" causes the value to be interpreted in hexadecimal.
- *                 The prefix "00" causes the value to be interpreted in octal.
- *                 The prefix "0b" causes the value to be interpreted in binary.
- *      - number: value is parsed as a real number. Can be an integer or a float.
- *      - string: value is parsed as is. As such, the value is case sensitive.
- *
- * |                               Name |    Type   |   Default Value   | Description
- * |------------------------------------|-----------|-------------------|--------------
- * |              AGATE_PRIVATE_CONTEXT |  bool     |       false       | If true, all interprocess capabilities will be disabled for this context. Any attempt to create a shared entity from this context will result in a return code of AGT_ERROR_CANNOT_CREATE_SHARED.
- * |             AGATE_SHARED_NAMESPACE |  string   | agate-default-key | If interprocess capabilities are enabled (as they are by default), this context will be able to communicate with any other contexts that were created with the same key.
- * |     AGATE_CHANNEL_DEFAULT_CAPACITY |  integer  |        255        | When creating a channel, a capacity is specified. The created channel is guaranteed to be able to concurrently store at least that many messages. If the specified capacity is 0, then the default capacity is used, as defined by this variable.
- * | AGATE_CHANNEL_DEFAULT_MESSAGE_SIZE |  integer  |        196        | When creating a channel, a message size is specified. The created channel is guaranteed to be able to send messages of up to the specified size in bytes without dynamic allocation. If the specified size is 0, then the default size is used, as defined by this variable.
- * |   AGATE_CHANNEL_DEFAULT_TIMEOUT_MS |  integer  |       30000       | When creating a channel, a timeout in milliseconds is specified. Any handles to the created channel will be disconnected if there is no activity after the duration specified in this variable. Used as a safeguard against denial of service-esque attacks.
- *
- * TODO: Decide whether or not to allow customized initialization via function parameters
- * */
-AGT_api agt_status_t        AGT_stdcall agt_init_(agt_ctx_t* pContext, int apiVersion) AGT_noexcept;
+AGT_api agt_instance_t      AGT_stdcall agt_get_instance(agt_ctx_t context) AGT_noexcept;
 
-// #define agt_init(...) (agt_init_(__VA_ARGS__, AGT_API_VERSION))
-
-AGT_api agt_status_t        AGT_stdcall agt_init(agt_ctx_t* pContext, const agt_init_info_t* pInitInfo) AGT_noexcept;
-
-
-
-/**
- * Closes the provided context. Behaviour of this function depends on how the library was configured
- *
- * TODO: Decide whether to provide another API call with differing behaviour depending on whether or not
- *       one wishes to wait for processing to finish.
- * */
-AGT_api agt_status_t        AGT_stdcall agt_finalize(agt_ctx_t context) AGT_noexcept;
+AGT_api agt_ctx_t           AGT_stdcall agt_current_context() AGT_noexcept;
 
 /**
  * Returns the API version of the linked library.
  * */
-AGT_api int                 AGT_stdcall agt_get_library_version() AGT_noexcept;
+AGT_api int                 AGT_stdcall agt_get_library_version(agt_instance_t instance) AGT_noexcept;
 
 
 
-AGT_api agt_error_handler_t AGT_stdcall agt_get_error_handler(agt_ctx_t context) AGT_noexcept;
+AGT_api agt_error_handler_t AGT_stdcall agt_get_error_handler(agt_instance_t instance) AGT_noexcept;
 
-AGT_api agt_error_handler_t AGT_stdcall agt_set_error_handler(agt_ctx_t context, agt_error_handler_t errorHandlerCallback) AGT_noexcept;
+AGT_api agt_error_handler_t AGT_stdcall agt_set_error_handler(agt_instance_t instance, agt_error_handler_t errorHandlerCallback) AGT_noexcept;
 
-
-
-
-
-/* ============[ Fixed Size Memory Pool ]============ */
-
-
-AGT_api agt_status_t        AGT_stdcall agt_new_pool(agt_ctx_t ctx, agt_pool_t* pPool, agt_size_t fixedSize, agt_pool_flags_t flags) AGT_noexcept;
-AGT_api agt_status_t        AGT_stdcall agt_reset_pool(agt_pool_t pool) AGT_noexcept;
-AGT_api void                AGT_stdcall agt_destroy_pool(agt_pool_t pool) AGT_noexcept;
-
-AGT_api void*               AGT_stdcall agt_pool_alloc(agt_pool_t pool) AGT_noexcept;
-AGT_api void                AGT_stdcall agt_pool_free(agt_pool_t pool, void* allocation) AGT_noexcept;
-
-
-
-
-
-/* ============[ Reference Counted Memory Pool ]============ */
-
-/*
- * Reference Counted Memory Pool API Guide
- *
- * agt_rcpool_t is a memory pool similar to agt_pool_t,
- * but where allocations are flexibly reference counted.
- *
- * The ability to reset the memory pool en-mass is lost in exchange
- * for reference counting with both strong and weak reference semantics.
- *
- * A weak reference consists of a pair of opaque values;
- *    - agt_weak_ref_t: an opaque reference token; refers to a reference
- *                      counted allocation that may or may not be valid.
- *    - agt_epoch_t:    an opaque epoch value; acts as a verifier for
- *                      the token.
- *
- *
- * agt_rc_alloc(pool, initialCount):
- *      Creates a new allocation from pool with an
- *      initial reference count of $initialCount.
- *
- * agt_rc_retain($alloc, $count):
- *      Increases the reference count of $alloc by $count
- *
- * agt_rc_release($alloc, $count):
- *      Decreases the reference count of $alloc by $count,
- *      releasing the allocation back to the pool from
- *      which it was allocated if the reference count has
- *      been reduced to zero.
- *
- * agt_rc_recycle($alloc, $releaseCount, $initialCount):
- *      Releases $releaseCounts references, and returns a
- *      new allocation from the same pool if the count was
- *      reduced to zero. This is an optimization primarily
- *      intended for the case where it is expected that
- *      the reference count will be reduced to zero, in
- *      which case the allocation may be reused without
- *      any interaction with the underlying pool. In
- *      either case, the reference count of the returned
- *      allocation is $initialCount.
- *
- * agt_weak_ref_take($alloc, $pEpoch, $count):
- *      Returns $count weak references referring to $alloc.
- *      This does not increase the reference count at all,
- *      and the returned weak reference must be
- *      successfully reacquired with
- *      agt_acquire_from_weak_ref to be accessed. $pEpoch
- *      must not be null, as the weak references' epoch
- *      is returned by writing to the memory pointed to
- *      by $pEpoch.
- *      NOTE: Despite "returning" $count weak references,
- *      only a single token/epoch pair is actually
- *      returned. In effect, each weak reference shares
- *      the same values for the token and epoch.
- *
- * agt_weak_ref_retain($ref, $epoch, $count):
- *      Acquires $count more weak references to the same
- *      allocation referred to by $ref and $epoch. If
- *      AGT_NULL_WEAK_REF is returned, the underlying
- *      allocation has already been invalidated, and the
- *      weak reference is dropped (otherwise it'd be
- *      necessary to call agt_weak_ref_drop immediately
- *      after anyways). As such, the return value should
- *      always be checked.
- *
- * agt_weak_ref_drop($ref, $epoch, $count):
- *      Drops $count weak references to the allocation
- *      referred to by $ref and $epoch. Take note that
- *      other API calls may cause a weak reference to be
- *      dropped, so only call when the owner of a weak
- *      reference no longer needs to reacquire it, or when
- *      multiple weak references are to be dropped at once.
- *
- * agt_acquire_from_weak_ref($ref, $epoch, $count, $flags):
- *      Try to reacquire a strong reference to a ref
- *      counted allocation referred to by $ref and $epoch.
- *      If successful, a pointer to the allocation is
- *      returned, and its reference count is increased by
- *      $count. Also if successful, one weak reference is
- *      dropped unless AGT_WEAK_REF_RETAIN_IF_ACQUIRED is
- *      specified in $flags. If unsuccessful, NULL is
- *      returned, and one weak reference is dropped.
- *      NOTE: While the reference count on success is
- *      incremented by $count, only one weak reference is
- *      dropped in either case.
- *
- *
- * */
-
-
-
-
-AGT_api agt_status_t        AGT_stdcall agt_new_rcpool(agt_ctx_t ctx, agt_rcpool_t* pPool, agt_size_t fixedSize, agt_pool_flags_t flags) AGT_noexcept;
-AGT_api void                AGT_stdcall agt_destroy_rcpool(agt_rcpool_t pool) AGT_noexcept;
 
 /**
- * Acquire ownership over a new rc allocation from the specified pool.
+ * \brief Reserves a name to be subsequently bound to some agate object. On success,
+ *        an opaque name token is returned. In the case of a name-clash, some basic
+ *        info about the bound object is returned instead.
+ *
+ * \details This is primarily intended to allow for early detection of name-clash errors
+ *          during object construction, and for enabling lazy construction of unique
+ *          objects.
+ *          In pseudocode, the intended idiom looks something along the lines of
+ *
+ *              reserve(name)
+ *              error = initialize(state)
+ *              if error
+ *                  release(name)
+ *              else
+ *                  error = agt_create_some_object(state, name, ...)
+ *                  if error
+ *                      release(name)
+ *
+ *          This is particularly useful when object creation is potentially expensive, or
+ *          when the named object should be unique within the specified scope. It may also
+ *          be used to retroactively name objects that were created anonymously.
+ *
+ * \returns \n
+ *              AGT_SUCCESS: Successfully reserved the specified name within the specified scope,
+ *                           and a token has been written to pResult->token that may be subsequently
+ *                           bound to some object. \n
+ *              AGT_DEFERRED: The specified name has already been reserved, but has not yet been
+ *                            bound. A deferred operation has been bound to pReservationDesc->async,
+ *                            which will reattempt the reservation if the name is released, or will
+ *                            return the binding info the bound object upon binding. \n
+ *              AGT_ERROR_RESERVATION_FAILED: The specified name has already been reserved, but has
+ *                                            not yet been bound, and the operation could not be
+ *                                            deferred because pReservationDesc->async was null. \n
+ *              AGT_ERROR_INVALID_ARGUMENT: Indicates either pReservationDesc or pResult was null,
+ *                                          which ideally, shouldn't ever be the case. \n
+ *              AGT_ERROR_NAME_ALREADY_IN_USE: The requested name has already been bound within the
+ *                                             specified scope, and a pointer to a struct containing
+ *                                             information about the bound object has been written to
+ *                                             pResult->bindingInfo. \n
+ *              AGT_ERROR_BAD_UTF8_ENCODING: The requested name was not valid UTF8. \n
+ *              AGT_ERROR_NAME_TOO_LONG: The requested name exceeded the maximum name length limit.
+ *                                       The maximum name length may be queried with agt_query_attributes. \n
+ *              AGT_ERROR_BAD_NAME: The requested name contained characters not allowed in a valid agate
+ *                                  name. As of right now, there aren't any, but that may change in the
+ *                                  future.
+ *
  * */
-AGT_api void*               AGT_stdcall agt_rc_alloc(agt_rcpool_t pool, agt_u32_t initialRefCount) AGT_noexcept;
+AGT_api agt_status_t        AGT_stdcall agt_reserve_name(agt_ctx_t ctx, const agt_reservation_desc_t* pReservationDesc, agt_reserve_name_result_t* pResult) AGT_noexcept;
+
 /**
- * Release ownership of the specified allocation, and acquire another from the pool from which it was allocated
+ * \brief Releases a name previously reserved by a call to agt_reserve_name.
  *
- * Semantically equivalent to calling
+ * \details This only needs to be called when a previously reserved name will not be
+ *          bound to anything. Primarily intended for use in cases where a name is
+ *          reserved prior to object creation, and then at some point during
+ *          construction, an error is encountered and the creation routine is
+ *          cancelled.
+ *          Note that attempts to bind a name token (eg. agt_bind_name, agt_new_agent, ...)
+ *          that result in failure do NOT automatically release the reserved name. This
+ *          is so that the name token may be reused in subsequent attempts, but it also
+ *          means that if a user wishes to propagate that failure upwards, they MUST
+ *          release the reserved name token. Failure to do so results in a memory leak.
  *
- * In many cases, this is much more efficient than calling
- * agt_rc_release(allocation);
- * result = agt_rc_alloc(pool);
+ * \note nameToken must be a valid token obtained from a call to agt_reserve_name that
+ *       has not yet been bound to anything.
  * */
-AGT_api void*               AGT_stdcall agt_rc_recycle(void* allocation, agt_u32_t releasedCount, agt_u32_t acquiredCount) AGT_noexcept;
-AGT_api void*               AGT_stdcall agt_rc_retain(void* allocation, agt_u32_t count) AGT_noexcept;
-AGT_api void                AGT_stdcall agt_rc_release(void* allocation, agt_u32_t count) AGT_noexcept;
+AGT_api void                AGT_stdcall agt_release_name(agt_ctx_t ctx, agt_name_token_t nameToken) AGT_noexcept;
 
-
-AGT_api agt_weak_ref_t      AGT_stdcall agt_weak_ref_take(void* rcObj, agt_epoch_t* pEpoch, agt_u32_t count) AGT_noexcept;
-AGT_api agt_weak_ref_t      AGT_stdcall agt_weak_ref_retain(agt_weak_ref_t ref, agt_epoch_t epoch, agt_u32_t count) AGT_noexcept;
-AGT_api void                AGT_stdcall agt_weak_ref_drop(agt_weak_ref_t token, agt_u32_t count) AGT_noexcept;
-AGT_api void*               AGT_stdcall agt_acquire_from_weak_ref(agt_weak_ref_t token, agt_epoch_t epoch, agt_weak_ref_flags_t flags) AGT_noexcept;
-
+/**
+ * \brief Binds an object to a previously reserved name.
+ *
+ * \note nameToken must have been previously obtained from a call to agt_reserve_name,
+ *       and must not have already been bound.
+ * */
+AGT_api agt_status_t        AGT_stdcall agt_bind_name(agt_ctx_t ctx, agt_name_token_t nameToken, void* object) AGT_noexcept;
 
 
 
 AGT_end_c_namespace
+
 
 #endif//AGATE_CORE_H

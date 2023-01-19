@@ -14,6 +14,8 @@ AGT_begin_c_namespace
 
 
 
+
+typedef struct agt_self_st*       agt_self_t;
 typedef struct agt_agent_st*      agt_agent_t;
 typedef struct agt_pinned_msg_st* agt_pinned_msg_t;
 typedef struct agt_executor_st*   agt_executor_t;
@@ -28,7 +30,7 @@ typedef agt_u64_t                 agt_raw_msg_t;
 typedef void* (*agt_agent_ctor_t)(const void* ctorUserData, void* params);
 typedef void  (*agt_agent_dtor_t)(void* agentState);
 typedef void  (*agt_agent_start_t)(void* agentState);
-typedef void  (*agt_agent_proc_t)(void* agentState, agt_message_id_t msgId, const void* message, agt_size_t messageSize);
+typedef void  (*agt_agent_proc_t)(agt_self_t self, void* agentState, const void* message, agt_size_t messageSize);
 
 
 typedef enum agt_enumeration_action_t {
@@ -46,7 +48,7 @@ typedef enum agt_agent_create_flag_bits_t {
   AGT_AGENT_CREATE_FROM_TYPE_NAME = 0x2,
   AGT_AGENT_CREATE_AS_LITERAL     = 0x4,
   AGT_AGENT_CREATE_SHARED         = 0x8,
-  AGT_AGENT_CREATE_DETATCHED      = 0x10 ///< A detatched agent is not reference counted and is responsible for its own lifetime. This can be useful for breaking reference cycles for instance.
+  AGT_AGENT_CREATE_DETACHED       = 0x10 ///< A detached agent is not reference counted and is responsible for its own lifetime. This can be useful for breaking reference cycles for instance.
 } agt_agent_create_flag_bits_t;
 typedef agt_flags32_t agt_agent_create_flags_t;
 
@@ -71,7 +73,6 @@ typedef agt_flags32_t agt_send_flags_t;
 
 
 typedef struct agt_send_info_t {
-  agt_message_id_t id;
   agt_size_t       size;
   const void*      buffer;
   agt_async_t*     asyncHandle;
@@ -79,7 +80,6 @@ typedef struct agt_send_info_t {
 } agt_send_info_t;
 
 typedef struct agt_raw_send_info_t {
-  agt_message_id_t id;
   agt_raw_msg_t    msg;
   agt_async_t*     async;
   agt_send_flags_t flags;
@@ -101,11 +101,12 @@ typedef struct agt_agent_type_literal_info_t {
   agt_agent_proc_t proc;
   agt_agent_dtor_t dtor;
   // Maybe include some indication of what messages it can process??
+  // I think message filtering/typing is probably beyond the scope of the core library
 } agt_agent_type_literal_info_t;
 
 typedef struct agt_agent_create_info_t {
   agt_agent_create_flags_t flags;
-  agt_name_t               name;             ///< Agent name; optional. If name is not set, the created agent will be anonymous.
+  agt_name_token_t         name;             ///< Agent name; optional. token must have previously been acquired from a call to agt_reserve_name. If 0, agent will remain anonymous.
   size_t                   fixedMessageSize; ///< If not 0, all messages sent to this agent must be equal to or less than fixedMessageSize. If 0, messages of any size may be sent.
   union {
     agt_typeid_t           typeId;           ///< Selected if flags includes AGT_AGENT_CREATE_FROM_TYPEID
@@ -163,7 +164,7 @@ AGT_api agt_status_t AGT_stdcall agt_transfer_owner(agt_ctx_t ctx, agt_agent_t a
  * Optimized equivalent to agt_export_agent(agt_self())
  * Obviously, only works within an agent execution context
  * */
-AGT_agent_api agt_agent_handle_t AGT_stdcall agt_export_self() AGT_noexcept;
+AGT_agent_api agt_agent_handle_t AGT_stdcall agt_export_self(agt_self_t self) AGT_noexcept;
 
 AGT_api       agt_status_t       AGT_stdcall agt_export_agent(agt_ctx_t ctx, agt_agent_t agent, agt_agent_handle_t* pHandle) AGT_noexcept;
 
@@ -173,27 +174,27 @@ AGT_api       agt_status_t       AGT_stdcall agt_import(agt_ctx_t ctx, agt_agent
 
 /* ========================= [ Agents ] ========================= */
 
-AGT_agent_api agt_ctx_t    AGT_stdcall agt_current_context() AGT_noexcept;
+AGT_agent_api agt_self_t  AGT_stdcall  agt_self(agt_ctx_t ctx) AGT_noexcept;
 
-AGT_agent_api agt_agent_t  AGT_stdcall agt_self() AGT_noexcept;
-
-AGT_agent_api agt_agent_t  AGT_stdcall agt_retain_sender() AGT_noexcept;
+AGT_agent_api agt_agent_t  AGT_stdcall agt_retain_sender(agt_self_t self) AGT_noexcept;
 
 AGT_agent_api agt_status_t AGT_stdcall agt_retain(agt_agent_t* pNewAgent, agt_agent_t agent) AGT_noexcept;
 
+AGT_agent_api agt_status_t AGT_stdcall agt_retain_self(agt_self_t self, agt_agent_t* pSelfAgent) AGT_noexcept;
 
 
-AGT_agent_api agt_status_t AGT_stdcall agt_send(agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept;
 
-AGT_agent_api agt_status_t AGT_stdcall agt_send_as(agt_agent_t spoofSender, agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept;
+AGT_agent_api agt_status_t AGT_stdcall agt_send(agt_self_t self, agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept;
 
-AGT_agent_api agt_status_t AGT_stdcall agt_send_many(const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept;
+AGT_agent_api agt_status_t AGT_stdcall agt_send_as(agt_self_t self, agt_agent_t spoofSender, agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept;
 
-AGT_agent_api agt_status_t AGT_stdcall agt_send_many_as(agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept;
+AGT_agent_api agt_status_t AGT_stdcall agt_send_many(agt_self_t self, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept;
 
-AGT_agent_api agt_status_t AGT_stdcall agt_reply(const agt_send_info_t* pSendInfo) AGT_noexcept;
+AGT_agent_api agt_status_t AGT_stdcall agt_send_many_as(agt_self_t self, agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept;
 
-AGT_agent_api agt_status_t AGT_stdcall agt_reply_as(agt_agent_t spoofReplier, const agt_send_info_t* pSendInfo) AGT_noexcept;
+AGT_agent_api agt_status_t AGT_stdcall agt_reply(agt_self_t self, const agt_send_info_t* pSendInfo) AGT_noexcept;
+
+AGT_agent_api agt_status_t AGT_stdcall agt_reply_as(agt_self_t self, agt_agent_t spoofReplier, const agt_send_info_t* pSendInfo) AGT_noexcept;
 
 
 
@@ -223,25 +224,25 @@ AGT_agent_api agt_status_t AGT_stdcall agt_reply_as(agt_agent_t spoofReplier, co
  * @param [in]  desiredMessageSize Desired size of the message. The buffer returned is guaranteed to be valid for at least this many bytes
  * @param [out] pRawMsg Handle for raw message. Used as a parameter in a subsequent send call.
  * */
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_acquire(agt_agent_t recipient, size_t desiredMessageSize, agt_raw_msg_t* pRawMsg, void** ppRawBuffer) AGT_noexcept;
+AGT_agent_api agt_status_t AGT_stdcall agt_raw_acquire(agt_self_t self, agt_agent_t recipient, size_t desiredMessageSize, agt_raw_msg_t* pRawMsg, void** ppRawBuffer) AGT_noexcept;
 
 /***/
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_send(agt_agent_t recipient, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+AGT_agent_api agt_status_t AGT_stdcall agt_raw_send(agt_self_t self, agt_agent_t recipient, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
 
 /***/
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_send_as(agt_agent_t spoofSender, agt_agent_t recipient, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+AGT_agent_api agt_status_t AGT_stdcall agt_raw_send_as(agt_self_t self, agt_agent_t spoofSender, agt_agent_t recipient, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
 
 /***/
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_send_many(const agt_agent_t* recipients, agt_size_t agentCount, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+AGT_agent_api agt_status_t AGT_stdcall agt_raw_send_many(agt_self_t self, const agt_agent_t* recipients, agt_size_t agentCount, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
 
 /***/
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_send_many_as(agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+AGT_agent_api agt_status_t AGT_stdcall agt_raw_send_many_as(agt_self_t self, agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
 
 /***/
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_reply(const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+AGT_agent_api agt_status_t AGT_stdcall agt_raw_reply(agt_self_t self, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
 
 /***/
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_reply_as(agt_agent_t spoofSender, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+AGT_agent_api agt_status_t AGT_stdcall agt_raw_reply_as(agt_self_t self, agt_agent_t spoofSender, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
 
 
 
@@ -283,8 +284,8 @@ AGT_agent_api void         AGT_stdcall agt_abort() AGT_noexcept;
  * Coroutine can be passed across C APIs as a simple address thanks to the standardized function calls
  *     - std::coroutine_handle<PromiseType>::address
  *     - std::coroutine_handle<PromiseType>::from_address
- * TODO: Figure out some way to set which C++ standard library implmentation is used internally. Possibly with an environment variable?
- *       On windows, it should generally be safe to default to the MSVC coroutine implmentation (what about MinGW/Cygwin?), but on
+ * TODO: Figure out some way to set which C++ standard library implementation is used internally. Possibly with an environment variable?
+ *       On windows, it should generally be safe to default to the MSVC coroutine implementation (what about MinGW/Cygwin?), but on
  *       unix-like systems, the choice between libstdc++ and libc++ is a meaningful one, and I'd have to double check but I'm virtually
  *       certain they're totally incompatible at the ABI level. At the very least there's no guarantee of compatibility.
  * */

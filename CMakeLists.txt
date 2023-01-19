@@ -64,7 +64,7 @@ function(add_agate_module target_)
     set(singleValueArgs)
     set(multiValueArgs SOURCES DEPENDENCIES DEFINES)
     cmake_parse_arguments(AGATE_MODULE "${optionalArgs}" "${singleValueArgs}" "${multiValueArgs}" ${ARGN})
-    list(TRANSFORM AGATE_MODULE_SOURCES PREPEND src/${target_}/)
+    list(TRANSFORM AGATE_MODULE_SOURCES PREPEND src/modules/${target_}/)
 
     add_library(agate.${target_}        SHARED src/agate/module.cpp ${AGATE_MODULE_SOURCES})
     add_library(agate-static.${target_} OBJECT ${AGATE_MODULE_SOURCES})
@@ -88,8 +88,8 @@ function(add_agate_module target_)
             ${MODULE_NAME_DEF})
 
 
-    target_include_directories(agate.${target_} PRIVATE include src)
-    target_include_directories(agate-static.${target_} PRIVATE include src)
+    target_include_directories(agate.${target_} PRIVATE include src src/modules)
+    target_include_directories(agate-static.${target_} PRIVATE include src src/modules)
 
     if(DEFINED AGATE_LIB_DEPENDENCIES)
         target_link_libraries(agate.${target_} PRIVATE agate-support ${AGATE_LIB_DEPENDENCIES})
@@ -160,9 +160,26 @@ set(AGATE_VERSION_PATCH 0)
 
 
 add_library(agate-support
-        src/agate/atomic.cpp
-        src/agate/dictionary.cpp
-        src/agate/vector.cpp)
+            src/agate/atomic.cpp
+            src/agate/dictionary.cpp
+            src/agate/vector.cpp)
+
+add_agate_module(
+        core
+            PRIVATE
+            SOURCES
+                context.cpp
+                error.cpp
+                init.cpp
+                object_allocator.cpp
+                random.cpp
+                segment.cpp
+                shared.cpp
+                thread_state.cpp
+                rcpool.cpp
+                rcmem.cpp
+                rcweak.cpp
+)
 
 
 add_agate_module(
@@ -196,25 +213,39 @@ add_agate_module(
                 receiver.cpp
                 message.cpp
                 message_pool.cpp
+                ring_queue.cpp
 )
-
 
 add_agate_module(
-        core
+        pool
             PRIVATE
             SOURCES
-                context.cpp
-                error.cpp
-                init.cpp
-                object_allocator.cpp
-                random.cpp
-                segment.cpp
-                shared.cpp
-                thread_state.cpp
-                rcpool.cpp
-                rcmem.cpp
-                rcweak.cpp
+                st_pool.cpp
+                mt_pool.cpp
+                st_rcpool.cpp
+                mt_rcpool.cpp
+                st_rcmem.cpp
+                mt_rcmem.cpp
+                st_rcweak.cpp
+                mt_rcweak.cpp
 )
+
+add_agate_module(
+        log
+            PRIVATE
+            SOURCES
+                st_log.cpp
+                mt_log.cpp
+)
+
+add_agate_module(
+        network
+            PRIVATE
+            SOURCES
+                st_net.cpp
+                mt_net.cpp
+)
+
 
 
 add_agate_module(
@@ -241,9 +272,9 @@ add_agate_module(
 
 
 add_library(agate STATIC src/agate/agate.cpp)
-target_include_directories(agate PRIVATE src include)
+target_include_directories(agate PRIVATE src include src/modules)
 target_link_libraries(agate PRIVATE agate-support)
-target_compile_definitions(agate PRIVATE AGT_BUILD_SHARED)
+target_compile_definitions(agate PRIVATE AGT_BUILD_SHARED AGT_BUILDING_CORE_LIBRARY)
 
 
 add_library(agate-static STATIC src/agate/agate.cpp)
@@ -254,8 +285,11 @@ target_link_libraries(agate-static PRIVATE
         $<TARGET_OBJECTS:agate-static.agents>
         $<TARGET_OBJECTS:agate-static.async>
         $<TARGET_OBJECTS:agate-static.channels>
-        $<TARGET_OBJECTS:agate-static.threads>)
-target_compile_definitions(agate-static PRIVATE AGT_BUILD_STATIC)
+        $<TARGET_OBJECTS:agate-static.threads>
+        $<TARGET_OBJECTS:agate-static.log>
+        $<TARGET_OBJECTS:agate-static.network>
+        $<TARGET_OBJECTS:agate-static.pool>)
+target_compile_definitions(agate-static PRIVATE AGT_BUILD_STATIC AGT_BUILDING_CORE_LIBRARY)
 
 
 
@@ -276,13 +310,13 @@ add_agate_executable(
 if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     add_agate_executable(
             coro
-            TEST
-            SOURCES
-            main.cpp
-            DEPENDENCIES
-            agate
-            OPTIONS
-            /await:strict
+                TEST
+                SOURCES
+                    main.cpp
+                DEPENDENCIES
+                    agate
+                OPTIONS
+                    /await:strict
     )
 endif()
 
@@ -308,3 +342,6 @@ add_agate_executable(
 
 add_library(DUMMY src/dummy.cpp)
 target_include_directories(DUMMY PRIVATE include src)
+
+add_library(DUMMY_MODULE src/dummy_module.cpp)
+target_include_directories(DUMMY_MODULE PRIVATE include src)

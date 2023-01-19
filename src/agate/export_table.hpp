@@ -31,6 +31,7 @@ namespace agt {
     version                     _header_version;
     version                     _effective_library_version;
     module_table*               _modules;
+    agt_instance_t              _instance;
     agt_ctx_t                   _ctx;
     size_t                      _size_of_async_struct;
     size_t                      _size_of_signal_struct;
