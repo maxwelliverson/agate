@@ -5,6 +5,8 @@
 // #include "internal.hpp"
 // #include "handle.hpp"
 
+#define AGT_UNDEFINED_ASYNC_STRUCT
+
 #include "agate.h"
 
 #include "sys_string.hpp"
@@ -71,145 +73,15 @@
 
 using namespace agt;
 
+struct module_info {
+  module_id id;
+  version   moduleVersion;
+  HMODULE   libraryHandle;
+  char      moduleName[16];
+  wchar_t   libraryPath[260];
+};
+
 namespace {
-
-  // Make sure this is in sync with the module bits of agt_init_flag_bits_t in core.h
-  enum module_id : agt_u32_t {
-    AGT_CORE_MODULE     = 0x0,
-    AGT_AGENTS_MODULE   = 0x1,
-    AGT_ASYNC_MODULE    = 0x2,
-    AGT_CHANNELS_MODULE = 0x4,
-    AGT_MODULE_MAX_ENUM_PLUS_ONE,
-  };
-
-  inline constexpr const char* module_names[] = {
-      "core",
-      "agents",
-      "async",
-      "channels"
-  };
-
-  static_assert( std::has_single_bit(static_cast<std::underlying_type_t<module_id>>(AGT_MODULE_MAX_ENUM_PLUS_ONE - 1)) );
-
-  inline constexpr size_t MaxModuleCount = std::countr_zero(AGT_MODULE_MAX_ENUM_PLUS_ONE - 1) + 2;
-
-  inline constexpr size_t module_index(module_id id) noexcept {
-    if !consteval {
-      AGT_assert( std::has_single_bit(static_cast<std::underlying_type_t<module_id>>(id)) && id < AGT_MODULE_MAX_ENUM_PLUS_ONE );
-    }
-    if (id == AGT_CORE_MODULE)
-      return 0;
-    return std::countr_zero(static_cast<std::underlying_type_t<module_id>>(id)) + 1;
-  }
-
-
-
-  struct module_info {
-    module_id id;
-    version   moduleVersion;
-    HMODULE   libraryHandle;
-    char      moduleName[16];
-    wchar_t   libraryPath[260];
-  };
-
-  struct module_table {
-    module_info* table;
-    size_t       count;
-    agt_u32_t    refCount;
-  };
-
-  struct AGT_cache_aligned export_table {
-
-    version                     _header_version;
-    version                     _effective_library_version;
-    module_table*               _modules;
-    agt_ctx_t                   _ctx;
-    size_t                      _size_of_async_struct;
-    size_t                      _size_of_signal_struct;
-
-
-    // Version 0.01
-
-    AGT_cache_aligned
-    agt_status_t (* AGT_stdcall _pfn_finalize)(agt_ctx_t ctx);
-
-    /* ========================= [ Async 0.01 ] ========================= */
-
-    agt_status_t (* AGT_stdcall _pfn_new_async)(agt_ctx_t ctx, agt_async_t* pAsync, agt_async_flags_t flags);
-    void         (* AGT_stdcall _pfn_copy_async)(const agt_async_t* pFrom, agt_async_t* pTo);
-    void         (* AGT_stdcall _pfn_move_async)(agt_async_t* from, agt_async_t* to);
-    void         (* AGT_stdcall _pfn_clear_async)(agt_async_t* async);
-    void         (* AGT_stdcall _pfn_destroy_async)(agt_async_t* async);
-    agt_status_t (* AGT_stdcall _pfn_async_status)(agt_async_t* async);
-
-    agt_status_t (* AGT_stdcall _pfn_wait)(agt_async_t* async, agt_timeout_t timeout);
-    agt_status_t (* AGT_stdcall _pfn_wait_all)(agt_async_t* const *, agt_size_t, agt_timeout_t);
-    agt_status_t (* AGT_stdcall _pfn_wait_any)(agt_async_t* const *, agt_size_t, agt_size_t*, agt_timeout_t);
-
-    agt_status_t (* AGT_stdcall _pfn_new_signal)(agt_ctx_t ctx, agt_signal_t* pSignal);
-    void         (* AGT_stdcall _pfn_attach_signal)(agt_signal_t*, agt_async_t* async);
-    void         (* AGT_stdcall _pfn_attach_many_signals)(agt_signal_t* const * pSignals, agt_size_t signalCount, agt_async_t* async, size_t waitForN);
-    void         (* AGT_stdcall _pfn_raise_signal)(agt_signal_t* signal);
-    void         (* AGT_stdcall _pfn_raise_many_signals)(agt_signal_t* const * pSignals, agt_size_t signalCount);
-    void         (* AGT_stdcall _pfn_destroy_signal)(agt_signal_t* signal);
-
-
-    /* ========================= [ Agents 0.01 ] ========================= */
-
-    agt_status_t (* AGT_stdcall _pfn_register_type)(agt_ctx_t ctx, const agt_agent_type_create_info_t* cpCreateInfo, agt_typeid_t* pId);
-    size_t       (* AGT_stdcall _pfn_enumerate_types)(agt_ctx_t ctx, const char* pattern, size_t patternLength, agt_type_enumerator_t enumerator, void* userData);
-
-
-    agt_status_t (* AGT_stdcall _pfn_create_busy_agent)(agt_ctx_t ctx, const agt_agent_create_info_t* cpCreateInfo, agt_agent_t* pAgent);
-    void         (* AGT_stdcall _pfn_create_busy_agent_on_current_thread)(agt_ctx_t ctx, const agt_agent_create_info_t* cpCreateInfo);
-    agt_status_t (* AGT_stdcall _pfn_create_event_agent)(agt_ctx_t ctx, const agt_agent_create_info_t* cpCreateInfo, agt_agent_t* pAgent);
-    agt_status_t (* AGT_stdcall _pfn_create_free_event_agent)(agt_ctx_t ctx, const agt_agent_create_info_t* cpCreateInfo, agt_agent_t* pAgent);
-    agt_status_t (* AGT_stdcall _pfn_transfer_owner)(agt_ctx_t ctx, agt_agent_t agentHandle, agt_agent_t newOwner);
-
-    agt_agent_handle_t (* AGT_stdcall _pfn_export_self)();
-    agt_status_t (* AGT_stdcall _pfn_export_agent)(agt_ctx_t ctx, agt_agent_t agent, agt_agent_handle_t* pHandle);
-    agt_status_t (* AGT_stdcall _pfn_import)(agt_ctx_t ctx, agt_agent_handle_t importHandle, agt_agent_t* pAgent);
-
-
-    // agt_ctx_t    (* AGT_stdcall _pfn_current_context)();
-    agt_agent_t  (* AGT_stdcall _pfn_self)();
-    agt_agent_t  (* AGT_stdcall _pfn_retain_sender)();
-    agt_status_t (* AGT_stdcall _pfn_retain)(agt_agent_t* pNewAgent, agt_agent_t agent);
-
-    agt_status_t (* AGT_stdcall _pfn_send)(agt_agent_t recipient, const agt_send_info_t* pSendInfo);
-    agt_status_t (* AGT_stdcall _pfn_send_as)(agt_agent_t spoofSender, agt_agent_t recipient, const agt_send_info_t* pSendInfo);
-    agt_status_t (* AGT_stdcall _pfn_send_many)(const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo);
-    agt_status_t (* AGT_stdcall _pfn_send_many_as)(agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo);
-    agt_status_t (* AGT_stdcall _pfn_reply)(const agt_send_info_t* pSendInfo);
-    agt_status_t (* AGT_stdcall _pfn_reply_as)(agt_agent_t spoofReplier, const agt_send_info_t* pSendInfo);
-
-
-    agt_status_t (* AGT_stdcall _pfn_raw_acquire)(agt_agent_t recipient, size_t desiredMessageSize, agt_raw_msg_t* pRawMsg, void** ppRawBuffer);
-    agt_status_t (* AGT_stdcall _pfn_raw_send)(agt_agent_t recipient, const agt_raw_send_info_t* pRawSendInfo);
-    agt_status_t (* AGT_stdcall _pfn_raw_send_as)(agt_agent_t spoofSender, agt_agent_t recipient, const agt_raw_send_info_t* pRawSendInfo);
-    agt_status_t (* AGT_stdcall _pfn_raw_send_many)(const agt_agent_t* recipients, agt_size_t agentCount, const agt_raw_send_info_t* pRawSendInfo);
-    agt_status_t (* AGT_stdcall _pfn_raw_send_many_as)(agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_raw_send_info_t* pRawSendInfo);
-    agt_status_t (* AGT_stdcall _pfn_raw_reply)(const agt_raw_send_info_t* pRawSendInfo);
-    agt_status_t (* AGT_stdcall _pfn_raw_reply_as)(agt_agent_t spoofSender, const agt_raw_send_info_t* pRawSendInfo);
-
-
-    void         (* AGT_stdcall _pfn_delegate)(agt_agent_t recipient);
-
-    void         (* AGT_stdcall _pfn_complete)();
-    void         (* AGT_stdcall _pfn_release)(agt_agent_t agent);
-
-    agt_pinned_msg_t (* AGT_stdcall _pfn_pin)();
-    void             (* AGT_stdcall _pfn_unpin)(agt_pinned_msg_t pinnedMsg);
-
-
-    void (* AGT_stdcall _pfn_exit)(int exitCode);
-    void (* AGT_stdcall _pfn_abort)();
-
-    void (* AGT_stdcall _pfn_resume_coroutine)(agt_agent_t receiver, void* coroutine, agt_async_t* asyncHandle);
-
-
-  };
-
 
   inline export_table g_lib = {};
 
@@ -265,10 +137,8 @@ namespace {
       AGT_async_func(raise_many_signals),
       AGT_async_func(destroy_signal),
 
-      AGT_agent_func(create_busy_agent),
+      AGT_agent_func(create_agent),
       AGT_agent_func(create_busy_agent_on_current_thread),
-      AGT_agent_func(create_event_agent),
-      AGT_agent_func(create_free_event_agent),
       AGT_agent_func(send)
   };
 
@@ -713,7 +583,7 @@ AGT_api       agt_status_t AGT_stdcall agt_init(agt_ctx_t* pContext, const agt_i
 
 
 
-AGT_agent_api agt_status_t AGT_stdcall agt_send(agt_agent_t recipientHandle, const agt_send_info_t* pSendInfo) AGT_noexcept {
+AGT_agent_api agt_status_t AGT_stdcall agt_send(agt_self_t self, agt_agent_t recipientHandle, const agt_send_info_t* pSendInfo) AGT_noexcept {
 
   assert(pSendInfo != nullptr);
   assert(recipientHandle != nullptr);
@@ -790,6 +660,50 @@ AGT_noinline static agt_status_t agtGetSharedObjectInfoById(agt_ctx_t context, a
 extern "C" {
 
 
+agt_status_t        AGT_stdcall agt_query_instance_attributes(agt_instance_t instance, agt_attr_t* pAttributes, size_t attributeCount) noexcept {
+  if (!instance) [[unlikely]]
+    return AGT_ERROR_INVALID_ARGUMENT;
+  if (attributeCount) [[likely]] {
+    if (!pAttributes) [[unlikely]]
+      return AGT_ERROR_INVALID_ARGUMENT;
+
+    agt_status_t status = AGT_SUCCESS;
+
+    const auto attrValues = g_lib.attrValues;
+    const auto attrTypes  = g_lib.attrTypes;
+    const auto attrCount  = g_lib.attrCount;
+
+    for (size_t i = 0; i < attributeCount; ++i) {
+      auto& attr = pAttributes[i];
+      if (attr.id >= attrCount) [[unlikely]] {
+        status = AGT_ERROR_UNKNOWN_ATTRIBUTE;
+        attr.type = AGT_ATTR_TYPE_UNKNOWN;
+        attr.u64 = 0;
+      }
+      else {
+        attr.u64 = attrValues[attr.id];
+        attr.type = attrTypes[attr.id];
+      }
+    }
+
+    return status;
+  }
+
+}
+
+agt_instance_t      AGT_stdcall agt_get_instance(agt_ctx_t context) noexcept {
+  return agt::get_instance(context);
+}
+
+agt_ctx_t           AGT_stdcall agt_current_context() noexcept {
+  return agt::get_ctx();
+}
+
+int                 AGT_stdcall agt_get_instance_version(agt_instance_t instance) noexcept {}
+
+agt_error_handler_t AGT_stdcall agt_get_error_handler(agt_instance_t instance) noexcept {}
+
+agt_error_handler_t AGT_stdcall agt_set_error_handler(agt_instance_t instance, agt_error_handler_t errorHandlerCallback) noexcept {}
 
 
 

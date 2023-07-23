@@ -5,44 +5,42 @@
 #ifndef JEMSYS_AGATE2_MESSAGE_HPP
 #define JEMSYS_AGATE2_MESSAGE_HPP
 
-#include "agate/epoch_ptr.hpp"
-#include "agate/flags.hpp"
+// #include "agate/epoch_ptr.hpp"
+
 #include "config.hpp"
+#include "agate/flags.hpp"
+#include "async/async.hpp"
 
 #include <utility>
 
 namespace agt {
 
 
-  enum agent_cmd_t {
+  enum class agent_handle : agt_u64_t;
+
+
+  enum cmd_t : agt_u16_t {
+
     AGT_CMD_NOOP,                    ///< As the name would imply, this is a noop.
-
-    AGT_CMD_PING_STATUS,             ///< Sent every so often by other executors to ensure
-
+    AGT_CMD_PING_STATUS,             ///< Sent every so often by other executors to test connection/latency
     AGT_CMD_KILL,                    ///< Command sent on abnormal termination. Minimal cleanup is performed, typically indicates some unhandled error
 
     AGT_CMD_SEND,                    ///< Process message sent with agt_send
-
     AGT_CMD_SEND_AS,                 ///< Process message sent with agt_send_as
-
     AGT_CMD_SEND_MANY,               ///< Process message sent with agt_send_many
-
     AGT_CMD_SEND_MANY_AS,            ///< Process message sent with agt_send_many_as
 
-    AGT_CMD_ATTACH_AGENT,            ///< Attach agent
+    AGT_CMD_GET_TIMESTAMP,           ///<
 
+    AGT_CMD_MESSAGE_SEQUENCE,        ///< Indirectly contains multiple messages to be invoked one after the other
+
+    AGT_CMD_ATTACH_AGENT,            ///< Attach agent; if agent is eager, also invokes the start routine
     AGT_CMD_DETACH_AGENT,            ///< Detach agent from this executor
-
     AGT_CMD_REBIND_AGENT,            ///< Rebind agent to another executor
-
-    AGT_CMD_PROC_MESSAGE_SHARED,     ///< Process shared message
-
-    // AGT_CMD_PROC_INDIRECT_MESSAGE,   ///< Process indirect message
 
     AGT_CMD_NAKED_MESSAGE,           ///< Message type of messages sent using raw channel API
 
-    AGT_CMD_CLOSE_QUEUE,             ///< Normal termination command. Any messages sent before this will be processed as normal, but no new messages will be sent. As soon as the queue is empty, the agent is destroyed.
-    AGT_CMD_INVALIDATE_QUEUE,        ///< Current message queue is discarded without having been processed, but the queue is not closed, nor is the agent destroyed.
+    AGT_CMD_CTX_TRIM_MEMORY_POOLS,   ///<
 
     AGT_CMD_BARRIER_ARRIVE,          ///< When this message is dequeued, the arrival count of the provided barrier is incremented. If the post-increment arrival count is equal to the expected arrival count, any agents waiting on the barrier are unblocked, and if the barrier was set with a continuation callback, it is called (in the context of the last agent to arrive).
     AGT_CMD_BARRIER_WAIT,            ///< If the arrival count of the provided barrier is less than the expected arrival count, the agent is blocked until they are equal. Otherwise, this is a noop.
@@ -51,28 +49,27 @@ namespace agt {
     AGT_CMD_ACQUIRE_SEMAPHORE,       ///<
     AGT_CMD_RELEASE_SEMAPHORE,       ///<
 
-    AGT_CMD_QUERY_UUID,              ///<
-    AGT_CMD_QUERY_NAME,              ///<
-    AGT_CMD_QUERY_DESCRIPTION,       ///<
-    AGT_CMD_QUERY_PRODUCER_COUNT,    ///<
-    AGT_CMD_QUERY_METHOD,            ///<
+    AGT_CMD_QUERY_AGENT_PROPERTY,    ///<
+    AGT_CMD_SET_AGENT_PROPERTY,      ///<
 
-    AGT_CMD_QUERY_PROPERTY,          ///<
-    AGT_CMD_QUERY_SUPPORT,           ///<
-    AGT_CMD_SET_PROPERTY,            ///<
+    AGT_CMD_QUERY_AGENT_METHOD,      ///<
+    AGT_CMD_INVOKE_AGENT_METHOD,     ///<
+    AGT_CMD_REGISTER_AGENT_METHOD,   ///<
+    AGT_CMD_UNREGISTER_AGENT_METHOD, ///<
+
     AGT_CMD_WRITE,                   ///<
     AGT_CMD_READ,                    ///<
-
     AGT_CMD_FLUSH,                   ///<
-    AGT_CMD_START,                   ///< Sent as the initial message to an eager agent; invokes an agent's start routine
-    AGT_CMD_INVOKE_METHOD_BY_ID,     ///<
-    AGT_CMD_INVOKE_METHOD_BY_NAME,   ///<
-    AGT_CMD_REGISTER_METHOD,         ///<
-    AGT_CMD_UNREGISTER_METHOD,       ///<
-    AGT_CMD_INVOKE_CALLBACK,         ///<
+
     AGT_CMD_INVOKE_COROUTINE,        ///<
+
+    AGT_CMD_INVOKE_CALLBACK,         ///<
+
     AGT_CMD_REGISTER_HOOK,           ///<
-    AGT_CMD_UNREGISTER_HOOK          ///<
+    AGT_CMD_UNREGISTER_HOOK,         ///<
+
+    AGT_CMD_CLOSE_QUEUE,             ///< Normal termination command. Any messages sent before this will be processed as normal, but no new messages will be sent. As soon as the queue is empty, the agent is destroyed.
+    AGT_CMD_INVALIDATE_QUEUE,        ///< Current message queue is discarded without having been processed, but the queue is not closed, nor is the agent destroyed.
   };
 
 
@@ -105,7 +102,7 @@ namespace agt {
     void*         payload;
   };*/
 
-  AGT_BITFLAG_ENUM(message_flags, agt_u32_t) {
+  AGT_BITFLAG_ENUM(message_flags, agt_u16_t) {
     // dispatchKindById    = AGT_DISPATCH_BY_ID,
     // dispatchKindByName  = AGT_DISPATCH_BY_NAME,
 
@@ -126,6 +123,32 @@ namespace agt {
   };
 
   inline constexpr static message_state default_message_state = {};
+
+
+  struct message {
+    message*        next;
+    uint32_t        bufferOffset;
+    cmd_t           cmd;
+    message_flags   flags;
+    agent_handle    sender;
+    agent_handle    receiver;
+    agt_timestamp_t sendTime;
+    agt_u64_t       extraData;
+    async_data_t    asyncData;
+    async_key_t     asyncKey;
+    uint32_t        payloadSize;
+    inline_buffer   buffer[];
+  };
+
+
+  static_assert(sizeof(message) == AGT_CACHE_LINE);
+
+
+  static inline void signal_message_completion(agt_ctx_t ctx, message& msg) noexcept {
+    if (async_data_is_attached(msg.asyncData))
+      async_data_arrive(ctx, msg.asyncData, msg.asyncKey);
+  }
+
 
   /**
    * @returns true if successful, false if there was an allocation error
@@ -164,7 +187,21 @@ namespace agt {
   void writeIndirectUserMessage(agt_message_t message, agt_message_t indirectMsg) noexcept;
 }
 
-struct agt_message_st {
+/*struct agt_message_st {
+  std::byte          reserved[12];
+  agt::cmd_t         cmd;
+  agt::message_flags flags;
+  agt_agent_handle_t sender;
+  agt_agent_handle_t receiver;
+  agt_timestamp_t    sendTime;
+  agt_u64_t          extraData;
+  agt::async_data_t  asyncData;
+  agt::async_key_t   asyncKey;
+  uint32_t           payloadSize;
+  agt::inline_buffer buffer[];
+};*/
+
+/*struct agt_message_st {
   union {
     agt::epoch_ptr<agt_message_st>        next;
     agt::tagged_value<size_t, agt_u32_t>  nextOffset;
@@ -186,10 +223,6 @@ struct agt_message_st {
   agt::async_data_t           asyncData;
   agt::async_key_t            asyncDataKey;
   agt::message_flags          flags;
-  /*agt_u32_t                   poolChunkOffset;
-  union {
-    agt::context_id           senderContextId;
-  };*/
   union {
     agt_u64_t          id;
     agt_message_t      indirectMsg;
@@ -198,9 +231,10 @@ struct agt_message_st {
   agt::agent_cmd_t            messageType;
   agt_u32_t                   payloadSize;
   agt::inline_buffer          inlineBuffer[];
-};
+};*/
 
-static_assert(sizeof(agt_message_st) == AGT_CACHE_LINE);
+// static_assert(sizeof(agt_message_st) == AGT_CACHE_LINE);
+
 
 
 #endif//JEMSYS_AGATE2_MESSAGE_HPP

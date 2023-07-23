@@ -300,6 +300,7 @@ public:
 
 
   void begin_query(VkQueryPool queryPool, uint32_t query, VkQueryControlFlags controlFlags) noexcept {
+
     vk->cmdBeginQuery();
   }
 

@@ -76,8 +76,8 @@ typedef struct agt_init_info_t {
   const agt_user_module_info_t* userModuleInfos;        ///< [optional] If not null, userModuleInfoCount must not be 0
   agt_size_t                    userModuleInfoCount;    ///< [optional] Ignored if userModuleInfos is null
   const agt_allocator_params_t* defaultAllocatorParams; ///< [optional] If not null,
-  agt_log_callback_t            logCallback;            ///< [optional] Set the global logging callback. If this is not null, the AGT_INIT_LOG_MODULE bit of flags must be set. Individual contexts may set their own log callback. Only handles internal logging
-  void*                         logCallbackUserData;
+  agt_internal_log_handler_t    internalLogHandler;     ///< [optional] Set the global internal log handler. If this is not null, the AGT_INIT_LOG_MODULE bit of flags must be set. Individual contexts may set their own log callback. Only handles internal logging
+  void*                         logHandlerUserData;
 } agt_init_info_t;
 
 

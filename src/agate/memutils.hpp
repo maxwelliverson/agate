@@ -8,7 +8,7 @@
 #include "agate.h"
 
 
-                                    namespace {
+namespace {
   struct memory_desc{
     agt_size_t size;
     agt_size_t alignment;

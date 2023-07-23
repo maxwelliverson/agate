@@ -5,7 +5,7 @@
 #ifndef AGATE_INTERNAL_CONFIG_HPP
 #define AGATE_INTERNAL_CONFIG_HPP
 
-
+#define AGT_UNDEFINED_ASYNC_STRUCT
 
 #include "agate.h"
 

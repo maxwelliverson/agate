@@ -22,14 +22,18 @@ struct agt_instance_st {
   agt_u32_t                refCount; // How many times has agate been loaded with this instance; only relevant when linking to external libraries that also use agate
   const agt::export_table* exports;
   agt_u32_t                asyncStructSize;
-  agt_u32_t                signalStructSize;
+  const agt_attr_t*        attributes;
+  size_t                   attributeCount;
   agt_error_handler_t      errorHandler;
   void*                    errorHandlerUserData;
-  agt_log_callback_t       logCallback;
+  agt_internal_log_handler_t logCallback;
   void*                    logCallbackUserData;
   agt_u32_t                contextCount;
 
   agt_size_t               defaultMaxObjectSize;
+
+  agt_u64_t                timeoutConstantMultiplier;
+  agt_u32_t                timeoutShiftValue;
 
   agt_u32_t                instanceNameOffset;
   agt_u32_t                instanceNameLength;
@@ -37,6 +41,8 @@ struct agt_instance_st {
   agt_u32_t                localNameRegistryOffset;
   agt_u32_t                pageAllocatorOffset;
   agt_u32_t                threadDescriptorsOffset;
+
+
 
   AGT_declare_default_allocator_params(defaultAllocatorParams);
 

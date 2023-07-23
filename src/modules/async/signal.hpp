@@ -7,17 +7,17 @@
 
 #include "config.hpp"
 
-namespace Agt {
+namespace agt {
 
-  agt_async_data_t signalGetAttachment(const agt_signal_st* signal) noexcept;
+  agt_async_data_t signal_get_attachment(const agt_signal_st* signal) noexcept;
 
-  void         signalAttach(agt_signal_t signal, agt_async_t async) noexcept;
+  void             signal_attach(agt_signal_t signal, agt_async_t& async) noexcept;
 
-  void         signalDetach(agt_signal_t signal) noexcept;
+  void             signal_detach(agt_signal_t signal) noexcept;
 
-  void         signalRaise(agt_signal_t signal) noexcept;
+  void             signal_raise(agt_signal_t signal) noexcept;
 
-  void         signalClose(agt_signal_t signal) noexcept;
+  void             signal_close(agt_signal_t signal) noexcept;
 
 }
 

@@ -5,55 +5,60 @@
 #include "executor.hpp"
 
 
+
+#include <memory>
+
+
+#if AGT_system_windows
+
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+
+
+
 namespace {
 
-  struct local_busy_executor {
-    agt::executor_kind           kind;
-    agt::local_mpsc_queue        queue;
-    agt::local_spmc_message_pool defaultPool;
-    agt::agent_instance*         agent;
-    agt::set<agt_executor_t>     linkedExecutors;
-    agt_timeout_t                timeout;
+
+  struct busy_thread_info {
+    agt::local_busy_executor* executor;
   };
 
-  struct local_single_thread_executor {
-    agt::executor_kind              kind;
-    agt_u32_t                       maxAgentCount;
-    agt::private_sized_message_pool selfPool;
-    agt::private_queue              selfQueue;
-    agt::local_mpsc_queue           queue;
-    agt::local_spmc_message_pool    defaultPool; // Only this executor allocates from pool, others deallocate
-    agt::set<agt::agent_instance*>  agents;
-    agt::set<agt_executor_t>        linkedExecutors;
-    agt_timeout_t                   timeout;
-  };
+  struct single_thread_info {};
 
-  struct local_pool_executor {
-    agt::executor_kind              kind;
-  };
+  struct thread_pool_info {};
 
-  struct shared_busy_executor {
-    agt::executor_kind              kind;
-  };
 
-  struct shared_single_thread_executor {
-    agt::executor_kind              kind;
-  };
 
-  struct shared_pool_executor {
-    agt::executor_kind              kind;
-  };
 
-  struct proxy_executor {
-    agt::executor_kind              kind;
-  };
+  DWORD busy_thread_proc(_In_ LPVOID userData) noexcept {
+    std::unique_ptr<busy_thread_info> args{static_cast<busy_thread_info*>(userData)};
+    auto executor = args->executor;
+
+
+  }
+
+  DWORD single_thread_proc(_In_ LPVOID userData) noexcept {
+    std::unique_ptr<single_thread_info> args{static_cast<single_thread_info*>(userData)};
+  }
+
+  DWORD thread_pool_proc(_In_ LPVOID userData) noexcept {
+    std::unique_ptr<thread_pool_info> args{static_cast<thread_pool_info*>(userData)};
+
+    auto tp = CreateThreadpool(nullptr);
+    PTP_WORK work;
+  }
+
+
+  void start_busy_thread() {
+    SECURITY_ATTRIBUTES securityAttributes{
+        .nLength              = sizeof(SECURITY_ATTRIBUTES),
+        .lpSecurityDescriptor = nullptr,
+        .bInheritHandle       = FALSE
+    };
+    auto threadResult = CreateThread();
+  }
 }
 
-
-agt_status_t agt::createSingleThreadExecutor(agt_ctx_t ctx, agt_executor_t &executor) noexcept {
-
-}
-
-agt_status_t agt::attachToExecutor(agt_executor_t executor, agt_agent_t agent) noexcept {
-
-}
+#else
+#endif

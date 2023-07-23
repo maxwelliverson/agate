@@ -25,11 +25,15 @@ typedef agt_u64_t                 agt_raw_msg_t;
 
 
 
+typedef AGT_transparent_union_2(agt_self_t, agt_agent_t) agt_agent_or_self_t;
+
+
+
 
 
 typedef void* (*agt_agent_ctor_t)(const void* ctorUserData, void* params);
-typedef void  (*agt_agent_dtor_t)(void* agentState);
-typedef void  (*agt_agent_start_t)(void* agentState);
+typedef void  (*agt_agent_dtor_t)(agt_self_t self, void* agentState);
+typedef void  (*agt_agent_init_t)(agt_self_t self, void* agentState);
 typedef void  (*agt_agent_proc_t)(agt_self_t self, void* agentState, const void* message, agt_size_t messageSize);
 
 
@@ -44,11 +48,10 @@ typedef agt_enumeration_action_t (* agt_type_enumerator_t)(void* userData, const
 
 
 typedef enum agt_agent_create_flag_bits_t {
-  AGT_AGENT_CREATE_FROM_TYPEID    = 0x1, ///< As of right now, this is the default behaviour if nothing else is specified.
-  AGT_AGENT_CREATE_FROM_TYPE_NAME = 0x2,
-  AGT_AGENT_CREATE_AS_LITERAL     = 0x4,
-  AGT_AGENT_CREATE_SHARED         = 0x8,
-  AGT_AGENT_CREATE_DETACHED       = 0x10 ///< A detached agent is not reference counted and is responsible for its own lifetime. This can be useful for breaking reference cycles for instance.
+  AGT_AGENT_CREATE_SHARED            = 0x01,
+  AGT_AGENT_CREATE_DETACHED          = 0x02, ///< A detached agent is not reference counted and is responsible for its own lifetime. This can be useful for breaking reference cycles for instance.
+  AGT_AGENT_CREATE_BUSY              = 0x04,
+  AGT_AGENT_CREATE_WITH_NEW_EXECUTOR = 0x08
 } agt_agent_create_flag_bits_t;
 typedef agt_flags32_t agt_agent_create_flags_t;
 
@@ -75,7 +78,7 @@ typedef agt_flags32_t agt_send_flags_t;
 typedef struct agt_send_info_t {
   agt_size_t       size;
   const void*      buffer;
-  agt_async_t*     asyncHandle;
+  agt_async_t*     async;
   agt_send_flags_t flags;
 } agt_send_info_t;
 
@@ -88,7 +91,7 @@ typedef struct agt_raw_send_info_t {
 
 
 
-typedef struct agt_agent_type_create_info_t {
+/*typedef struct agt_agent_type_create_info_t {
   agt_scope_t      scope;        ///< Scope; optional. If not set, scope is local.
   agt_name_t       name;         ///< Type Name
   agt_agent_ctor_t ctor;         ///< Constructor callback; optional. If null, userData provided during agent creation is used as is as state (and as such, must point to valid memory for the entire lifetime of the agent.)
@@ -102,32 +105,61 @@ typedef struct agt_agent_type_literal_info_t {
   agt_agent_dtor_t dtor;
   // Maybe include some indication of what messages it can process??
   // I think message filtering/typing is probably beyond the scope of the core library
-} agt_agent_type_literal_info_t;
+} agt_agent_type_literal_info_t;*/
+
+typedef struct agt_executor_create_info_t {
+
+} agt_executor_create_info_t;
+
+typedef struct agt_thread_executor_create_info_t {
+
+} agt_thread_executor_create_info_t;
+
+typedef struct agt_proxy_executor_create_info_t {
+
+} agt_proxy_executor_create_info_t;
+
+typedef struct agt_thread_pool_executor_create_info_t {
+
+} agt_thread_pool_executor_create_info_t;
+
+typedef struct agt_agent_take_ownership_info_t {
+  const agt_agent_t* agents;
+  size_t             agentCount;
+} agt_agent_take_ownership_info_t;
+
+typedef struct agt_agent_inherit_ownership_info_t {
+
+} agt_agent_inherit_ownership_info_t;
+
+
+typedef struct agt_agent_type_info_t {
+
+  agt_agent_init_t         initFn;           ///< [optional] Initial callback executed in the agent's context before it starts receiving messages.
+  agt_agent_proc_t         procFn;           ///< Main callback executed in the agent's context
+  agt_agent_dtor_t         dtorFn;           ///< [optional] Destructor, called on state when agent is destroyed
+} agt_agent_type_info_t;
 
 typedef struct agt_agent_create_info_t {
   agt_agent_create_flags_t flags;
-  agt_name_token_t         name;             ///< Agent name; optional. token must have previously been acquired from a call to agt_reserve_name. If 0, agent will remain anonymous.
-  size_t                   fixedMessageSize; ///< If not 0, all messages sent to this agent must be equal to or less than fixedMessageSize. If 0, messages of any size may be sent.
-  union {
-    agt_typeid_t           typeId;           ///< Selected if flags includes AGT_AGENT_CREATE_FROM_TYPEID
-    const agt_name_t*      typeName;         ///< Selected if flags includes AGT_AGENT_CREATE_FROM_TYPE_NAME
-    const agt_agent_type_literal_info_t* typeLiteral; ///< Selected if flags includes AGT_AGENT_CREATE_AS_LITERAL
-  };
-  agt_agent_t              owner;            ///< The agent who owns the returned reference. If null and within an agent execution context, the owner defaults to agt_self(). If null and NOT within such a context, the agent has no defined owner.
-  agt_executor_t           executor;         ///< The executor responsible for executing agent actions. If null and within an agent execution context, will try to use the current executor. If that fails for some reason, or if this field is null and not within an agent execution context, a default executor will be created as per context settings.
-  agt_agent_start_t        initializer;      ///< Initial callback executed in the agent's context before it starts receiving messages.
-  void*                    userData;         ///< The argument passed to the agent's constructor. If the agent does not have a constructor, then this points to the agent state (NOTE: in this case, the memory pointed to by userData must remain valid for the entire lifetime of the agent. May be null if the agent type has no state).
+  agt_name_t               name;             ///< [optional] Agent name; token must have previously been acquired from a call to agt_reserve_name. If set to AGT_ANONYMOUS, agent will remain anonymous.
+  size_t                   fixedMessageSize; ///< [optional] If not 0, all messages sent to this agent must be equal to or less than fixedMessageSize. If 0, messages of any size may be sent.
+  agt_agent_t              owner;            ///< [optional] The agent who owns the returned reference. If null and within an agent execution context, the owner defaults to agt_self(). If null and NOT within such a context, the agent has no defined owner.
+  agt_executor_t           executor;         ///< [optional] The executor responsible for executing agent actions. If null and within an agent execution context, will try to use the current executor. If that fails for some reason, or if this field is null and not within an agent execution context, a default executor will be created as per context settings.
+  agt_agent_init_t         initFn;           ///< [optional] Initial callback executed in the agent's context before it starts receiving messages.
+  agt_agent_proc_t         procFn;           ///< Main callback executed in the agent's context
+  agt_agent_dtor_t         dtorFn;           ///< [optional] Destructor, called on state when agent is destroyed
+  void*                    state;            ///< [optional] The argument passed to the agent's constructor. If the agent does not have a constructor, then this points to the agent state (NOTE: in this case, the memory pointed to by userData must remain valid for the entire lifetime of the agent. May be null if the agent type has no state).
 } agt_agent_create_info_t;
-
 
 
 
 /* =================[ Agent Types ]================= */
 
 
-AGT_api agt_status_t AGT_stdcall agt_register_type(agt_ctx_t ctx, const agt_agent_type_create_info_t* cpCreateInfo, agt_typeid_t* pId) AGT_noexcept;
+// AGT_api agt_status_t AGT_stdcall agt_register_type(agt_ctx_t ctx, const agt_agent_type_create_info_t* cpCreateInfo, agt_typeid_t* pId) AGT_noexcept;
 
-AGT_api size_t       AGT_stdcall agt_enumerate_types(agt_ctx_t ctx, const char* pattern, size_t patternLength, agt_type_enumerator_t enumerator, void* userData) AGT_noexcept;
+// AGT_api size_t       AGT_stdcall agt_enumerate_types(agt_ctx_t ctx, const char* pattern, size_t patternLength, agt_type_enumerator_t enumerator, void* userData) AGT_noexcept;
 
 
 
@@ -136,7 +168,10 @@ AGT_api size_t       AGT_stdcall agt_enumerate_types(agt_ctx_t ctx, const char* 
 
 /***/
 
-AGT_api agt_status_t AGT_stdcall agt_create_busy_agent(agt_ctx_t ctx, const agt_agent_create_info_t* cpCreateInfo, agt_agent_t* pAgent) AGT_noexcept;
+AGT_api agt_status_t AGT_stdcall agt_create_agent(agt_ctx_t ctx, const agt_agent_create_info_t* cpCreateInfo, agt_agent_t* pAgent) AGT_noexcept;
+
+AGT_api agt_status_t AGT_stdcall agt_create_agent_from_type(agt_ctx_t ctx, ) AGT_noexcept;
+
 
 /**
  * Surrenders the current thread to a newly created BusyAgent.
@@ -147,34 +182,40 @@ AGT_api agt_status_t AGT_stdcall agt_create_busy_agent(agt_ctx_t ctx, const agt_
  * */
 AGT_noreturn AGT_api void AGT_stdcall agt_create_busy_agent_on_current_thread(agt_ctx_t ctx, const agt_agent_create_info_t* cpCreateInfo) AGT_noexcept;
 
-/**
- * If the pAgent parameter is null, the initializer field of cpCreateInfo cannot be null.
- * */
-AGT_api agt_status_t AGT_stdcall agt_create_event_agent(agt_ctx_t ctx, const agt_agent_create_info_t* cpCreateInfo, agt_agent_t* pAgent) AGT_noexcept;
-AGT_api agt_status_t AGT_stdcall agt_create_free_event_agent(agt_ctx_t ctx, const agt_agent_create_info_t* cpCreateInfo, agt_agent_t* pAgent) AGT_noexcept;
+AGT_api agt_status_t AGT_stdcall agt_create_executor(agt_ctx_t ctx, const agt_executor_create_info_t* cpCreateInfo, agt_executor_t* pExecutor) AGT_noexcept;
 
 
 // If agentHandle is null, this is a noop.
-AGT_api agt_status_t AGT_stdcall agt_transfer_owner(agt_ctx_t ctx, agt_agent_t agentHandle, agt_agent_t newOwner) AGT_noexcept;
+// If agentHandle is detached (ie. does not, and cannot have an owner), this fails with AGT_ERROR_AGENT_IS_DETACHED
+AGT_api       agt_status_t AGT_stdcall agt_transfer_owner(agt_ctx_t ctx, agt_agent_t agentHandle, agt_agent_t newOwner) AGT_noexcept;
 
+// If agent
+AGT_agent_api agt_status_t AGT_stdcall agt_take_ownership(agt_self_t self, agt_agent_t agent) AGT_noexcept;
 
-/* =============[ Import/Export ]============= */
+/* =============[ Queries ]============= */
 
-/**
- * Optimized equivalent to agt_export_agent(agt_self())
- * Obviously, only works within an agent execution context
- * */
-AGT_agent_api agt_agent_handle_t AGT_stdcall agt_export_self(agt_self_t self) AGT_noexcept;
-
-AGT_api       agt_status_t       AGT_stdcall agt_export_agent(agt_ctx_t ctx, agt_agent_t agent, agt_agent_handle_t* pHandle) AGT_noexcept;
-
-AGT_api       agt_status_t       AGT_stdcall agt_import(agt_ctx_t ctx, agt_agent_handle_t importHandle, agt_agent_t* pAgent) AGT_noexcept;
-
+AGT_agent_api agt_status_t AGT_stdcall   agt_get_executor(agt_agent_or_self_t object, agt_executor_t* pResult) AGT_noexcept;
 
 
 /* ========================= [ Agents ] ========================= */
 
-AGT_agent_api agt_self_t  AGT_stdcall  agt_self(agt_ctx_t ctx) AGT_noexcept;
+AGT_agent_api agt_self_t   AGT_stdcall agt_self(agt_ctx_t ctx) AGT_noexcept;
+
+AGT_agent_api agt_ctx_t    AGT_stdcall agt_self_ctx(agt_self_t self) AGT_noexcept;
+
+/**
+ * Optimized equivalent to the following:
+ *
+ * \code
+ * agt_handle_t handle;
+ * agt_export_handle(agt_self_ctx(self), self, &handle);
+ * return handle;
+ * \endcode
+ *
+ * Obviously, only works within an agent execution context.
+ * Calling this function outside of an agent execution context results in undefined behaviour (how'd you even get a self object??)
+ * */
+AGT_agent_api agt_handle_t AGT_stdcall agt_export_self(agt_self_t self) AGT_noexcept;
 
 AGT_agent_api agt_agent_t  AGT_stdcall agt_retain_sender(agt_self_t self) AGT_noexcept;
 
@@ -247,34 +288,33 @@ AGT_agent_api agt_status_t AGT_stdcall agt_raw_reply_as(agt_self_t self, agt_age
 
 
 
-AGT_agent_api void         AGT_stdcall agt_delegate(agt_agent_t recipient) AGT_noexcept;
+AGT_agent_api void         AGT_stdcall agt_delegate(agt_self_t self, agt_agent_t recipient) AGT_noexcept;
 
 
 /**
  * Signals early completion of a message process to any waiting agents.
- * As messages signal completion automatically upon return of the response callback,
- * this should only be called if an agent wishes to signal completion of a specific task
- * while continuing to do work after. In particular, a call to this function as the last
- * operation in a callback is entirely redundant.
+ *
+ * If a message does not call this function, by default, it will still "return" upon
+ * the agent proc callback returning, but no value will be sent to any waiting parties.
  * */
-AGT_agent_api void         AGT_stdcall agt_complete() AGT_noexcept;
+AGT_agent_api void         AGT_stdcall agt_return(agt_self_t self, agt_u64_t value) AGT_noexcept;
 
-AGT_agent_api void         AGT_stdcall agt_release(agt_agent_t agent) AGT_noexcept;
+AGT_agent_api void         AGT_stdcall agt_release(agt_self_t self, agt_agent_t agent) AGT_noexcept;
 
-AGT_agent_api agt_pinned_msg_t AGT_stdcall agt_pin() AGT_noexcept;
+AGT_agent_api agt_pinned_msg_t AGT_stdcall agt_pin(agt_self_t self) AGT_noexcept;
 
-AGT_agent_api void         AGT_stdcall agt_unpin(agt_pinned_msg_t pinnedMsg) AGT_noexcept;
+AGT_agent_api void         AGT_stdcall agt_unpin(agt_self_t self, agt_pinned_msg_t pinnedMsg) AGT_noexcept;
 
 /**
  * Signals normal termination of an agent.
  *
  * */
-AGT_agent_api void         AGT_stdcall agt_exit(int exitCode) AGT_noexcept;
+AGT_agent_api void         AGT_stdcall agt_exit(agt_self_t self, int exitCode) AGT_noexcept;
 
 /**
  * Signals abnormal termination
  * */
-AGT_agent_api void         AGT_stdcall agt_abort() AGT_noexcept;
+AGT_agent_api void         AGT_stdcall agt_abort(agt_self_t self) AGT_noexcept;
 
 
 

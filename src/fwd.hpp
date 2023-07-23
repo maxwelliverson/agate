@@ -145,6 +145,10 @@ namespace agt {
   }
 
 
+
+
+
+
   namespace impl {
     template <typename T>
     struct default_destroy {

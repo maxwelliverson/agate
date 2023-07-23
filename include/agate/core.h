@@ -126,6 +126,14 @@
 #  define AGT_has_attribute(...) false
 # endif
 
+#define AGT_static_api
+#define AGT_core_api
+#define AGT_agents_api
+#define AGT_async_api
+#define AGT_channels_api
+#define AGT_log_api
+#define AGT_network_api
+#define AGT_pool_api
 
 #if defined(_MSC_VER) || defined(__MINGW32__)
 # if !defined(AGT_SHARED_LIB)
@@ -148,6 +156,8 @@
 # define AGT_thread_local      __declspec(thread)
 # define AGT_alignas(n)        __declspec(align(n))
 # define AGT_restrict          __restrict
+# define AGT_nonnull
+# define AGT_nonnull_params(...)
 #
 # define AGT_cdecl __cdecl
 # define AGT_stdcall __stdcall
@@ -185,6 +195,12 @@
 # define AGT_assume(...)
 # define AGT_forceinline  __attribute__((always_inline))
 # define AGT_unreachable  __builtin_unreachable()
+# define AGT_nonnull_params(...) __attribute__((nonnull(__VA_ARGS__)))
+# if AGT_compiler_clang
+#  define AGT_nonnull _Nonnull
+# else
+#  define AGT_nonnull
+# endif
 #
 # if (defined(__clang_major__) && (__clang_major__ < 4)) || (__GNUC__ < 5)
 #  define AGT_alloc_size(...)
@@ -216,9 +232,184 @@
 # define AGT_noalias
 # define AGT_forceinline
 # define AGT_thread_local            __thread        // hope for the best :-)
+# define AGT_nonnull
+# define AGT_nonnull_params(...)
 # define AGT_alignas(n)
 # define AGT_assume(...)
 # define AGT_unreachable AGT_assume(false)
+#endif
+
+
+#if 0
+#if AGT_cplusplus > 0
+namespace agtxx {
+# if AGT_cplusplus >= 201103L
+
+  namespace meta {
+
+    template <typename T, typename ...Types>
+    struct enable_if_one_of;
+    template <typename T, typename Head, typename ...Tail>
+    struct enable_if_one_of<T, Head, Tail...> : enable_if_one_of<T, Tail...> { };
+    template <typename T, typename ...Tail>
+    struct enable_if_one_of<T, T, Tail...> {
+      using type = int;
+    };
+    template <typename T>
+    struct enable_if_one_of<T>;
+    template <typename T, typename ...Types>
+    using enable_if_one_of_t = typename enable_if_one_of<T, Types...>::type;
+
+    struct tu_list_head;
+
+    template <class...>
+    using void_t = void;
+
+    template <bool Value>
+    struct boolean_value {
+      constexpr static bool value = Value;
+      using type = boolean_value<Value>;
+    };
+
+    using true_type = boolean_value<true>;
+
+    using false_type = boolean_value<false>;
+
+    template <typename T,
+             template <typename...> class TT,
+             typename = void>
+    struct is_instantiable : false_type { };
+
+    template <typename T, template <typename...> class TT>
+    struct is_instantiable<T, TT, void_t<TT<T>>> : true_type { };
+
+    template <typename T>
+    auto declval() -> T;
+
+    template <typename T,
+             typename = boolean_value<sizeof(T) == sizeof(unsigned long long)>,
+             typename = void>
+    struct valid_tu_member;
+    template <typename T>
+    struct valid_tu_member<T,
+                           true_type,
+                           void_t<decltype((void*)(declval<T>())),
+                                  decltype((T)(declval<void*>()))>> { };
+
+    template <typename Void, template <typename...> class TT, typename ...Types>
+    struct all_instantiable : false_type { };
+    template <template <typename...> class TT, typename Head, typename ...Types>
+    struct all_instantiable<void_t<TT<Head>>, TT, Head, Types...> : all_instantiable<void, TT, Types...> {};
+    template <template <typename...> class TT>
+    struct all_instantiable<void, TT> : true_type {};
+
+    template <typename ...Types>
+    struct typelist;
+
+    template <typename Typelist>
+    struct pop_list;
+    template <typename Head, typename ...Tail>
+    struct pop_list<typelist<Head, Tail...>> {
+      using type = typelist<Tail...>;
+    };
+
+    template <typename Typelist>
+    struct list_front;
+    template <typename Head, typename ...Tail>
+    struct list_front<typelist<Head, Tail...>> {
+      using type = Head;
+    };
+
+    template <typename Typelist, typename T>
+    struct push_list;
+    template <typename ...Types, typename T>
+    struct push_list<typelist<Types...>, T> {
+      using type = typelist<Types..., T>;
+    };
+
+    template <typename List>
+    using pop = typename pop_list<List>::type;
+    template <typename List>
+    using front = typename list_front<List>::type;
+    template <typename List, typename T>
+    using push = typename push_list<List, T>::type;
+
+    template <typename T, typename TypeList>
+    struct is_in_list;
+    template <typename T, typename Head, typename ...Tail>
+    struct is_in_list<T, typelist<Head, Tail...>> : is_in_list<T, typelist<Tail...>> {};
+    template <typename T, typename ...Tail>
+    struct is_in_list<T, typelist<T, Tail...>> : true_type {};
+    template <typename T>
+    struct is_in_list<T, typelist<>> : false_type {};
+
+    template <typename List, typename UniqueList = typelist<>, typename = false_type>
+    struct list_has_no_duplicates : false_type { };
+    template <typename List, typename UniqueList>
+    struct list_has_no_duplicates<List, UniqueList, typename is_in_list<front<List>, UniqueList>::type>
+        : list_has_no_duplicates<pop<List>, push<UniqueList, front<List>>, false_type> { };
+    template <typename UniqueList>
+    struct list_has_no_duplicates<typelist<>, UniqueList, false_type> : true_type { };
+
+    template <typename ...Types>
+    using list_has_no_duplicates_t = list_has_no_duplicates<typelist<Types...>>;
+
+
+    template <typename ...Types>
+    struct transparent_union_is_valid : boolean_value<
+                                            all_instantiable<void, valid_tu_member, Types...>::value &&
+                                            (sizeof...(Types) > 1) &&
+                                            list_has_no_duplicates_t<Types...>::value> { };
+
+  }
+
+  template <typename ...Types>
+  class transparent_union_param {
+    static_assert(meta::transparent_union_is_valid<Types...>::value, "Each union member type must be castable to and from void*, be exactly 8 bytes, and there must be at least 2 distinct types.");
+  public:
+
+    template <typename T, meta::enable_if_one_of_t<T, Types...> = 0>
+    transparent_union_param(T value) noexcept
+        : m_value((void*)value)
+    { }
+
+    template <typename T, meta::enable_if_one_of_t<T, Types...> = 0>
+    inline T as() const noexcept {
+      return (T)m_value;
+    }
+
+  private:
+    void* m_value;
+  };
+
+#  define AGT_transparent_union(...) ::agtxx::transparent_union_param<__VA_ARGS__>
+# else
+#  define PP_AGT_impl_TRANSPARENT_UNION_DISPATCH
+# endif
+}
+#elif AGT_has_attribute(transparent_union)
+# define PP_AGT_impl_TRANSPARENT_UNION_DISPATCH
+# define PP_AGT_impl_TRANSPARENT_UNION_2(a, b) union __attribute__((transparent_union)) { a m_##a; b m_##b; }
+# define PP_AGT_impl_TRANSPARENT_UNION_3(a, b, c) union __attribute__((transparent_union)) { a m_##a; b m_##b; c m_##c; }
+# define PP_AGT_impl_TRANSPARENT_UNION_4(a, b, c, d) union __attribute__((transparent_union)) { a m_##a; b m_##b; c m_##c; d m_##d; }
+# define PP_AGT_impl_TRANSPARENT_UNION_5(a, b, c, d, e) union __attribute__((transparent_union)) { a m_##a; b m_##b; c m_##c; d m_##d; e m_##e; }
+# define PP_AGT_impl_TRANSPARENT_UNION_6(a, b, c, d, e, f) union __attribute__((transparent_union)) { a m_##a; b m_##b; c m_##c; d m_##d; e m_##e; f m_##f; }
+# define PP_AGT_impl_TRANSPARENT_UNION_7(a, b, c, d, e, f, g) union __attribute__((transparent_union)) { a m_##a; b m_##b; c m_##c; d m_##d; e m_##e; f m_##f; g m_##g; }
+# define PP_AGT_impl_TRANSPARENT_UNION_8(a, b, c, d, e, f, g, h) union __attribute__((transparent_union)) { a m_##a; b m_##b; c m_##c; d m_##d; e m_##e; f m_##f; g m_##g; h m_##h; }
+# define PP_AGT_impl_TRANSPARENT_UNION_9(a, b, c, d, e, f, g, h, i) union __attribute__((transparent_union)) { a m_##a; b m_##b; c m_##c; d m_##d; e m_##e; f m_##f; g m_##g; h m_##h; i m_##i; }
+# define PP_AGT_impl_TRANSPARENT_UNION_10(a, b, c, d, e, f, g, h, i, j) union __attribute__((transparent_union)) { a m_##a; b m_##b; c m_##c; d m_##d; e m_##e; f m_##f; g m_##g; h m_##h; i m_##i; j m_##j;  }
+# define PP_AGT_impl_TRANSPARENT_UNION_11(a, b, c, d, e, f, g, h, i, j, k) union __attribute__((transparent_union)) { a m_##a; b m_##b; c m_##c; d m_##d; e m_##e; f m_##f; g m_##g; h m_##h; i m_##i; j m_##j; k m_##k; }
+# define PP_AGT_impl_TRANSPARENT_UNION_12(a, b, c, d, e, f, g, h, i, j, k, l) union __attribute__((transparent_union)) { a m_##a; b m_##b; c m_##c; d m_##d; e m_##e; f m_##f; g m_##g; h m_##h; i m_##i; j m_##j; k m_##k; l m_##l; }
+# define PP_AGT_impl_TRANSPARENT_UNION_13(a, b, c, d, e, f, g, h, i, j, k, l, m) union __attribute__((transparent_union)) { a m_##a; b m_##b; c m_##c; d m_##d; e m_##e; f m_##f; g m_##g; h m_##h; i m_##i; j m_##j; k m_##k; l m_##l; m m_##m; }
+# define PP_AGT_impl_TRANSPARENT_UNION_14(a, b, c, d, e, f, g, h, i, j, k, l, m, n) union __attribute__((transparent_union)) { a m_##a; b m_##b; c m_##c; d m_##d; e m_##e; f m_##f; g m_##g; h m_##h; i m_##i; j m_##j; k m_##k; l m_##l; m m_##m; n m_##n; }
+# define PP_AGT_impl_TRANSPARENT_UNION_15(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) union __attribute__((transparent_union)) { a m_##a; b m_##b; c m_##c; d m_##d; e m_##e; f m_##f; g m_##g; h m_##h; i m_##i; j m_##j; k m_##k; l m_##l; m m_##m; n m_##n; o m_##o; }
+# define PP_AGT_impl_TRANSPARENT_UNION_16(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p) union __attribute__((transparent_union)) { a m_##a; b m_##b; c m_##c; d m_##d; e m_##e; f m_##f; g m_##g; h m_##h; i m_##i; j m_##j; k m_##k; l m_##l; m m_##m; n m_##n; o m_##o; p m_##p; }
+# define PP_AGT_impl_TRANSPARENT_UNION_17(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q) union __attribute__((transparent_union)) { a m_##a; b m_##b; c m_##c; d m_##d; e m_##e; f m_##f; g m_##g; h m_##h; i m_##i; j m_##j; k m_##k; l m_##l; m m_##m; n m_##n; o m_##o; p m_##p; q m_##q; }
+# define PP_AGT_impl_TRANSPARENT_UNION_18(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r) union __attribute__((transparent_union)) { a m_##a; b m_##b; c m_##c; d m_##d; e m_##e; f m_##f; g m_##g; h m_##h; i m_##i; j m_##j; k m_##k; l m_##l; m m_##m; n m_##n; o m_##o; p m_##p; q m_##q; r m_##r; }
+#else
+# define AGT_transparent_union(...) void*
+#endif
+
 #endif
 
 #if AGT_has_attribute(transparent_union)
@@ -247,6 +438,7 @@
 
 
 
+
 #define AGT_no_default default: AGT_unreachable
 
 #define AGT_cache_aligned     AGT_alignas(AGT_CACHE_LINE)
@@ -268,14 +460,11 @@
 #endif
 
 
-
-#define AGT_NAME(name) ((agt_name_t){ .data = name, .length = ((sizeof name) - 1) })
-
-
-
-
 /* =================[ Constants ]================= */
 
+
+#define AGT_FALSE              0
+#define AGT_TRUE               1
 
 #define AGT_DONT_CARE          ((agt_u64_t)-1)
 #define AGT_NULL_HANDLE        ((void*)0)
@@ -285,6 +474,7 @@
 #define AGT_VIRTUAL_PAGE_SIZE  ((agt_size_t)(1 << 16))
 
 #define AGT_INVALID_NAME_TOKEN ((agt_name_token_t)0)
+#define AGT_ANONYMOUS ((agt_name_t){ ((agt_name_token_t)0) })
 
 
 #if !defined(AGT_DISABLE_STATIC_STRUCT_SIZES)
@@ -293,6 +483,9 @@
 # define AGT_SIGNAL_STRUCT_SIZE 24
 # define AGT_SIGNAL_STRUCT_ALIGNMENT 8
 #endif
+
+#define AGT_OBJECT_PARAMS_BUFFER_SIZE 64
+#define AGT_OBJECT_PARAMS_BUFFER_ALIGNMENT 8
 
 
 #define AGT_INVALID_OBJECT_ID ((agt_object_id_t)-1)
@@ -366,6 +559,8 @@ typedef agt_u64_t                agt_message_id_t;
 typedef agt_u64_t                agt_type_id_t;
 typedef agt_u64_t                agt_object_id_t;
 
+typedef agt_u64_t                agt_handle_t;
+
 typedef agt_u64_t                agt_send_token_t;
 
 
@@ -373,18 +568,19 @@ typedef struct agt_instance_st*  agt_instance_t;
 typedef struct agt_ctx_st*       agt_ctx_t;
 
 typedef struct agt_async_t       agt_async_t;
-typedef struct agt_signal_t      agt_signal_t;
+typedef struct agt_query_t       agt_query_t;
+
+
+typedef struct agt_signal_st*    agt_signal_t;
 
 typedef struct agt_agent_st*     agt_agent_t;
 
-typedef struct agt_namespace_st* agt_namespace_t;
 
 
 
-
-typedef agt_u64_t               agt_duration_t;
-typedef agt_duration_t          agt_timeout_t;
-typedef agt_u64_t               agt_timestamp_t;
+typedef agt_u64_t                agt_duration_t;
+typedef agt_duration_t           agt_timeout_t;
+typedef agt_u64_t                agt_timestamp_t;
 
 
 
@@ -418,7 +614,7 @@ typedef enum agt_status_t {
   AGT_ERROR_NOT_MULTIFRAME,
   AGT_ERROR_BAD_SIZE,
   AGT_ERROR_INVALID_ARGUMENT,
-  AGT_ERROR_RESERVATION_FAILED,
+  AGT_ERROR_AGENT_IS_DETACHED,
   AGT_ERROR_BAD_UTF8_ENCODING,
   AGT_ERROR_BAD_NAME,
   AGT_ERROR_NAME_TOO_LONG,
@@ -430,6 +626,7 @@ typedef enum agt_status_t {
   AGT_ERROR_TOO_MANY_SENDERS,
   AGT_ERROR_NO_SENDERS,
   AGT_ERROR_PARTNER_DISCONNECTED,
+  AGT_ERROR_CONNECTION_DROPPED,
   AGT_ERROR_TOO_MANY_RECEIVERS,
   AGT_ERROR_NO_RECEIVERS,
   AGT_ERROR_ALREADY_RECEIVED,
@@ -440,6 +637,7 @@ typedef enum agt_status_t {
   AGT_ERROR_COULD_NOT_REACH_ALL_TARGETS,
   AGT_ERROR_INTERNAL_OVERFLOW,            /** < Indicates an internal overflow error that was caught and corrected but that caused the requested operation to fail. */
 
+  AGT_ERROR_UNKNOWN_ATTRIBUTE,
   AGT_ERROR_INVALID_ATTRIBUTE_VALUE,
   AGT_ERROR_INVALID_ENVVAR_VALUE,
   AGT_ERROR_MODULE_NOT_FOUND,
@@ -456,24 +654,42 @@ typedef enum agt_error_handler_status_t {
 } agt_error_handler_status_t;
 
 typedef enum agt_scope_t {
-  AGT_CTX_SCOPE,       ///< Visible to (and intended for use by) only the current context. Generally implies the total absence of any concurrency protection (ie no locks, no atomic operations, etc). Roughly analogous to "thread local" scope.
-  AGT_INSTANCE_SCOPE,  ///< Visible to any context created by the current instance. Roughly analogous to "process local" scope.
-  AGT_SHARED_SCOPE     ///< Visible to any context created by any instance attached to the same shared instance as the current instance. Roughly analogous to "system" scope.
+  AGT_CTX_SCOPE       = 0x1, ///< Visible to (and intended for use by) only the current context. Generally implies the total absence of any concurrency protection (ie no locks, no atomic operations, etc). Roughly analogous to "thread local" scope.
+  AGT_INSTANCE_SCOPE  = 0x2, ///< Visible to any context created by the current instance. Roughly analogous to "process local" scope.
+  AGT_SHARED_SCOPE    = 0x4  ///< Visible to any context created by any instance attached to the same shared instance as the current instance. Roughly analogous to "system" scope.
 } agt_scope_t;
+typedef agt_flags32_t agt_scope_mask_t; // Some bitwise-or combination of agt_scope_t values
 
+
+// Specifying this enum as a bit mask allows these values to be used to easily filter operations by type
 typedef enum agt_object_type_t {
-  AGT_AGENT_TYPE,
-  AGT_QUEUE_TYPE,
-  AGT_BQUEUE_TYPE,
-  AGT_SENDER_TYPE,
-  AGT_RECEIVER_TYPE,
-  AGT_POOL_TYPE,
-  AGT_RCPOOL_TYPE,
-  AGT_SIGNAL_TYPE,
-  AGT_USER_ALLOCATION_TYPE,
-  AGT_UNKNOWN_TYPE
+  AGT_AGENT_TYPE           = 0x1,
+  AGT_QUEUE_TYPE           = 0x2,
+  AGT_BQUEUE_TYPE          = 0x4,
+  AGT_SENDER_TYPE          = 0x8,
+  AGT_RECEIVER_TYPE        = 0x10,
+  AGT_POOL_TYPE            = 0x20,
+  AGT_RCPOOL_TYPE          = 0x40,
+  AGT_SIGNAL_TYPE          = 0x80,
+  AGT_USER_ALLOCATION_TYPE = 0x100,
+  AGT_SHEAP_TYPE           = 0x200,
+  AGT_SHPOOL_TYPE          = 0x400,
+  AGT_SHMEM_TYPE           = 0x800,
+  AGT_UNKNOWN_TYPE         = (-0x7FFFFFFF) - 1 /// Specifying 0x80000000 is implementation defined because the underlying integer type is int, which cannot represent the positive value 0x80000000.
 } agt_object_type_t;
+typedef agt_flags32_t agt_object_type_mask_t;
+#define AGT_ANY_TYPE 0x7FFFFFFF
 
+
+typedef struct agt_object_desc_t {
+  void*             object;
+  agt_object_type_t type;
+  agt_scope_t       scope;
+  const void*       params; ///< Depends on type
+} agt_object_desc_t;
+typedef struct AGT_alignas(AGT_OBJECT_PARAMS_BUFFER_ALIGNMENT) agt_object_params_buffer_t {
+  agt_u8_t reserved[AGT_OBJECT_PARAMS_BUFFER_SIZE];
+} agt_object_params_buffer_t;
 
 
 
@@ -483,30 +699,35 @@ typedef void (AGT_stdcall* agt_internal_log_handler_t)(const struct agt_internal
 
 
 
+
+typedef void (* AGT_stdcall agt_proc_t)(void);
+
 /// Attribute Types
 
 typedef enum agt_attr_type_t {
   AGT_ATTR_TYPE_BOOLEAN,
-  AGT_ATTR_TYPE_STRING,
-  AGT_ATTR_TYPE_WIDE_STRING,
+  AGT_ATTR_TYPE_STRING,      // UTF-8, Null-terminated
+  AGT_ATTR_TYPE_WIDE_STRING, // UTF-16, generally used on Windows only
   AGT_ATTR_TYPE_UINT32,
   AGT_ATTR_TYPE_INT32,
   AGT_ATTR_TYPE_UINT64,
-  AGT_ATTR_TYPE_INT64
+  AGT_ATTR_TYPE_INT64,
+  AGT_ATTR_TYPE_UNKNOWN = 0x7FFFFFFF
 } agt_attr_type_t;
 
 typedef enum agt_attr_id_t {
-  AGT_ATTR_ASYNC_STRUCT_SIZE,                  ///< type: UINT32
-  AGT_ATTR_SIGNAL_STRUCT_SIZE,                 ///< type: UINT32
-  AGT_ATTR_LIBRARY_PATH,                       ///< type: STRING or WIDE_STRING
-  AGT_ATTR_LIBRARY_VERSION,                    ///< type: INT32 or INT32_RANGE
-  AGT_ATTR_SHARED_CONTEXT,                     ///< type: BOOLEAN
-  AGT_ATTR_SHARED_NAMESPACE,                   ///< type: STRING or WIDE_STRING
-  AGT_ATTR_CHANNEL_DEFAULT_CAPACITY,           ///< type: UINT32
-  AGT_ATTR_CHANNEL_DEFAULT_MESSAGE_SIZE,       ///< type: UINT32
-  AGT_ATTR_CHANNEL_DEFAULT_TIMEOUT_MS,         ///< type: UINT32
-  AGT_ATTR_DURATION_UNIT_SIZE_NS,              ///< type: UINT64
-  AGT_ATTR_MIN_FIXED_CHANNEL_SIZE_GRANULARITY, ///< type: UINT64
+  AGT_ATTR_ASYNC_STRUCT_SIZE,              ///< type: UINT32
+  AGT_ATTR_THREAD_COUNT,                   ///< type: UINT32
+  AGT_ATTR_LIBRARY_PATH,                   ///< type: STRING or WIDE_STRING
+  AGT_ATTR_LIBRARY_VERSION,                ///< type: INT32 or INT32_RANGE
+  AGT_ATTR_SHARED_CONTEXT,                 ///< type: BOOLEAN
+  AGT_ATTR_SHARED_NAMESPACE,               ///< type: STRING or WIDE_STRING
+  AGT_ATTR_CHANNEL_DEFAULT_CAPACITY,       ///< type: UINT32
+  AGT_ATTR_CHANNEL_DEFAULT_MESSAGE_SIZE,   ///< type: UINT32
+  AGT_ATTR_CHANNEL_DEFAULT_TIMEOUT_MS,     ///< type: UINT32
+  AGT_ATTR_DURATION_UNIT_SIZE_NS,          ///< type: UINT64
+  AGT_ATTR_NATIVE_DURATION_UNIT_SIZE_NS,   ///< type: UINT64
+  AGT_ATTR_FIXED_CHANNEL_SIZE_GRANULARITY, ///< type: UINT64
 } agt_attr_id_t;
 
 typedef struct agt_attr_t {
@@ -532,33 +753,15 @@ typedef struct agt_attr_t {
 
 
 
-/// Naming Types
+/// Name Types
 
-typedef agt_u64_t               agt_name_token_t;
+typedef agt_u64_t agt_name_token_t; // token type that refers to a reserved name
 
-typedef struct agt_name_t {
-  const char* data;   ///< Name data
-  agt_size_t  length; ///< Name length; optional. If 0, data must be null terminated.
+typedef union agt_name_t {
+  agt_name_token_t         token;
+  const agt_object_desc_t* boundObject;
 } agt_name_t;
 
-typedef struct agt_name_binding_info_t {
-  void*             object;
-  agt_object_type_t type;
-  agt_scope_t       scope;
-  const void*       params;
-} agt_name_binding_info_t;
-
-typedef struct agt_reservation_desc_t {
-  agt_name_t      name;      ///< Encoded in utf8
-  agt_scope_t     scope;     ///< As always, AGT_SHARED_SCOPE is only valid if AGT_ATTR_SHARED_CONTEXT is true
-  agt_namespace_t nameSpace; ///< [optional] "namespace" is a reserved identifier in C++, so we abuse camelCase.
-  agt_async_t*    async;     ///< [optional]
-} agt_reservation_desc_t;
-
-typedef union agt_reserve_name_result_t {
-  agt_name_token_t               token;
-  const agt_name_binding_info_t* bindingInfo;
-} agt_reserve_name_result_t;
 
 
 /// Pool Types
@@ -584,103 +787,93 @@ typedef agt_flags32_t agt_weak_ref_flags_t;
 
 
 
+#define AGT_COMMON_FLAG_BIT(x) ((x) << 16)
+
+/**
+ * \brief Flags that are common to a number of API calls.
+ *
+ * \details agt_common_flag_bits_t is not used anywhere directly,
+ *          but rather provides a set of flags that are used in the
+ *          exact same capacity across a set of API calls. This is
+ *          intended to help simplify the implementation and
+ *          increase cache performance by allowing common
+ *          subroutines to all share the same code.
+ *          Bits [31:16] are reserved for common flags.
+ *          A given flag type that requires more than 16 bits may
+ *          use bits [31:16] if the routines for which the
+ *          flag type is specified do not take any common flags,
+ *          and will not in the future.
+ *
+ * \note For a flag to be considered "common", it should be used
+ *       across at least 3 distinct API calls, and is required to
+ *       have the exact same semantics relative to the dispatch
+ *       type of the call.
+ * */
+// typedef enum agt_common_flag_bits_t {
+#define AGT_ASYNC_IS_UNINITIALIZED 0x10000//, ///< Indicates that the async handle specified has not yet been initialized; If the async handle is required, it will be initialized before use. If not required, it will remain uninitialized. This helps prevent spurious/unnecessary overhead
+#define AGT_ONE_AND_DONE           0x20000//, ///< Indicates that the specified object should be automatically destroyed/released after its first use. What exactly constitutes "destroy/release" and "use" is specified in the documentation of any call that takes this flag.
+// } agt_common_flag_bits_t;
+
+
+/** ===============[ Core Static API Functions ]=================== **/
+
+AGT_static_api agt_instance_t      AGT_stdcall agt_get_instance(agt_ctx_t context) AGT_noexcept;
+
+AGT_static_api agt_ctx_t           AGT_stdcall agt_current_context() AGT_noexcept;
+
+/**
+ * Returns the API version of the linked library.
+ * */
+AGT_static_api int                 AGT_stdcall agt_get_instance_version(agt_instance_t instance) AGT_noexcept;
+
+
+
+AGT_static_api agt_error_handler_t AGT_stdcall agt_get_error_handler(agt_instance_t instance) AGT_noexcept;
+
+AGT_static_api agt_error_handler_t AGT_stdcall agt_set_error_handler(agt_instance_t instance, agt_error_handler_t errorHandlerCallback) AGT_noexcept;
+
+
+AGT_static_api agt_status_t        AGT_stdcall agt_query_instance_attributes(agt_instance_t instance, agt_attr_t* pAttributes, size_t attributeCount) AGT_noexcept;
+
+AGT_static_api agt_status_t        AGT_stdcall agt_get_proc_address(agt_ctx_t ctx, const char* symbol, agt_proc_t* pProc, int* pProcVersion) AGT_noexcept;
 
 
 
 /** ===============[ Core API Functions ]=================== **/
 
-AGT_api agt_instance_t      AGT_stdcall agt_get_instance(agt_ctx_t context) AGT_noexcept;
 
-AGT_api agt_ctx_t           AGT_stdcall agt_current_context() AGT_noexcept;
-
-/**
- * Returns the API version of the linked library.
- * */
-AGT_api int                 AGT_stdcall agt_get_library_version(agt_instance_t instance) AGT_noexcept;
-
-
-
-AGT_api agt_error_handler_t AGT_stdcall agt_get_error_handler(agt_instance_t instance) AGT_noexcept;
-
-AGT_api agt_error_handler_t AGT_stdcall agt_set_error_handler(agt_instance_t instance, agt_error_handler_t errorHandlerCallback) AGT_noexcept;
 
 
 /**
- * \brief Reserves a name to be subsequently bound to some agate object. On success,
- *        an opaque name token is returned. In the case of a name-clash, some basic
- *        info about the bound object is returned instead.
+ * pDstObject should be a pointer to an object that is the real type of srcObject.
  *
- * \details This is primarily intended to allow for early detection of name-clash errors
- *          during object construction, and for enabling lazy construction of unique
- *          objects.
- *          In pseudocode, the intended idiom looks something along the lines of
+ * Example:
  *
- *              reserve(name)
- *              error = initialize(state)
- *              if error
- *                  release(name)
- *              else
- *                  error = agt_create_some_object(state, name, ...)
- *                  if error
- *                      release(name)
- *
- *          This is particularly useful when object creation is potentially expensive, or
- *          when the named object should be unique within the specified scope. It may also
- *          be used to retroactively name objects that were created anonymously.
- *
- * \returns \n
- *              AGT_SUCCESS: Successfully reserved the specified name within the specified scope,
- *                           and a token has been written to pResult->token that may be subsequently
- *                           bound to some object. \n
- *              AGT_DEFERRED: The specified name has already been reserved, but has not yet been
- *                            bound. A deferred operation has been bound to pReservationDesc->async,
- *                            which will reattempt the reservation if the name is released, or will
- *                            return the binding info the bound object upon binding. \n
- *              AGT_ERROR_RESERVATION_FAILED: The specified name has already been reserved, but has
- *                                            not yet been bound, and the operation could not be
- *                                            deferred because pReservationDesc->async was null. \n
- *              AGT_ERROR_INVALID_ARGUMENT: Indicates either pReservationDesc or pResult was null,
- *                                          which ideally, shouldn't ever be the case. \n
- *              AGT_ERROR_NAME_ALREADY_IN_USE: The requested name has already been bound within the
- *                                             specified scope, and a pointer to a struct containing
- *                                             information about the bound object has been written to
- *                                             pResult->bindingInfo. \n
- *              AGT_ERROR_BAD_UTF8_ENCODING: The requested name was not valid UTF8. \n
- *              AGT_ERROR_NAME_TOO_LONG: The requested name exceeded the maximum name length limit.
- *                                       The maximum name length may be queried with agt_query_attributes. \n
- *              AGT_ERROR_BAD_NAME: The requested name contained characters not allowed in a valid agate
- *                                  name. As of right now, there aren't any, but that may change in the
- *                                  future.
- *
+ * agt_agent_t clone_agent(agt_agent_t src) {
+ *   agt_agent_t dst;
+ *   agt_dup(src, &dst);
+ *   return dst;
+ * }
  * */
-AGT_api agt_status_t        AGT_stdcall agt_reserve_name(agt_ctx_t ctx, const agt_reservation_desc_t* pReservationDesc, agt_reserve_name_result_t* pResult) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_dup(void* srcObject, void* pDstObject, size_t dstObjectCount) AGT_noexcept;
+
+AGT_core_api void         AGT_stdcall agt_close(void* object) AGT_noexcept;
 
 /**
- * \brief Releases a name previously reserved by a call to agt_reserve_name.
+ * Imports an object from a generic, sharable handle.
  *
- * \details This only needs to be called when a previously reserved name will not be
- *          bound to anything. Primarily intended for use in cases where a name is
- *          reserved prior to object creation, and then at some point during
- *          construction, an error is encountered and the creation routine is
- *          cancelled.
- *          Note that attempts to bind a name token (eg. agt_bind_name, agt_new_agent, ...)
- *          that result in failure do NOT automatically release the reserved name. This
- *          is so that the name token may be reused in subsequent attempts, but it also
- *          means that if a user wishes to propagate that failure upwards, they MUST
- *          release the reserved name token. Failure to do so results in a memory leak.
- *
- * \note nameToken must be a valid token obtained from a call to agt_reserve_name that
- *       has not yet been bound to anything.
+ * \note While the handles API is a part of the core module, and is thus always
+ *       available, it's generally not worth using when ctx is known to be private
+ *       (ie. not shared).
+ *       The value of a handle of an object with instance local (ie. context or
+ *       instance ) scope is little more than the address at which it is located
+ *       in the local address space. As such, when passing instance local objects
+ *       around within the local instance, one may simply pass the objects themselves.
  * */
-AGT_api void                AGT_stdcall agt_release_name(agt_ctx_t ctx, agt_name_token_t nameToken) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_import_handle(agt_ctx_t ctx, agt_handle_t handle, agt_object_type_mask_t typeMask, agt_object_desc_t* pObjectDesc) AGT_noexcept;
 
-/**
- * \brief Binds an object to a previously reserved name.
- *
- * \note nameToken must have been previously obtained from a call to agt_reserve_name,
- *       and must not have already been bound.
- * */
-AGT_api agt_status_t        AGT_stdcall agt_bind_name(agt_ctx_t ctx, agt_name_token_t nameToken, void* object) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_export_handle(agt_ctx_t ctx, void* object, agt_handle_t* pHandle) AGT_noexcept;
+
 
 
 

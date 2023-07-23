@@ -94,11 +94,11 @@ namespace agt {
   }
 
   template <impl::bitflag_enum E>
-  AGT_forceinline constexpr static void set(E& value, const E setFlags) noexcept {
+  AGT_forceinline constexpr static void set_flags(E& value, const E setFlags) noexcept {
     value = value | setFlags;
   }
   template <impl::bitflag_enum E, std::convertible_to<E> F>
-  AGT_forceinline constexpr static void set(E& value, F&& setFlags) noexcept {
+  AGT_forceinline constexpr static void set_flags(E& value, F&& setFlags) noexcept {
     set(value, static_cast<E>(std::forward<F>(setFlags)));
   }
   template <impl::bitflag_enum E>

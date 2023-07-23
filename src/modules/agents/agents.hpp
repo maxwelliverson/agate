@@ -5,14 +5,20 @@
 #ifndef AGATE_INTERNAL_AGENTS_HPP
 #define AGATE_INTERNAL_AGENTS_HPP
 
-#include "agate/flags.hpp"
 #include "config.hpp"
-#include "modules/channels/channel.hpp"
-#include "modules/core/object.hpp"
+
+#include "agate/flags.hpp"
+#include "channels/channel.hpp"
+#include "core/object.hpp"
 
 #include <csetjmp>
 
+
+
 namespace agt {
+
+  struct agent_properties;
+  struct agent_methods;
 
   AGT_BITFLAG_ENUM(agent_flags, uint32_t) {
       isProxy    = 0x1,
@@ -21,6 +27,28 @@ namespace agt {
       isBlocked  = 0x8,
       isLiteral  = 0x10,
       isImported = 0x20
+  };
+
+
+
+  struct agent_self : rc_object {
+    agt_agent_proc_t  proc;
+    agt_agent_dtor_t  dtor;
+    void*             state;
+    agt_executor_t    executor;
+    agt_handle_t      selfHandle; // Exporting and such
+    agt_u32_t         agentEpoch;
+    agent_properties* properties;
+    agent_methods*    methods;
+  };
+
+  AGT_virtual_object_type(agent) {
+    agent_flags                  flags;
+    agent_self*                  self;
+    agent_self*                  refOwner;
+    receiver_t                   receiver;
+    const agt_u32_t*             pAgentEpoch;
+    agt_u32_t                    agentEpoch;
   };
 
 
@@ -82,6 +110,15 @@ namespace agt {
 
   agt_status_t waitMany(blocked_queue& queue, agt_async_t* const * ppAsyncs, size_t asyncCount, size_t waitForCount, size_t& index, agt_timeout_t timeout) noexcept;
 }
+
+
+struct agt_self_st : agt::rc_object {
+
+};
+
+struct agt_agent_st : agt::object {
+
+};
 
 /*struct agt_agent_st {
   agt::agent_flags     flags;

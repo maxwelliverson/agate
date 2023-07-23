@@ -127,7 +127,12 @@ function(add_agate_executable target_)
     string(REGEX REPLACE "\\." "/" AGATE_EXE_SOURCE_PREFIX ${AGATE_EXE_SOURCE_PREFIX})
     list(TRANSFORM AGATE_EXE_SOURCES PREPEND "${AGATE_EXE_SOURCE_PREFIX}/")
     add_executable(${AGATE_EXE_TARGET} ${AGATE_EXE_SOURCES})
-    target_include_directories(${AGATE_EXE_TARGET} PUBLIC include src)
+    if (AGATE_EXE_TEST)
+        target_include_directories(${AGATE_EXE_TARGET} PUBLIC include src test)
+    else()
+        target_include_directories(${AGATE_EXE_TARGET} PUBLIC include)
+    endif()
+
     if(NOT DEFINED AGATE_EXE_LINK)
         set(AGATE_EXE_LINK static)
     endif()
@@ -162,7 +167,10 @@ set(AGATE_VERSION_PATCH 0)
 add_library(agate-support
             src/agate/atomic.cpp
             src/agate/dictionary.cpp
-            src/agate/vector.cpp)
+            src/agate/vector.cpp
+            src/agate/thread.cpp
+            src/agate/thread_pool.cpp)
+target_include_directories(agate-support PRIVATE include src)
 
 add_agate_module(
         core

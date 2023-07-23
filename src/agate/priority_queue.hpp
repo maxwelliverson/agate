@@ -6,7 +6,6 @@
 #define AGATE_PRIORITY_QUEUE_HPP
 
 #include "config.hpp"
-
 #include "core/object_pool.hpp"
 
 namespace agt {
@@ -26,8 +25,6 @@ namespace agt {
      * using
      * */
   };
-
-
 
   namespace impl {
     template <typename T>
@@ -104,8 +101,6 @@ namespace agt {
     template <typename T, typename Traits>
     using accessor_type_t = typename get_accessor_type<T, Traits>::type;
   }
-
-
 
   template <typename T,
             thread_safety SafetyModel,

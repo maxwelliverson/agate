@@ -7,7 +7,9 @@
 #include "agate.h"
 
 #if defined(__clang__) && defined(__CLION_IDE__)
-#define __cpp_lib_coroutine
+# if !defined(__cpp_lib_coroutine)
+#  define __cpp_lib_coroutine
+# endif
 #endif
 
 #include <coroutine>

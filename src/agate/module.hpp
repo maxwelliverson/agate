@@ -46,22 +46,29 @@ namespace agt {
     return std::countr_zero(static_cast<std::underlying_type_t<module_id>>(id)) + 1;
   }
 
-  struct function_info {
-    function_ptr     address       = {};
-    std::string_view dispatchFlags = {};
+
+  struct dispatch_flags {
+    std::string_view flags;
   };
 
-  class agate_module {
 
+  dispatch_flags to_flags(const uintptr_t* attrValues, const agt_attr_type_t* attrTypes, uint32_t attrCount) noexcept;
+
+
+  class module_accessor {
     inline constexpr static size_t MaxNameLength = 20;
     inline constexpr static size_t MaxPathLength = 260;
 
-    void*                                  m_handle              = nullptr;
-    version                                m_version             = {};
-    dictionary<std::vector<function_info>> m_exports             = {};
-    sys_char                               m_name[MaxNameLength] = {};
-    sys_char                               m_path[MaxPathLength] = {};
+    struct function_family {
+      function_ptr*   entryAddresses;
+      dispatch_flags* entryFlags;
+      size_t          entryCount;
+    };
 
+    struct function_info {
+      function_ptr     address       = {};
+      std::string_view dispatchFlags = {};
+    };
 
     class module_walker {
       char*                           imageBase;
@@ -127,6 +134,11 @@ namespace agt {
 
       constexpr static std::string_view ApiPrefixString = "_agate_api_";
 
+      struct function_info {
+        function_ptr     address       = {};
+        std::string_view dispatchFlags = {};
+      };
+
       module_walker walker{m_handle};
 
       auto exportDirectory = static_cast<PIMAGE_EXPORT_DIRECTORY>(walker.directory_entry(IMAGE_DIRECTORY_ENTRY_EXPORT));
@@ -141,6 +153,8 @@ namespace agt {
 
       auto funcNames = std::span{ pNameTable, exportedNameCount };
 
+      dictionary<std::vector<function_info>> exportDictionary = {};
+
       for (size_t i = 0; i < exportedNameCount; ++i) {
         auto pName = walker.at_offset<const char>(pNameTable[i]);
         std::string_view name{pName};
@@ -150,7 +164,7 @@ namespace agt {
           if (pos != std::string_view::npos) {
             std::string_view firstNamePart = name.substr(0, pos);
 
-            auto& fam = m_exports[firstNamePart];
+            auto& fam = exportDictionary[firstNamePart];
             auto& func = fam.emplace_back();
 
             WORD ordinal = pOrdinalTable[i];
@@ -161,14 +175,31 @@ namespace agt {
         }
       }
 
+
+      for (auto&& entry : exportDictionary) {
+        auto& entryVec = entry.get();
+        auto [exportPos, isNew] = m_exports.try_emplace(entry.key());
+        AGT_invariant( isNew );
+        auto& fam = exportPos->get();
+        size_t count = entryVec.size();
+        auto ptrArray = new function_ptr[count];
+        auto flagsArray = new dispatch_flags[count];
+        for (size_t i = 0; i < count; ++i) {
+          ptrArray[i]         = entryVec[i].address;
+          flagsArray[i].flags = entryVec[i].dispatchFlags;
+        }
+        fam.entryAddresses = ptrArray;
+        fam.entryFlags     = flagsArray;
+        fam.entryCount     = count;
+      }
+
     }
 
+    static double flag_match(dispatch_flags dispatchFlags, dispatch_flags desiredFlags) noexcept;
 
   public:
 
-
-
-    static std::unique_ptr<agate_module> load(sys_cstring libName) noexcept {
+    static std::unique_ptr<module_accessor> load(sys_cstring libName) noexcept {
 
       using pfn_get_module_version = agt_u32_t(*)();
 
@@ -177,7 +208,7 @@ namespace agt {
       if (!(handle = LoadLibraryW(libName)))
         return nullptr;
 
-      auto m = std::make_unique<agate_module>();
+      auto m = std::make_unique<module_accessor>();
 
       m->m_handle = handle;
 
@@ -206,13 +237,23 @@ namespace agt {
       return std::move(m);
     }
 
-
-
-    [[nodiscard]] std::span<const function_info> lookup(std::string_view name) const noexcept {
+    // If module exports at least one function in the specified family, returns the address and match score of the family entry with the greatest match score
+    // If module does not export any functions from the specified family, returns null address, and score should be ignored.
+    [[nodiscard]] std::pair<function_ptr, double> lookup(std::string_view name, dispatch_flags desiredFlags) const noexcept {
       auto result = m_exports.find(name);
       if (result == m_exports.end())
-        return {};
-      return result->get();
+        return { nullptr, 0 };
+      auto&& family = result->get();
+      function_ptr bestFuncPtr = family.entryAddresses[0];
+      double       bestScore   = flag_match(family.entryFlags[0], desiredFlags);
+      for (size_t i = 1; i < family.entryCount; ++i) {
+        double score = flag_match(family.entryFlags[i], desiredFlags);
+        if (bestScore < score) {
+          bestScore = score;
+          bestFuncPtr = family.entryAddresses[i];
+        }
+      }
+      return { bestFuncPtr, bestScore };
     }
 
     [[nodiscard]] version         version() const noexcept {
@@ -226,6 +267,13 @@ namespace agt {
     [[nodiscard]] sys_string_view path() const noexcept {
       return { (sys_cstring)m_path };
     }
+
+  private:
+    void*                       m_handle              = nullptr;
+    class version               m_version             = {};
+    dictionary<function_family> m_exports             = {};
+    sys_char                    m_name[MaxNameLength] = {};
+    sys_char                    m_path[MaxPathLength] = {};
   };
 }
 

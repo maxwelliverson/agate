@@ -7,19 +7,52 @@
 
 #include "config.hpp"
 
-#include "modules/channels/message_pool.hpp"
-#include "modules/channels/message_queue.hpp"
-
+#include "channels/message_pool.hpp"
+#include "channels/message_queue.hpp"
 #include "agate/set.hpp"
+
+#include "core/object.hpp"
 
 namespace agt {
 
-  enum executor_kind {
-    local_busy_kind,
-    single_thread_executor,
-    local_pool_executor,
-    proxy_kind
+  struct agent_self;
+
+  AGT_virtual_object_type(executor) {
+    set<executor*> linkedExecutors;
+    agt_u32_t      maxAgents;
+    agt_u32_t      attachedAgents;
+    agt_timeout_t  timeout;
   };
+
+
+  AGT_final_object_type(local_busy_executor, extends(executor)) {
+    local_mpsc_receiver     receiver;
+    agent_self*             agent;
+    local_spmc_message_pool defaultPool;
+  };
+
+  AGT_final_object_type(local_single_thread_executor, extends(executor)) {
+    local_mpsc_receiver        receiver;
+    private_sized_message_pool selfPool;
+    private_sender             selfSender;
+    private_receiver           selfReceiver;
+    local_spmc_message_pool    defaultPool; // Only this executor allocates from pool, others deallocate
+    set<agent_self*>           agents;
+    set<agt_executor_t>        linkedExecutors;
+    agt_timeout_t              timeout;
+  };
+
+  AGT_final_object_type(local_pool_executor, extends(executor)) {
+
+  };
+
+  AGT_final_object_type(local_proxy_executor, extends(executor)) {
+
+  };
+
+
+  agt_status_t create_local_busy_executor(agt_ctx_t ctx, local_busy_executor*& executor) noexcept;
+
 
 
   struct acquire_raw_info {
@@ -60,6 +93,16 @@ namespace agt {
 
 
   agt_executor_t importExecutor(agt_ctx_t ctx, shared_handle sharedHandle) noexcept;
+
+}
+
+
+extern "C" {
+
+struct agt_executor_st {
+
+};
+
 
 }
 

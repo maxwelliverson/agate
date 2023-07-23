@@ -1,0 +1,121 @@
+{
+  "maxVersion": "0.1.0",
+  "types": [
+    {
+      "name": "agt_bool_t",
+      "kind": "alias",
+      "aliasof": "int"
+    },
+    {
+      "name": "agt_name_t",
+      "kind": "union",
+      "members": [
+        {
+          "type": "agt_name_token_t",
+          "ident": "name"
+        },
+        {
+          "type": "const agt_binding_info_t*",
+          "ident": "bindingInfo"
+        }
+      ]
+    },
+    {
+      "name": "agt_agent_t",
+      "kind": "opaque"
+    },
+    {
+      "name":  "agt_agent_flag_bits_t",
+      "kind":  "flagbits",
+      "width": "32",
+      "values": [
+        {
+          "ident": "AGT_AGENT_IS_NAMED",
+          "bitshift": 0
+        },
+        {
+          "ident": "AGT_AGENT_IS_SHARED",
+          "bitshift": 1
+        },
+        {
+          "ident": "AGT_AGENT_HAS_DYNAMIC_PROPERTIES",
+          "bitshift": 16
+        }
+      ]
+    },
+    {
+      "name":    "agt_agent_flags_t",
+      "kind":    "flags",
+      "width":   "32",
+      "bittype": "agt_agent_flag_bits_t"
+    }
+  ],
+  "versionSpecs": [
+    {
+      "minVersion": "0.1.0",
+      "asyncStructSize": 40,
+      "attributes": [
+        {
+
+        }
+      ],
+      "exports": [
+        {
+          "name":   "send",
+          "module": "agents",
+          "addressOffset": 0,
+          "proto": {
+            "returnType": "agt_status_t",
+            "params": [
+              {
+                "type": "agt_self_t",
+                "ident": "self",
+                "optional": false
+              },
+              {
+                "type": "agt_agent_t",
+                "ident": "target",
+                "optional": false
+              },
+              {
+                "type": "const agt_send_info_t*",
+                "ident": "pSendInfo",
+                "optional": false
+              }
+            ]
+          }
+        },
+        {
+          "name":   "send_as",
+          "module": "agents",
+          "addressOffset": 8,
+          "proto": {
+            "returnType": "agt_status_t",
+            "params": [
+              {
+                "type": "agt_self_t",
+                "ident": "self",
+                "optional": false
+              },
+              {
+                "type": "agt_agent_t",
+                "ident": "spoofSender",
+                "optional": false
+              },
+              {
+                "type": "agt_agent_t",
+                "ident": "target",
+                "optional": false
+              },
+              {
+                "type": "const agt_send_info_t*",
+                "ident": "pSendInfo",
+                "optional": false
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
