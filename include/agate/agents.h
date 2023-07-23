@@ -194,7 +194,7 @@ AGT_agent_api agt_status_t AGT_stdcall agt_take_ownership(agt_self_t self, agt_a
 
 /* =============[ Queries ]============= */
 
-AGT_agent_api agt_status_t AGT_stdcall   agt_get_executor(agt_agent_or_self_t object, agt_executor_t* pResult) AGT_noexcept;
+AGT_agent_api agt_status_t AGT_stdcall agt_get_executor(agt_agent_or_self_t object, agt_executor_t* pResult) AGT_noexcept;
 
 
 /* ========================= [ Agents ] ========================= */
