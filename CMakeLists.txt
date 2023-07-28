@@ -177,13 +177,14 @@ add_agate_module(
             PRIVATE
             SOURCES
                 context.cpp
+                ctx.cpp
                 error.cpp
                 init.cpp
+                instance.cpp
                 object_allocator.cpp
                 random.cpp
                 segment.cpp
                 shared.cpp
-                thread_state.cpp
                 rcpool.cpp
                 rcmem.cpp
                 rcweak.cpp

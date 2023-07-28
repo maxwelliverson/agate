@@ -21,6 +21,11 @@
 
 namespace agt {
 
+  struct ctx_vtable {
+    agt_status_t (* create)(agt_ctx_t* pResult, agt_instance_t instance, agt_executor_t executor, const agt_allocator_params_t* allocParams);
+    void         (* destroy)(agt_ctx_t ctx);
+  };
+
   /*struct ctx_params {
     const agt_allocator_params_t* customAllocatorParams;
 
@@ -442,17 +447,20 @@ namespace agt {
     AGT_forceinline void    _trim_local_allocator(object_allocator* allocator, int poolIndex = -1) noexcept;
   }*/
 
-  [[nodiscard]] agt_ctx_t      get_or_default_init_ctx(agt_instance_t instance) noexcept;
+
+  [[nodiscard]] agt_ctx_t    acquire_ctx(agt_instance_t instance = nullptr) noexcept;
 
   // Returns nullptr if ctx has not been initialized
-  [[nodiscard]] agt_ctx_t             get_ctx() noexcept;
+  // Should only really be called if it is already known that the local context has been initialized within the calling module
+  // Note that this is specific to the calling module
+  [[nodiscard]] agt_ctx_t    get_ctx() noexcept;
+
+  [[nodiscard]] agt_status_t new_ctx(agt_ctx_t& ctx, agt_instance_t instance, agt_executor_t executor, const agt_allocator_params_t* allocatorParams) noexcept;
+
+  void                       destroy_ctx(agt_ctx_t ctx) noexcept;
 
 
 
-
-  [[nodiscard]] inline agt_status_t   new_ctx(agt_ctx_t& ctx, agt_instance_t instance, agt_executor_t executor, const agt_allocator_params_t* allocatorParams) noexcept;
-
-  inline void                         destroy_ctx(agt_ctx_t ctx) noexcept;
 
   [[nodiscard]] inline agt_instance_t get_instance(agt_ctx_t ctx) noexcept;
 
@@ -487,7 +495,7 @@ struct agt_ctx_st {
 
 
 template<size_t Size>
-agt::impl::ctx_pool& agt::get_ctx_pool(agt_ctx_t ctx) noexcept {
+agt::impl::ctx_pool&           agt::get_ctx_pool(agt_ctx_t ctx) noexcept {
   // constexpr static size_t PoolIndex = alloc_impl::get_pool_index(Size);
   AGT_invariant( ctx != nullptr );
 
@@ -502,7 +510,7 @@ agt::impl::ctx_pool& agt::get_ctx_pool(agt_ctx_t ctx) noexcept {
   return *alloc_impl::get_ctx_pool_unchecked(ctx->allocator, Size);
 }
 
-agt::impl::ctx_pool& agt::get_ctx_pool_dyn(size_t size, agt_ctx_t ctx) noexcept {
+agt::impl::ctx_pool&           agt::get_ctx_pool_dyn(size_t size, agt_ctx_t ctx) noexcept {
   // constexpr static size_t PoolIndex = alloc_impl::get_pool_index(Size);
   AGT_invariant( ctx != nullptr );
   if ( size > alloc_impl::get_max_alloc_size(ctx->allocator) ) [[unlikely]] {
@@ -510,24 +518,6 @@ agt::impl::ctx_pool& agt::get_ctx_pool_dyn(size_t size, agt_ctx_t ctx) noexcept 
     abort();
   }
   return *alloc_impl::get_ctx_pool_unchecked(ctx->allocator, size);
-}
-
-
-agt_status_t agt::new_ctx(agt_ctx_t& ctxRef, agt_instance_t instance, agt_executor_t executor, const agt_allocator_params_t *allocatorParams) noexcept {
-  const size_t ctxStructSize = sizeof(agt_ctx_st) + alloc_impl::ctx_allocator_lut_required_size(instance, allocatorParams);
-  auto ctx = (agt_ctx_t)std::malloc(ctxStructSize);
-  std::memset(ctx, 0, ctxStructSize);
-  auto status = alloc_impl::init_ctx_allocator(instance, ctx->allocator, allocatorParams);
-  if (status != AGT_SUCCESS) {
-    std::free(ctx);
-    return status;
-  }
-  ctx->executor = executor;
-  ctx->instance = instance;
-  ctx->fastThreadId = agt::get_thread_id();
-  ctx->exports = instance->exports;
-  ctxRef = ctx;
-  return AGT_SUCCESS;
 }
 
 

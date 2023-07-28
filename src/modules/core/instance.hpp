@@ -146,6 +146,20 @@ namespace agt {
     object_slots_per_chunk256
   };
 
+  namespace impl {
+#define AGT_builtin_value(type_, value_) template <> struct builtin_value_info<builtin_value::value_> { inline constexpr static auto value = builtin_value::value_; using type = type_; }
+    template <builtin_value Value>
+    struct builtin_value_info;
+
+    AGT_builtin_value(const char*, process_name);
+    AGT_builtin_value(size_t,      async_struct_size);
+    AGT_builtin_value(size_t,      signal_struct_size);
+  }
+
+#define AGT_builtin(inst_, value_) ((typename ::agt::impl::builtin_value_info<::agt::builtin_value::value_>::type)::agt::inst_get_builtin(inst_, ::agt::builtin_value::value_))
+
+
+  uintptr_t     inst_get_builtin(agt_instance_t inst, builtin_value value) noexcept;
 
   void*         instance_mem_alloc(agt_instance_t instance, size_t size, size_t alignment) noexcept;
   void          instance_mem_free(agt_instance_t instance, void* ptr, size_t size, size_t alignment) noexcept;
@@ -160,7 +174,7 @@ namespace agt {
   bool          instance_may_ignore_errors(agt_instance_t inst) noexcept;
 
 
-  inline static void get_instance_name(agt_instance_t instance, agt_name_t& name) noexcept {
+  inline static void get_instance_name(agt_instance_t instance, agt_string_t& name) noexcept {
 
   }
 
@@ -204,8 +218,9 @@ namespace agt {
   agt_status_t inst_enumerate_named_objects(agt_instance_t inst, size_t& count, const char** pNames) noexcept;
   agt_status_t inst_enumerate_shared_objects(agt_instance_t inst, size_t& count, const char** pNames) noexcept;
 
-  uintptr_t    inst_get_builtin(agt_instance_t inst, builtin_value value) noexcept;
 
+
+  agt_instance_t inst_get() noexcept;
 
   void         inst_set_thread_ctx(agt_instance_t inst, agt_ctx_t ctx) noexcept;
   agt_ctx_t    inst_get_thread_ctx(agt_instance_t inst) noexcept;
@@ -221,10 +236,6 @@ namespace agt {
   void*         ctxAcquireSharedAsyncData(agt_ctx_t ctx, async_data_t& handle) noexcept;
   void*         ctxMapSharedAsyncData(agt_ctx_t ctx, async_data_t handle) noexcept;
   void          ctxReleaseSharedAsyncData(agt_ctx_t ctx, async_data_t handle) noexcept;
-
-
-#define AGT_builtin(inst, value) inst_get_builtin(inst, builtin_value:: value)
-
 }
 
 #endif//JEMSYS_AGATE2_CONTEXT_HPP
