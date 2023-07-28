@@ -13,7 +13,8 @@ AGT_begin_c_namespace
 
 
 typedef enum agt_signal_flag_bits_t {
-  AGT_SIGNAL_AUTO_RESET = 0x1
+  // AGT_SIGNAL_AUTO_RESET = 0x1,
+  AGT_SIGNAL_IS_LEVEL_TRIGGERED = 0x10
 } agt_signal_flag_bits_t;
 typedef agt_flags32_t agt_signal_flags_t;
 
@@ -23,8 +24,6 @@ typedef agt_flags32_t agt_signal_flags_t;
 /* ========================= [ Signal Functions ] ========================= */
 
 AGT_api agt_status_t AGT_stdcall agt_new_signal(agt_ctx_t ctx, agt_signal_t* pSignal, agt_name_t name, agt_signal_flags_t flags) AGT_noexcept;
-
-AGT_api agt_status_t AGT_stdcall agt_open_signal(agt_ctx_t ctx, agt_signal_t* pSignal, const char* name, size_t nameLength, agt_scope_t scope, agt_signal_flags_t flags) AGT_noexcept;
 
 AGT_api void         AGT_stdcall agt_close_signal(agt_signal_t signal) AGT_noexcept;
 

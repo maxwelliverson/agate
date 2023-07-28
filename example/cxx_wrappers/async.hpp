@@ -220,7 +220,7 @@ namespace agtcxx {
 
   template <typename RetType>
   class promise {
-    agt_async_t* m_async;
+    agt_async_t*         m_async;
     mutable agt_status_t m_status;
     mutable RetType      m_result;
 
