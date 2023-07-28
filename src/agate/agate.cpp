@@ -9,9 +9,10 @@
 
 #include "agate.h"
 
-#include "sys_string.hpp"
 #include "environment.hpp"
+#include "integer_division.hpp"
 #include "module.hpp"
+#include "sys_string.hpp"
 
 #include "priority_queue.hpp"
 
