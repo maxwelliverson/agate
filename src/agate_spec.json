@@ -31,15 +31,15 @@
       "values": [
         {
           "ident": "AGT_AGENT_IS_NAMED",
-          "bitshift": 0
+          "bitpos": 0
         },
         {
           "ident": "AGT_AGENT_IS_SHARED",
-          "bitshift": 1
+          "bitpos": 1
         },
         {
           "ident": "AGT_AGENT_HAS_DYNAMIC_PROPERTIES",
-          "bitshift": 16
+          "bitpos": 16
         }
       ]
     },
