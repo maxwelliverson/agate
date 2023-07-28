@@ -14,27 +14,23 @@ AGT_begin_c_namespace
 
 typedef enum agt_name_flag_bits_t {
   // AGT_NAME_ASYNC_IS_UNINITIALIZED = 0x1,
-  AGT_NAME_RETAIN_OBJECT          = 0x1,
+  AGT_NAME_RETAIN_OBJECT = 0x8,
 } agt_name_flag_bits_t;
 typedef agt_flags32_t agt_name_flags_t;
 
-#define AGT_NAME_RETAIN_OBJECT_IF_IS(typeMask) ((((agt_name_flags_t)(typeMask)) << 32) | AGT_NAME_RETAIN_OBJECT)
-#define AGT_NAME_RETAIN_ANY_OBJECT AGT_NAME_RETAIN_OBJECT_IF_IS(AGT_ANY_TYPE)
-
 typedef struct agt_name_desc_t {
-  agt_async_t*           async;      ///< [optional]
-  const char*            pName;      ///< UTF8 encoding, length is equal to nameLength, or if nameLength is 0, should be null terminated
-  size_t                 nameLength;
-  agt_name_flags_t       flags;      ///< Valid
-  agt_object_type_mask_t retainMask; ///< If flags contains AGT_NAME_RETAIN_OBJECT, this must be a set of bitwise-or'd agt_object_type_t values, which act as a filter on which types of objects will be retained (important to be careful here, as any retained object must be subsequently released)
-  agt_scope_t            scope;      ///< As always, AGT_SHARED_SCOPE is only valid if AGT_ATTR_SHARED_CONTEXT is true
+  agt_async_t*           async;       ///< [optional]
+  agt_string_t           name;        ///< See documentation for @refitem agt_string_t
+  agt_name_flags_t       flags;       ///< May be any valid bitwise combination of agt_name_flag_bits_t values and an optional (valid) agt_scope_t value.
+  agt_object_type_mask_t retainMask;  ///< If flags does not contain AGT_NAME_RETAIN_OBJECT, this field is ignored. Otheriwse, this must be a set of bitwise-or'd agt_object_type_t values, which act as a filter on which types of objects will be retained (important to be careful here, as any retained object must be subsequently released)
+  void*                  paramBuffer; ///< If
 } agt_name_desc_t;
 
 typedef struct agt_name_filter_info_t {
-  agt_async_t*     async;
-  const char*      pFilter;
-  size_t           filterStringLength;
-  agt_scope_mask_t scopes;
+  agt_async_t*           async;
+  agt_string_t           filterString;
+  agt_scope_mask_t       scopes;
+  agt_object_type_mask_t types;
 } agt_name_filter_info_t;
 
 
@@ -49,14 +45,21 @@ typedef struct agt_name_filter_info_t {
 *          objects.
 *          In pseudocode, the intended idiom looks something along the lines of
 *
-*              reserve(name)
-*              error = initialize(state)
-*              if error
-*                  release(name)
-*              else
-*                  error = agt_create_some_object(state, name, ...)
-*                  if error
-*                      release(name)
+*              \code
+*              function new_object(desiredName, params)
+*                  object = null
+*                  name = reserve_name(desiredName)
+*                  if name is null:
+*                      throw name_clash_exception
+*                  try:
+*                      state = initialize(params)           // expensive state initialization
+*                      object = agt_new_object(state, name) // note that this internally calls agt_bind_name
+*                  catch:
+*                      release_name(name)
+*                      rethrow exception
+*                  return object
+*              \endcode
+*
 *
 *          This is particularly useful when object creation is potentially expensive, or
 *          when the named object should be unique within the specified scope. It may also
@@ -67,7 +70,7 @@ typedef struct agt_name_filter_info_t {
 *                           and a token has been written to pResult->token that may be subsequently
 *                           bound to some object. \n
 *              AGT_DEFERRED: The specified name has already been reserved, but has not yet been
-*                            bound. A deferred operation has been bound to pReservationDesc->async,
+*                            bound. A deferred operation has been bound to pNameDesc->async,
 *                            which will reattempt the reservation if the name is released, or will
 *                            return the binding info the bound object upon binding. \n
 *              AGT_ERROR_INVALID_ARGUMENT: Indicates either pReservationDesc or pResult was null,
@@ -84,7 +87,10 @@ typedef struct agt_name_filter_info_t {
 *                                  future.
 *
 * */
-AGT_core_api agt_status_t AGT_stdcall agt_reserve_name(agt_ctx_t ctx, const agt_name_desc_t* pNameDesc, agt_name_t* pResult) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_reserve_name(agt_ctx_t ctx, const agt_name_desc_t* pNameDesc, agt_name_result_t* pResult) AGT_noexcept;
+
+AGT_core_api agt_status_t AGT_stdcall agt_lookup_named_object(agt_ctx_t ctx, ) AGT_noexcept;
+
 
 /**
  * \brief Releases a name previously reserved by a call to agt_reserve_name.
@@ -93,7 +99,7 @@ AGT_core_api agt_status_t AGT_stdcall agt_reserve_name(agt_ctx_t ctx, const agt_
  *          bound to anything. Primarily intended for use in cases where a name is
  *          reserved prior to object creation, and then at some point during
  *          construction, an error is encountered and the creation routine is
- *          cancelled.
+ *          abandonned.
  *          Note that attempts to bind a name token (eg. agt_bind_name, agt_new_agent, ...)
  *          that result in failure do NOT automatically release the reserved name. This
  *          is so that the name token may be reused in subsequent attempts, but it also
