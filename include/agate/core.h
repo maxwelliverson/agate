@@ -473,8 +473,8 @@ namespace agtxx {
 #define AGT_PHYSICAL_PAGE_SIZE ((agt_size_t)1 << 12)
 #define AGT_VIRTUAL_PAGE_SIZE  ((agt_size_t)(1 << 16))
 
-#define AGT_INVALID_NAME_TOKEN ((agt_name_token_t)0)
-#define AGT_ANONYMOUS ((agt_name_t){ ((agt_name_token_t)0) })
+#define AGT_INVALID_NAME_TOKEN ((agt_name_t)0)
+#define AGT_ANONYMOUS ((agt_name_t)0)
 
 
 #if !defined(AGT_DISABLE_STATIC_STRUCT_SIZES)
@@ -567,7 +567,7 @@ typedef agt_u64_t                agt_send_token_t;
 typedef struct agt_instance_st*  agt_instance_t;
 typedef struct agt_ctx_st*       agt_ctx_t;
 
-typedef struct agt_async_t       agt_async_t;
+typedef struct agt_async_t       agt_async_t; // TODO: Refactor agt_async_t such that agt_async_t is a pointer type
 typedef struct agt_query_t       agt_query_t;
 
 
@@ -681,11 +681,19 @@ typedef agt_flags32_t agt_object_type_mask_t;
 #define AGT_ANY_TYPE 0x7FFFFFFF
 
 
+typedef struct agt_string_t {
+  const char* data;
+  size_t      length;
+} agt_string_t;
+
+
+
 typedef struct agt_object_desc_t {
-  void*             object;
-  agt_object_type_t type;
-  agt_scope_t       scope;
-  const void*       params; ///< Depends on type
+  void*               object;
+  agt_object_type_t   type;
+  agt_scope_t         scope;
+  const agt_string_t* name;
+  const void*         params; ///< Depends on type
 } agt_object_desc_t;
 typedef struct AGT_alignas(AGT_OBJECT_PARAMS_BUFFER_ALIGNMENT) agt_object_params_buffer_t {
   agt_u8_t reserved[AGT_OBJECT_PARAMS_BUFFER_SIZE];
@@ -755,12 +763,12 @@ typedef struct agt_attr_t {
 
 /// Name Types
 
-typedef agt_u64_t agt_name_token_t; // token type that refers to a reserved name
+typedef agt_u64_t agt_name_t;
 
-typedef union agt_name_t {
-  agt_name_token_t         token;
-  const agt_object_desc_t* boundObject;
-} agt_name_t;
+typedef union agt_name_result_t {
+  agt_name_t               name;
+  const agt_object_desc_t* object;
+} agt_name_result_t;
 
 
 
