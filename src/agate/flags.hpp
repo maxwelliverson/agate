@@ -31,6 +31,10 @@
   }                                                 \
   enum class EnumType : UnderlyingType
 
+
+#include <concepts>
+
+
 namespace agt {
   namespace impl {
     template <typename T>

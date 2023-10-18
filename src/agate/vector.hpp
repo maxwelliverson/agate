@@ -220,7 +220,7 @@ namespace agt {
 
         bool references_storage = false;
         agt_u64_t Index = -1;
-        if constexpr ( !U::takes_params_by_value ) {
+        if constexpr ( !U::takes_param_by_value ) {
           if (This->is_reference_to_storage(&element)) [[unlikely]] {
               references_storage = true;
               Index = &element - This->begin();
@@ -457,10 +457,13 @@ namespace agt {
     template <typename T>
     class small_array_template_base<T, true> : public small_array_template_common<T> {
       friend class small_array_template_common<T>;
+
     protected:
+
       /// True if it's cheap enough to take parameters by value. Doing so avoids
       /// overhead related to mitigations for reference invalidation.
       static constexpr bool takes_param_by_value = sizeof(T) <= 2 * sizeof(void *);
+
 
       /// Either const T& or T, depending on whether it's cheap enough to take
       /// parameters by value.

@@ -11,16 +11,11 @@
 #include <immintrin.h>
 
 
-
-union win32_large_integer {
-  agt_u64_t quadPart;
-  struct {
-    agt_u32_t lowPart;
-    agt_u32_t highPart;
-  };
-};
-
-extern "C" int QueryPerformanceCounter(win32_large_integer* pLargeInteger);
+// Ideally would like to find a way to not include the entire windows header in a very basic,
+// common utility header like this one.
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 
 
 
@@ -29,16 +24,16 @@ namespace agt {
 
   bool      has_static_time_unit() noexcept;
 
-  agt_u64_t get_dynamic_time_unit() noexcept;
+  agt_u64_t get_dynamic_time_unit(agt_ctx_t ctx) noexcept;
 
   AGT_forceinline static agt_timestamp_t get_fast_timestamp() noexcept {
     return __rdtsc();
   }
 
   AGT_forceinline static agt_timestamp_t get_stable_timestamp() noexcept {
-    win32_large_integer largeInteger;
+    LARGE_INTEGER largeInteger;
     QueryPerformanceCounter(&largeInteger);
-    return largeInteger.quadPart;
+    return largeInteger.QuadPart;
   }
 }
 

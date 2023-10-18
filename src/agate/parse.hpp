@@ -10,6 +10,9 @@
 
 namespace agt {
 
+  // A series of flexible, fast, constexpr-safe(?) string parsing functions that don't return any error info,
+  // but instead just return an optional value, where a missing failure represents a parsing error
+
   namespace detail {
     template <typename CharTraits>
     inline static constexpr auto get_char(char c) noexcept {

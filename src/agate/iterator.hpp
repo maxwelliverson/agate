@@ -11,6 +11,10 @@
 
 
 namespace agt{
+
+  // range_view, and a CRTP based iterator class intended to simplify custom iterator implementations
+
+
   template <typename BeginIter, typename EndIter = BeginIter>
   class range_view{
   public:
@@ -56,7 +60,7 @@ namespace agt{
             typename DifferenceTypeT = std::ptrdiff_t,
             typename PointerT = T *,
             typename ReferenceT = T &>
-  class iterator_facade_base : public std::iterator<IteratorCategoryT, T, DifferenceTypeT, PointerT, ReferenceT> {
+  class iterator_facade_base {
   protected:
 
     inline constexpr static bool IsRandomAccess  = std::derived_from<IteratorCategoryT, std::random_access_iterator_tag>;

@@ -8,6 +8,7 @@
 
 #include "agate.h"
 
+#include "align.hpp"
 #include "iterator.hpp"
 #include "allocator.hpp"
 
@@ -15,26 +16,33 @@
 #include <memory>
 #include <bit>
 
+
+// Implementation of a "dictionary" type, which in this context, is a typed string map.
+// String keys are mapped to values of the specified type.
+// Functions more or less equivalently to an agt::map type, but is optimized for string key types.
+// For string => string maps, use a codex instead, which is very similar, but is further optimized by storing
+// all text (both keys and values) inline in single buckets to avoid extraneous allocation.
+
 namespace agt {
 
   struct nothing_t{};
   inline constexpr static nothing_t nothing{};
 
 
-
-
   namespace impl{
     
     template <typename T>
     inline constexpr static agt_size_t ptr_free_low_bits = std::countr_zero(alignof(T));
+
+    inline constexpr static size_t OptimalStringAlign = 16;
     
     class dictionary_entry_base {
-      agt_u64_t keyLength;
+      agt_u64_t m_keyLength;
 
     public:
-      explicit dictionary_entry_base(agt_u64_t keyLength) : keyLength(keyLength) {}
+      explicit dictionary_entry_base(agt_u64_t keyLength) : m_keyLength(keyLength) {}
 
-      AGT_nodiscard agt_u64_t get_key_length() const { return keyLength; }
+      AGT_nodiscard agt_u64_t get_key_length() const noexcept { return m_keyLength; }
     };
 
     template <typename Val>
@@ -66,6 +74,36 @@ namespace agt {
 
       AGT_nodiscard nothing_t get() const { return nothing; }
     };
+
+    template <typename T>
+    class dictionary_entry_array_storage : public dictionary_entry_base {
+      uint32_t m_arrayLength;
+      uint32_t m_keyOffset;
+      T        m_array[1];
+    protected:
+      [[nodiscard]] const char* _get_key() const noexcept {
+        return std::assume_aligned<OptimalStringAlign>(reinterpret_cast<const char*>(this) + m_keyOffset);
+      }
+    public:
+      dictionary_entry_array_storage(size_t keyLength, size_t arrayLength)
+          : dictionary_entry_base(keyLength),
+            m_arrayLength(arrayLength),
+            m_keyOffset(align_to<OptimalStringAlign>(offsetof(dictionary_entry_array_storage, m_array) + (sizeof(T) * arrayLength)))
+      {}
+
+      dictionary_entry_array_storage(dictionary_entry_array_storage&e) = delete;
+
+
+      std::span<T>       get()       noexcept { return { &m_array[0], m_arrayLength }; }
+      std::span<const T> get() const noexcept { return { &m_array[0], m_arrayLength }; }
+
+      void set(std::span<const T> elements) {
+        assert( m_arrayLength == elements.size() );
+        std::ranges::copy(elements, &m_array[0]);
+      }
+    };
+
+
 
 
     class dictionary {
@@ -149,6 +187,8 @@ namespace agt {
       }
     };
 
+
+
     template<typename DerivedTy, typename T>
     class dictionary_iter_base : public iterator_facade_base<DerivedTy, std::forward_iterator_tag, T> {
     protected:
@@ -206,9 +246,10 @@ namespace agt {
   class dictionary_key_iterator;
 
 
+  class string_pool;
 
 
-  template<typename Val>
+  template <typename Val>
   class dictionary_entry final : public impl::dictionary_entry_storage<Val> {
 
     static size_t allocSize(size_t keySize) noexcept {
@@ -273,11 +314,12 @@ namespace agt {
   };
 
 
-
   template <typename T, typename EntryAllocator = default_allocator>
   class dictionary : public impl::dictionary, private EntryAllocator {
 
     using entry_allocator_t = EntryAllocator;
+
+    friend class string_pool;
 
     entry_allocator_t& get_allocator() const noexcept {
       return const_cast<entry_allocator_t&>(static_cast<const entry_allocator_t&>(*this));
@@ -472,7 +514,7 @@ namespace agt {
     template<typename V>
     std::pair<iterator, bool> insert_or_assign(std::string_view Key, V &&Val) {
       auto Ret = try_emplace(Key, std::forward<V>(Val));
-      if (!Ret.get())
+      if (!Ret.second)
         Ret.first->get() = std::forward<V>(Val);
       return Ret;
     }
@@ -536,7 +578,6 @@ namespace agt {
       return true;
     }
   };
-
 
 
   template<typename T>

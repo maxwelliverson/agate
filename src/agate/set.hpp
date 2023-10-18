@@ -7,9 +7,6 @@
 
 #include "map.hpp"
 
-
-#include <llvm/ADT/DenseSet.h>
-
 namespace agt {
   
   namespace impl {
@@ -196,9 +193,9 @@ namespace agt {
     };
   }
 
-  template <typename T, typename KeyInfo = map_key_info<T>, typename Alloc = default_allocator>
-  class set : public impl::basic_set<T, map<T, impl::no_value, KeyInfo, impl::bucket<T, impl::no_value>, Alloc>, KeyInfo>{
-    using map_type = map<T, impl::no_value, KeyInfo, impl::bucket<T, impl::no_value>, Alloc>;
+  template <typename T, typename KeyInfo = map_key_info<T>>
+  class set : public impl::basic_set<T, map<T, impl::no_value, KeyInfo>, KeyInfo> {
+    using map_type  = map<T, impl::no_value, KeyInfo>;
     using base_type = impl::basic_set<T, map_type, KeyInfo>;
   public:
     using base_type::base_type;

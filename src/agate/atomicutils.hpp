@@ -11,6 +11,9 @@
 #include <semaphore>
 
 
+// TODO: Merge <agate/atomicutils.hpp> and <agate/atomic.hpp>, and cleanup the resulting file. This shit is messy.
+
+
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>

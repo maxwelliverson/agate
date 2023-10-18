@@ -52,9 +52,21 @@ namespace agt {
   };
 
 
-  dispatch_flags to_flags(const uintptr_t* attrValues, const agt_attr_type_t* attrTypes, uint32_t attrCount) noexcept;
 
-
+  // TODO: this was implemented for my original method of dynamic linking, whereby
+  //       exported functions would be named such that there is a public name followed
+  //       by a suffix indicating the dispatch flags that would be used to select a
+  //       specific function to export to the public name (ex. the name function named
+  //       agate_api_pool_alloc__st would be the single-threaded implementation of
+  //       agt_pool_alloc, and agate_api_pool_alloc__mt would be the function selected
+  //       by multi-threaded implementations. I ultimately deemed this to be way too
+  //       complicated to be practical, and also not as future proof, as it would not be
+  //       possible to link to functions (or dispatch on flags) the static loader is not aware of.
+  //       I will instead simply have each module export a function that takes the
+  //       configuration settings being used to initialize the library, and declares all
+  //       of the functions it exports, along with the addresses of specific implmentations
+  //       selected for the given config settings.
+  //       I need to update the module_accessor class to reflect the new style of initialization/linking
   class module_accessor {
     inline constexpr static size_t MaxNameLength = 20;
     inline constexpr static size_t MaxPathLength = 260;
@@ -227,9 +239,6 @@ namespace agt {
       auto libPathBufferLength = (DWORD)std::size(m->m_path);
       auto pathResult = GetModuleFileNameW(handle, m->m_path, libPathBufferLength);
       AGT_assert(pathResult <= libPathBufferLength);
-
-
-      // auto& exports = m->m_exports;
 
       m->load_exported_functions();
 

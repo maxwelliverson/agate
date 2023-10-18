@@ -8,6 +8,8 @@
 #include "config.hpp"
 #include "core/object_pool.hpp"
 
+// Initial attempt at a composable priority queue, not sure if I like the design, holding off on finishing implementation
+
 namespace agt {
   enum class priority : agt_u32_t {
     critical,

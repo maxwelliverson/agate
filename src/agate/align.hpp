@@ -10,6 +10,8 @@
 #include <concepts>
 #include <bit>
 
+// Simple, inline utility functions to aid in alignment and powers of 2.
+
 namespace agt {
 
   template <size_t Align>

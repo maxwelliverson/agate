@@ -13,6 +13,8 @@
 #include <vector>
 #include <concepts>
 
+// Considering scrapping this file, and doing away with templated allocator support, as it has not been used yet, and likely won't be.
+
 namespace agt {
 
 
@@ -56,6 +58,35 @@ namespace agt {
     std::memcpy(newArray, array, oldArraySize * sizeof(T));
     free_array(array, oldArraySize, alignment);
     return newArray;
+#endif
+  }
+
+
+
+  inline void* alloc_aligned(size_t size, size_t alignment) noexcept {
+#if defined(_WIN32)
+    return ::_aligned_malloc(size, alignment);
+#else
+    return std::aligned_alloc(size, alignment);
+#endif
+  }
+
+  inline void  free_aligned(void* memory, size_t size, size_t alignment) noexcept {
+#if defined(_WIN32)
+    ::_aligned_free(memory);
+#else
+    free(memory);
+#endif
+  }
+
+  inline void* realloc_aligned(void* memory, size_t newSize, size_t oldSize, size_t alignment) noexcept {
+#if defined(_WIN32)
+    return ::_aligned_realloc(memory, newSize, alignment);
+#else
+    auto newMemory = alloc_aligned(newSize, alignment);
+    std::memcpy(newMemory, memory, (std::min)(newSize, oldSize));
+    free_aligned(memory, oldSize, alignment);
+    return newMemory;
 #endif
   }
 

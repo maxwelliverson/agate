@@ -7,12 +7,15 @@
 
 #include <cstdint>
 #include <limits>
+#include <memory>
 
 namespace agt {
 
+/// LLVM Style epoch tracking container debugging
+
 #if defined(AGT_ENABLE_ABI_BREAKING_DEBUGGING)
 
-  /// LLVM Style epoch tracking container debugging
+
   class debug_epoch_base {
     uint64_t epoch;
 
@@ -60,6 +63,17 @@ namespace agt {
     };
   };
 
+  namespace impl {
+    template <typename T>
+    concept is_pointer_like = requires{
+      typename std::pointer_traits<T>::element_type;
+    };
+  };
+
+  template <typename T = void*>
+  inline constexpr bool should_reverse_iterate() noexcept {
+    return impl::is_pointer_like<T>;
+  }
 
 #else
 
@@ -76,7 +90,16 @@ namespace agt {
     };
   };
 
+  template <typename T = void*>
+  inline constexpr bool should_reverse_iterate() noexcept {
+    return false;
+  }
+
 #endif
+
+
+
+  using debug_handle_base = typename debug_epoch_base::handle_base;
 }
 
 #endif//AGATE_SUPPORT_EPOCH_TRACKER_HPP

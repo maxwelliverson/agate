@@ -2252,7 +2252,7 @@ namespace agt {
 
   inline constexpr static impl::try_once_t try_once{};
 
-  inline static impl::try_for_t try_for(agt_timeout_t timeout) noexcept {
+  inline static impl::try_for_t   try_for(agt_timeout_t timeout) noexcept {
     return impl::try_for_t{ timeout };
   }
 

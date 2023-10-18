@@ -5,6 +5,9 @@
 #ifndef AGATE_INTERNAL_SYS_STRING_HPP
 #define AGATE_INTERNAL_SYS_STRING_HPP
 
+
+// TODO: Refactor agate/sys_string.hpp, this file is gross :(
+
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>

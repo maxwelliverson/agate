@@ -12,7 +12,7 @@
 
 void agt::thread::do_start(proc_rettype(* pProc)(proc_argtype), thread_info* threadInfo, bool startSuspended) noexcept {
   DWORD tid;
-  m_handle = CreateThread(nullptr, 0, pProc, threadInfo, CREATE_SUSPENDED, &tid);
+  m_handle = CreateThread(nullptr, 0, pProc, threadInfo, startSuspended ? CREATE_SUSPENDED : 0, &tid);
   m_pInfo = threadInfo;
 }
 

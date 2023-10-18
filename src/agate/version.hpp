@@ -43,6 +43,13 @@ namespace agt {
       return m_value & PatchMask;
     }
 
+    [[nodiscard]] constexpr agt_u32_t to_u32() const noexcept {
+      return m_value;
+    }
+
+    [[nodiscard]] constexpr agt_i32_t to_i32() const noexcept {
+      return m_value;
+    }
 
     constexpr static version from_integer(agt_u32_t value) noexcept {
       version v;

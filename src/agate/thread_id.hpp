@@ -13,6 +13,12 @@
 
 namespace agt {
   [[nodiscard]] AGT_forceinline uintptr_t get_thread_id() noexcept {
+    // TODO: Couch use of platform specific intrinsics in preprocessor conditionals
+    //       if they need to be used in header files
+
+    // Reads the value of the GS segment register, which on x64 Windows, holds the
+    // linear address offset of the thread control block. Definitely hacky, but
+    // super fast.
     return _readgsbase_u64();
   }
 

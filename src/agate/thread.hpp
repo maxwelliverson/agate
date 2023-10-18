@@ -5,6 +5,11 @@
 #ifndef AGATE_INTERNAL_THREAD_HPP
 #define AGATE_INTERNAL_THREAD_HPP
 
+// A class wrapping a system thread, much in the same vein as std::thread.
+// The main reason I wrote a custom implementation instead of using std::thread
+// is so that threads may be created in a suspended state, which is necessary for
+// implementing executors.
+
 #include "config.hpp"
 #include "thread_id.hpp"
 
