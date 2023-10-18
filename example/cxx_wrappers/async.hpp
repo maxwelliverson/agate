@@ -19,6 +19,16 @@ namespace agtcxx {
 
   class context;
 
+  class instance {
+    agt_instance_t m_instance;
+  public:
+    instance() noexcept : m_instance(AGT_INVALID_INSTANCE) { }
+
+    [[nodiscard]] agt_instance_t raw_handle() const noexcept {
+      return m_instance;
+    }
+  };
+
   class self {
     agt_self_t m_self;
 
@@ -37,7 +47,7 @@ namespace agtcxx {
 
     friend class self;
 
-    agt_ctx_t m_ctx = nullptr;
+    agt_ctx_t m_ctx = AGT_INVALID_CTX;
     explicit context(agt_ctx_t ctx) noexcept : m_ctx(ctx) { }
   public:
     context() = default;
@@ -48,7 +58,11 @@ namespace agtcxx {
 
 
     static context current() noexcept {
-      return context(agt_current_context());
+      return context(agt_ctx());
+    }
+
+    static context acquire(instance inst = {}) noexcept {
+      return context(agt_acquire_ctx(inst.raw_handle()));
     }
 
     static context null() noexcept {
@@ -146,67 +160,92 @@ namespace agtcxx {
   template <typename RetType>
   class promise;
 
+  class async_storage {
+
+    friend class async;
+
+    agt_inline_async_t inlineAsync;
+  public:
+    explicit async_storage(context ctx = context::acquire()) noexcept
+        : inlineAsync(){
+      inlineAsync.ctx = ctx.raw_handle();
+    }
+  };
+
   class async {
     agt_async_t m_async;
 
     template <typename>
     friend class promise;
 
+    explicit async(agt_async_t handle) noexcept
+        : m_async(handle) { }
   public:
 
-    async() noexcept
-        : async(nullptr) { }
-    explicit async(agt_async_flags_t flags) noexcept
-        : async(nullptr, flags) { }
+    async(agt_async_flags_t flags = 0) noexcept
+        : m_async(agt_new_async(agt_ctx(), flags)) { }
+    async(async_storage& storage, agt_async_flags_t flags = 0) noexcept
+        : m_async(agt_init_async(&storage.inlineAsync, flags)) { }
     explicit async(context ctx, agt_async_flags_t flags = 0) noexcept
-        : m_async{ .ctx = ctx.raw_handle(), .status = AGT_ERROR_NOT_BOUND, .flags = flags } {
-    }
+        : m_async(agt_new_async(ctx.raw_handle(), flags)) { }
 
     async(const async& other) {
-      agt_copy_async(&other.m_async, &m_async);
+      assert( other.m_async != nullptr );
+      m_async = agt_new_async(agt_ctx(), AGT_ASYNC_UNINITIALIZED);
+      agt_copy_async(other.m_async, m_async);
     }
-    async(async&& other) noexcept {
-      memcpy(&m_async, &other.m_async, AGT_ASYNC_STRUCT_SIZE);
-      other.m_async.flags = 0;
-    }
+    async(async&& other) noexcept : m_async(std::exchange(other.m_async, nullptr)) { }
 
     async& operator=(const async& other) {
       if (this != &other) {
-        agt_copy_async(&other.m_async, &m_async);
+        if (!m_async)
+          m_async = agt_new_async(agt_ctx(), AGT_ASYNC_UNINITIALIZED);
+        agt_copy_async(other.m_async, m_async);
       }
       return *this;
     }
     async& operator=(async&& other) noexcept {
-      if (m_async.flags & AGT_ASYNC_IS_VALID)
-        agt_destroy_async(&m_async);
-      memcpy(&m_async, &other.m_async, AGT_ASYNC_STRUCT_SIZE);
-      other.m_async.flags = 0;
+      if (m_async)
+        agt_move_async(std::exchange(other.m_async, nullptr), m_async);
+      else
+        m_async = std::exchange(other.m_async, nullptr);
       return *this;
     }
 
     ~async() {
-      if (m_async.flags & AGT_ASYNC_IS_VALID)
-        agt_destroy_async(&m_async);
+      if (m_async)
+        agt_destroy_async(m_async);
     }
 
-
-    /// Note: not necessary to call before use
-    void init(agt_ctx_t ctx = agt_current_context()) noexcept {
-      agt_new_async(ctx, &m_async, m_async.flags);
+    [[nodiscard]] async copy_to(async_storage& storage) noexcept {
+      assert( m_async != nullptr );
+      auto handle = agt_init_async(&storage.inlineAsync, AGT_ASYNC_UNINITIALIZED | AGT_ASYNC_MAY_REPLACE);
+      agt_copy_async(m_async, handle);
+      return async(handle);
     }
 
-    [[nodiscard]] agt_status_t status() noexcept {
-      if (m_async.status == AGT_NOT_READY)
+    [[nodiscard]] async move_to(async_storage& storage) noexcept {
+      assert( m_async != nullptr );
+      auto handle = agt_init_async(&storage.inlineAsync, AGT_ASYNC_UNINITIALIZED | AGT_ASYNC_MAY_REPLACE);
+      agt_move_async(std::exchange(m_async, nullptr), handle);
+      return async(handle);
+    }
+
+    [[nodiscard]] agt_status_t status(agt_u64_t& value) noexcept {
+      return agt_async_status(m_async, &value);
+      /*if (m_async.status == AGT_NOT_READY)
         return agt_wait(&m_async, AGT_DO_NOT_WAIT);
-      return m_async.status;
+      return m_async.status;*/
     }
 
     void wait() noexcept {
+      agt_u64_t result;
+      agt_wait(m_async, &result, AGT_WAIT);
       agt_wait(&m_async, AGT_WAIT);
     }
 
     void wait_for(agt_timeout_t timeout) noexcept {
-      agt_wait(&m_async, timeout);
+      agt_wait(m_async, timeout);
     }
 
     void attach(const signal& s) noexcept {
@@ -220,7 +259,7 @@ namespace agtcxx {
 
   template <typename RetType>
   class promise {
-    agt_async_t*         m_async;
+    agt_async_t         m_async;
     mutable agt_status_t m_status;
     mutable RetType      m_result;
 
@@ -232,19 +271,25 @@ namespace agtcxx {
           m_status(AGT_SUCCESS),
           m_result()
     { }
+
     explicit promise(RetType value) noexcept
         : m_async(nullptr),
           m_status(AGT_SUCCESS),
           m_result(value)
     { }
-    promise(async& async) noexcept
-        : m_async(&async.m_async),
+
+    promise(const async& async) noexcept
+        : m_async(async.m_async),
           m_status(AGT_NOT_READY),
           m_result()
     { }
 
 
 
+    [[nodiscard]] RetType wait() const noexcept {
+      agt_u64_t result;
+      agt_wait(m_async, &result, AGT_WAIT);
+    }
 
 
     [[nodiscard]] agt_status_t status() const noexcept {
