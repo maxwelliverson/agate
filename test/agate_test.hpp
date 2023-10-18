@@ -258,15 +258,15 @@ namespace {
       return AGT_SUCCESS;
     }
     template <typename Agt>
-    inline agt_status_t _do_process_arg(agt_ctx_t ctx, agent_builder& builder, const agt_reservation_desc_t& reservationDesc) noexcept {
-      agt_reserve_name_result_t result;
-      auto status = agt_reserve_name(ctx, &reservationDesc, &result, 0);
+    inline agt_status_t _do_process_arg(agt_ctx_t ctx, agent_builder& builder, const agt_name_desc_t& nameDesc) noexcept {
+      agt_name_result_t result;
+      auto status = agt_reserve_name(ctx, &nameDesc, &result);
       if (status == AGT_SUCCESS) {
-        builder.createInfo.name = result.token;
+        builder.createInfo.name = result.name;
         builder.setNameToken = true;
       }
       else if (status == AGT_DEFERRED) {
-        builder.boundAsyncHandle = reservationDesc.async;
+        builder.boundAsyncHandle = nameDesc.async;
       }
       return status;
     }
@@ -364,24 +364,24 @@ namespace {
 
 
   auto name(std::string_view name, agt_scope_t scope = AGT_INSTANCE_SCOPE) noexcept {
-    return agt_reservation_desc_t{
+    return agt_name_desc_t {
+        .async = nullptr,
         .name = {
-            .data   = name.data(),
+            .data = name.data(),
             .length = name.length()
         },
-        .scope = scope,
-        .async = nullptr
+        .flags = (agt_name_flags_t)scope
     };
   }
 
   auto name(std::string_view name, agt_async_t& async, agt_scope_t scope = AGT_INSTANCE_SCOPE) noexcept {
-    return agt_reservation_desc_t{
+    return agt_name_desc_t {
+        .async = &async,
         .name = {
-            .data   = name.data(),
+            .data = name.data(),
             .length = name.length()
         },
-        .scope = scope,
-        .async = &async
+        .flags = (agt_name_flags_t)scope
     };
   }
 

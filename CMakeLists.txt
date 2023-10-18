@@ -65,15 +65,13 @@ function(add_agate_module target_)
     set(multiValueArgs SOURCES DEPENDENCIES DEFINES)
     cmake_parse_arguments(AGATE_MODULE "${optionalArgs}" "${singleValueArgs}" "${multiValueArgs}" ${ARGN})
     list(TRANSFORM AGATE_MODULE_SOURCES PREPEND src/modules/${target_}/)
+    set(AGATE_MODULE_EXPORTS_FILE src/modules/${target_}/exports.cpp)
 
-    add_library(agate.${target_}        SHARED src/agate/module.cpp ${AGATE_MODULE_SOURCES})
-    add_library(agate-static.${target_} OBJECT ${AGATE_MODULE_SOURCES})
+    add_library(agate.${target_}        SHARED ${AGATE_MODULE_EXPORTS_FILE} ${AGATE_MODULE_SOURCES})
 
     string(TOUPPER ${target_} MODULE_NAME_DEF)
     string(PREPEND MODULE_NAME_DEF AGT_BUILDING_)
     string(APPEND MODULE_NAME_DEF _MODULE)
-
-
 
     target_compile_definitions(agate.${target_}        PRIVATE
             AGT_BUILD_SHARED
@@ -82,21 +80,14 @@ function(add_agate_module target_)
             AGT_MODULE_VERSION_MAJOR=${AGATE_VERSION_MAJOR}
             AGT_MODULE_VERSION_MINOR=${AGATE_VERSION_MINOR}
             AGT_MODULE_VERSION_PATCH=${AGATE_VERSION_PATCH})
-    target_compile_definitions(agate-static.${target_} PRIVATE
-            AGT_BUILD_STATIC
-            AGT_BUILDING_MODULE
-            ${MODULE_NAME_DEF})
 
 
     target_include_directories(agate.${target_} PRIVATE include src src/modules)
-    target_include_directories(agate-static.${target_} PRIVATE include src src/modules)
 
     if(DEFINED AGATE_LIB_DEPENDENCIES)
         target_link_libraries(agate.${target_} PRIVATE agate-support ${AGATE_LIB_DEPENDENCIES})
-        target_link_libraries(agate-static.${target_} PRIVATE agate-support ${AGATE_LIB_DEPENDENCIES})
     else()
         target_link_libraries(agate.${target_}        PRIVATE agate-support)
-        target_link_libraries(agate-static.${target_} PRIVATE agate-support)
     endif()
 
     set_target_properties(agate.${target_} PROPERTIES OUTPUT_NAME agate-${target_})
@@ -104,7 +95,7 @@ endfunction()
 
 
 function(add_agate_executable target_)
-    set(optionalArgs TEST SAMPLE)
+    set(optionalArgs TEST EXAMPLE)
     set(singleValueArgs LINK)
     set(multiValueArgs SOURCES DEPENDENCIES OPTIONS)
     cmake_parse_arguments(AGATE_EXE "${optionalArgs}" "${singleValueArgs}" "${multiValueArgs}" ${ARGN})
@@ -116,8 +107,8 @@ function(add_agate_executable target_)
             set(AGATE_EXE_TARGET test.${target_})
             set(AGATE_EXE_SOURCE_PREFIX "${AGATE_EXE_TARGET}")
         endif()
-    elseif(AGATE_EXE_SAMPLE)
-        set(AGATE_EXE_TARGET sample.${target_})
+    elseif(AGATE_EXE_EXAMPLE)
+        set(AGATE_EXE_TARGET example.${target_})
         set(AGATE_EXE_SOURCE_PREFIX "${AGATE_EXE_TARGET}")
     else()
         set(AGATE_EXE_TARGET ${target_})
@@ -166,19 +157,21 @@ set(AGATE_VERSION_PATCH 0)
 
 add_library(agate-support
             src/agate/atomic.cpp
+            src/agate/codex.cpp
             src/agate/dictionary.cpp
-            src/agate/vector.cpp
-            src/agate/thread.cpp
-            src/agate/thread_pool.cpp)
+            src/agate/dynamic_code.cpp
+            src/agate/processor.cpp
+        src/agate/thread.cpp
+        src/agate/vector.cpp)
 target_include_directories(agate-support PRIVATE include src)
 
 add_agate_module(
         core
             PRIVATE
             SOURCES
-                context.cpp
                 ctx.cpp
                 error.cpp
+                fiber.cpp
                 init.cpp
                 instance.cpp
                 object_allocator.cpp
@@ -243,8 +236,6 @@ add_agate_module(
         log
             PRIVATE
             SOURCES
-                st_log.cpp
-                mt_log.cpp
 )
 
 add_agate_module(
@@ -255,14 +246,6 @@ add_agate_module(
                 mt_net.cpp
 )
 
-
-
-add_agate_module(
-        threads
-            PRIVATE
-            SOURCES
-                thread.cpp
-)
 
 
 
@@ -280,13 +263,13 @@ add_agate_module(
 )]]
 
 
-add_library(agate STATIC src/agate/agate.cpp)
+add_library(agate STATIC src/agate.cpp src/config.cpp)
 target_include_directories(agate PRIVATE src include src/modules)
 target_link_libraries(agate PRIVATE agate-support)
 target_compile_definitions(agate PRIVATE AGT_BUILD_SHARED AGT_BUILDING_CORE_LIBRARY)
 
 
-add_library(agate-static STATIC src/agate/agate.cpp)
+#[[add_library(agate-static STATIC src/agate.cpp src/loader.cpp)
 target_include_directories(agate-static PRIVATE src include)
 target_link_libraries(agate-static PRIVATE
         agate-support
@@ -298,7 +281,7 @@ target_link_libraries(agate-static PRIVATE
         $<TARGET_OBJECTS:agate-static.log>
         $<TARGET_OBJECTS:agate-static.network>
         $<TARGET_OBJECTS:agate-static.pool>)
-target_compile_definitions(agate-static PRIVATE AGT_BUILD_STATIC AGT_BUILDING_CORE_LIBRARY)
+target_compile_definitions(agate-static PRIVATE AGT_BUILD_STATIC AGT_BUILDING_CORE_LIBRARY)]]
 
 
 
@@ -344,6 +327,21 @@ add_agate_executable(
 add_agate_executable(
         alloc_benchmarks
             TEST
+            SOURCES
+                main.cpp
+)
+
+add_agate_executable(
+        cpuinfo
+            TEST
+            SOURCES
+                main.cpp
+                ../../src/agate/processor.cpp
+)
+
+add_agate_executable(
+        fibers
+            EXAMPLE
             SOURCES
                 main.cpp
 )

@@ -1,7 +1,9 @@
 # Agate
-**A machine local message passing subsystem**
+**A machine-local agent subsystem**
 
-# Note: this is a work in progress
+My next task is to better rewrite this, as the direction of the project has changes significantly since last updating the README.
+
+# Note: ignore description right now :(
 
 The motivation for Agate came initially from toying around with Vulkan, a modern graphics API.
 One major benefit that Vulkan has over its predecessor, OpenGL, is simply that it has been
@@ -68,26 +70,23 @@ As such, I figured there was need for a small, fast, low-level message passing l
 ## Goals
  - Lightweight
  - Optimized for in-process use
- - Support interprocess use transparently 
+ - Support interprocess use transparently, though at minimal overhead for those who do not need interprocess capabilities
  - Minimal dependencies
  - Small
 
 
 ## Design Choices
- - Handle based API
- - Dedicated "async" type that can be attached to any asynchronous operaiton
+ - Object based API
+ - Dedicated "async" type that abstracts any given asynchronous operation
  - Each object has a **scope**, which is one of the following:
-    - **Private**: Not thread tagged_atomic, process local.
-    - **Local**:   Thread tagged_atomic, process local.
-    - **Shared**:  Thread tagged_atomic, shared between processes.
- - Proper API use requires handles to be "attached" and "detatched".
-   Handle users must attach successfully before use, and must detach when done. Scope/user limits are enforced only during attachment
-
+    - **Private**: Thread local, process local. Requires no inter-thread synchronization.
+    - **Local**:   Process local, may require synchronization with atomics.
+    - **Shared**:  Shared across processes.
+ - 
 
 ## Undecided Design Choices
 
- - Scope of objects integrated as handles (ie. should users be able to implement/"install" their own object types that can then be used as handles? If so, how?)
- - WIP
+ - 
 
 
 

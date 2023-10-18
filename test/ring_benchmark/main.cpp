@@ -72,14 +72,15 @@ struct supervisor {
 
   supervisor(agt_ctx_t ctx, agt_async_t& async, int numRings, int repetitions) {
     agt_new_async(ctx, &async, 0);
-    agt_new_signal(ctx, &signal);
+    agt_new_signal(ctx, &signal, AGT_ANONYMOUS, 0);
     agt_attach_signal(signal, &async);
     left = numRings + (numRings * repetitions);
     startTime = std::chrono::high_resolution_clock::now();
   }
 
   ~supervisor() {
-    agt_destroy_signal(signal);
+    agt_close_signal(signal);
+    // agt_destroy_signal(signal);
   }
 
   void proc(agt_self_t self, const void* message, agt_size_t messageSize) noexcept {
@@ -141,7 +142,9 @@ struct chain_master {
     agt_send_info_t          msg;
     agt_agent_create_info_t  createInfo;
 
-    auto context = agt_current_context();
+    auto context = agt_self_ctx(self);
+
+    // auto context = agt_current_context();
 
     msg.flags  = 0;
     msg.size   = sizeof msgValue;
@@ -274,7 +277,7 @@ int main(int argc, char** argv) {
     assert( result == AGT_SUCCESS );
   }
 
-  result = agt_wait(&async, AGT_WAIT);
+  result = agt_wait(&async, nullptr, AGT_WAIT);
 
   assert(result == AGT_SUCCESS);
 
