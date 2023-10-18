@@ -42,13 +42,13 @@ typedef agt_flags32_t agt_shpool_flags_t;
 
 
 typedef struct agt_sheap_create_info_t {
-  agt_async_t* async;
+  agt_async_t  async;
   agt_name_t   name;
   agt_size_t   fixedAddressSpaceSize;
 } agt_sheap_create_info_t;
 
 typedef struct agt_shpool_create_info_t {
-  agt_async_t* async;
+  agt_async_t  async;
   agt_name_t   name;
   agt_u32_t    blockSize;
   agt_u32_t    maxBlocksPerChunk;

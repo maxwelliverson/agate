@@ -28,11 +28,11 @@ AGT_api agt_status_t AGT_stdcall agt_new_signal(agt_ctx_t ctx, agt_signal_t* pSi
 AGT_api void         AGT_stdcall agt_close_signal(agt_signal_t signal) AGT_noexcept;
 
 
-AGT_api void         AGT_stdcall agt_attach_signal(agt_signal_t signal, agt_async_t* async) AGT_noexcept;
+AGT_api void         AGT_stdcall agt_attach_signal(agt_signal_t signal, agt_async_t async) AGT_noexcept;
 /**
  * if waitForN is 0,
  * */
-AGT_api void         AGT_stdcall agt_attach_many_signals(const agt_signal_t* pSignals, agt_size_t signalCount, agt_async_t* async, size_t waitForN) AGT_noexcept;
+AGT_api void         AGT_stdcall agt_attach_many_signals(const agt_signal_t* pSignals, agt_size_t signalCount, agt_async_t async, size_t waitForN) AGT_noexcept;
 
 
 AGT_api void         AGT_stdcall agt_raise_signal(agt_signal_t signal) AGT_noexcept;
@@ -53,6 +53,7 @@ AGT_api void         AGT_stdcall agt_raise_many_signals(const agt_signal_t* pSig
 
 AGT_api void         AGT_stdcall agt_reset_signal(agt_signal_t signal, agt_u32_t resetValue) AGT_noexcept;
 
+// Not clear whether this is a necessary function
 AGT_api void         AGT_stdcall agt_reset_many_signals() AGT_noexcept;
 
 

@@ -18,11 +18,11 @@ typedef void(* AGT_stdcall agt_log_handler_t)(void* userData,
 
 
 typedef struct agt_log_object_info_t {
-  agt_object_type_t type;
-  agt_object_id_t   id;
-  const void*       address;
-  const agt_name_t* name;
-  agt_scope_t       scope;
+  agt_object_type_t   type;
+  agt_object_id_t     id;
+  const void*         address;
+  const agt_string_t* name;
+  agt_scope_t         scope;
 } agt_log_object_info_t;
 
 typedef enum agt_log_severity_t {
@@ -50,13 +50,13 @@ typedef struct agt_log_info_t {
   agt_u32_t       category;
   agt_timestamp_t timestamp;
   agt_agent_t     agent;
-  agt_name_t      agentName;
+  agt_string_t    agentName;
 } agt_log_info_t;
 
 
 
 
-AGT_api void                       AGT_stdcall agt_log(agt_agent_t self, agt_u32_t category, const void* msg, size_t msgLength) AGT_noexcept;
+AGT_api void                       AGT_stdcall agt_log(agt_self_t self, agt_u32_t category, const void* msg, size_t msgLength) AGT_noexcept;
 
 
 
@@ -64,7 +64,6 @@ AGT_api agt_internal_log_handler_t AGT_stdcall agt_set_internal_log_handler(agt_
 
 AGT_api agt_internal_log_handler_t AGT_stdcall agt_get_internal_log_handler(agt_ctx_t ctx, void** pUserData) AGT_noexcept;
 
-AGT_api void                       AGT_stdcall agt_get_timespec(agt_ctx_t ctx, agt_timestamp_t timestamp, struct timespec* ts) AGT_noexcept;
 
 AGT_end_c_namespace
 

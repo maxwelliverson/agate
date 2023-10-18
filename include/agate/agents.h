@@ -17,24 +17,25 @@ AGT_begin_c_namespace
 
 typedef struct agt_self_st*       agt_self_t;
 typedef struct agt_agent_st*      agt_agent_t;
-typedef struct agt_pinned_msg_st* agt_pinned_msg_t;
-typedef struct agt_executor_st*   agt_executor_t;
 typedef agt_u64_t                 agt_agent_handle_t; // For sending shared handles across shared channels
 typedef agt_u64_t                 agt_typeid_t;
 typedef agt_u64_t                 agt_raw_msg_t;
 
-
-
-typedef AGT_transparent_union_2(agt_self_t, agt_agent_t) agt_agent_or_self_t;
-
+typedef struct agt_msg_st*        agt_msg_t;
 
 
 
 
-typedef void* (*agt_agent_ctor_t)(const void* ctorUserData, void* params);
-typedef void  (*agt_agent_dtor_t)(agt_self_t self, void* agentState);
-typedef void  (*agt_agent_init_t)(agt_self_t self, void* agentState);
-typedef void  (*agt_agent_proc_t)(agt_self_t self, void* agentState, const void* message, agt_size_t messageSize);
+typedef void* (* agt_agent_ctor_t)(const void* ctorUserData, void* params);
+typedef void  (* agt_agent_init_t)(agt_self_t self, void* agentState);
+typedef void  (* agt_agent_dtor_t)(agt_self_t self, void* agentState);
+typedef void  (* agt_agent_proc_t)(agt_self_t self, void* agentState, const void* message, agt_size_t messageSize);
+
+
+typedef enum agt_exec_mode_t {
+  AGT_EXEC_EXCLUSIVE,
+  AGT_EXEC_CONCURRENT
+} agt_exec_mode_t;
 
 
 typedef enum agt_enumeration_action_t {
@@ -48,10 +49,12 @@ typedef agt_enumeration_action_t (* agt_type_enumerator_t)(void* userData, const
 
 
 typedef enum agt_agent_create_flag_bits_t {
-  AGT_AGENT_CREATE_SHARED            = 0x01,
-  AGT_AGENT_CREATE_DETACHED          = 0x02, ///< A detached agent is not reference counted and is responsible for its own lifetime. This can be useful for breaking reference cycles for instance.
-  AGT_AGENT_CREATE_BUSY              = 0x04,
-  AGT_AGENT_CREATE_WITH_NEW_EXECUTOR = 0x08
+  AGT_AGENT_CREATE_SHARED             = 0x01,
+  AGT_AGENT_CREATE_DETACHED           = 0x02, ///< A detached agent is not reference counted and is responsible for its own lifetime. This can be useful for breaking reference cycles for instance.
+  AGT_AGENT_CREATE_BUSY               = 0x04,
+  AGT_AGENT_CREATE_WITH_NEW_EXECUTOR  = 0x08,
+  AGT_AGENT_CREATE_ONLY_EXCLUSIVE     = 0x10, ///< The execution mode of the created agent cannot be set to AGT_EXEC_CONCURRENT.
+  AGT_AGENT_CREATE_DEFAULT_CONCURRENT = 0x20
 } agt_agent_create_flag_bits_t;
 typedef agt_flags32_t agt_agent_create_flags_t;
 
@@ -70,23 +73,40 @@ typedef agt_flags32_t agt_agent_flags_t;
 
 
 typedef enum agt_send_flag_bits_t {
-
+  AGT_SEND_READ_ONLY_MESSAGE = 0x40
 } agt_send_flag_bits_t;
 typedef agt_flags32_t agt_send_flags_t;
+
+
+typedef enum agt_msg_flag_bits_t {
+
+} agt_msg_flag_bits_t;
+typedef agt_flags32_t agt_msg_flags_t;
 
 
 typedef struct agt_send_info_t {
   agt_size_t       size;
   const void*      buffer;
-  agt_async_t*     async;
+  agt_async_t      async;
   agt_send_flags_t flags;
 } agt_send_info_t;
 
 typedef struct agt_raw_send_info_t {
   agt_raw_msg_t    msg;
-  agt_async_t*     async;
+  size_t           msgSize;
+  agt_async_t      async;
   agt_send_flags_t flags;
 } agt_raw_send_info_t;
+
+
+typedef struct agt_msg_info_t {
+  const void*     data;
+  size_t          size;
+  agt_msg_flags_t flags;
+  agt_agent_t     sender;
+  agt_timestamp_t sendTime;
+  agt_timestamp_t receiveTime;
+} agt_msg_info_t;
 
 
 
@@ -170,7 +190,7 @@ typedef struct agt_agent_create_info_t {
 
 AGT_api agt_status_t AGT_stdcall agt_create_agent(agt_ctx_t ctx, const agt_agent_create_info_t* cpCreateInfo, agt_agent_t* pAgent) AGT_noexcept;
 
-AGT_api agt_status_t AGT_stdcall agt_create_agent_from_type(agt_ctx_t ctx, ) AGT_noexcept;
+// AGT_api agt_status_t AGT_stdcall agt_create_agent_from_type(agt_ctx_t ctx, ) AGT_noexcept;
 
 
 /**
@@ -194,7 +214,10 @@ AGT_agent_api agt_status_t AGT_stdcall agt_take_ownership(agt_self_t self, agt_a
 
 /* =============[ Queries ]============= */
 
-AGT_agent_api agt_status_t AGT_stdcall agt_get_executor(agt_agent_or_self_t object, agt_executor_t* pResult) AGT_noexcept;
+/**
+ * If agent is null, then the executor for self is returned instead.
+ * */
+AGT_agent_api agt_status_t AGT_stdcall agt_get_executor(agt_self_t self, agt_agent_t agent, agt_executor_t* pResult) AGT_noexcept;
 
 
 /* ========================= [ Agents ] ========================= */
@@ -265,7 +288,7 @@ AGT_agent_api agt_status_t AGT_stdcall agt_reply_as(agt_self_t self, agt_agent_t
  * @param [in]  desiredMessageSize Desired size of the message. The buffer returned is guaranteed to be valid for at least this many bytes
  * @param [out] pRawMsg Handle for raw message. Used as a parameter in a subsequent send call.
  * */
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_acquire(agt_self_t self, agt_agent_t recipient, size_t desiredMessageSize, agt_raw_msg_t* pRawMsg, void** ppRawBuffer) AGT_noexcept;
+AGT_agent_api agt_status_t AGT_stdcall agt_raw_acquire(agt_self_t self, agt_agent_t recipient, size_t desiredMessageSize, agt_raw_send_info_t* pRawSendInfo, void** ppRawBuffer) AGT_noexcept;
 
 /***/
 AGT_agent_api agt_status_t AGT_stdcall agt_raw_send(agt_self_t self, agt_agent_t recipient, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
@@ -299,11 +322,52 @@ AGT_agent_api void         AGT_stdcall agt_delegate(agt_self_t self, agt_agent_t
  * */
 AGT_agent_api void         AGT_stdcall agt_return(agt_self_t self, agt_u64_t value) AGT_noexcept;
 
+
 AGT_agent_api void         AGT_stdcall agt_release(agt_self_t self, agt_agent_t agent) AGT_noexcept;
 
-AGT_agent_api agt_pinned_msg_t AGT_stdcall agt_pin(agt_self_t self) AGT_noexcept;
 
-AGT_agent_api void         AGT_stdcall agt_unpin(agt_self_t self, agt_pinned_msg_t pinnedMsg) AGT_noexcept;
+
+/**
+ * Sets the current execution mode. Lasts the duration of the message currently being processed.
+ *
+ *   AGT_EXEC_EXCLUSIVE -> AGT_EXEC_CONCURRENT: Drops exclusive access, any concurrent messages that had previously been blocked may now run.
+ *   AGT_EXEC_CONCURRENT -> AGT_EXEC_EXCLUSIVE: Tries to acquire exclusive access; If self has no other concurrent messages running, this returns immediately and execution may continue. Otherwise, execution of this message blocks until other concurrent processes finish execution. New concurrent processes will be blocked from starting execution so as not to risk indefinite blockage.
+ *
+ * If the set mode is equal to the current mode, this is a noop.
+ * */
+AGT_agent_api void            AGT_stdcall agt_set_exec_mode(agt_self_t self, agt_exec_mode_t mode) AGT_noexcept;
+
+AGT_agent_api agt_exec_mode_t AGT_stdcall agt_get_exec_mode(agt_self_t self) AGT_noexcept;
+
+
+
+
+
+
+AGT_agent_api agt_msg_t    AGT_stdcall agt_msg_retain(agt_self_t self) AGT_noexcept;
+
+AGT_agent_api void         AGT_stdcall agt_msg_get_info(agt_self_t self, agt_msg_t msg, agt_msg_info_t* pMsgInfo) AGT_noexcept;
+
+AGT_agent_api agt_status_t AGT_stdcall agt_msg_reply(agt_self_t self, agt_msg_t msg, const agt_send_info_t* pSendInfo) AGT_noexcept;
+
+AGT_agent_api agt_status_t AGT_stdcall agt_msg_reply_as(agt_self_t self, agt_msg_t msg, agt_agent_t spoofReplier, const agt_send_info_t* pSendInfo) AGT_noexcept;
+
+AGT_agent_api agt_status_t AGT_stdcall agt_msg_raw_reply(agt_self_t self, agt_msg_t msg, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+
+AGT_agent_api agt_status_t AGT_stdcall agt_msg_raw_reply_as(agt_self_t self, agt_msg_t msg, agt_agent_t spoofSender, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+
+AGT_agent_api void         AGT_stdcall agt_msg_delegate(agt_self_t self, agt_msg_t msg, agt_agent_t recipient) AGT_noexcept;
+
+AGT_agent_api void         AGT_stdcall agt_msg_return(agt_self_t self, agt_msg_t msg, agt_u64_t value) AGT_noexcept;
+
+AGT_agent_api void         AGT_stdcall agt_msg_release(agt_self_t self, agt_msg_t msg) AGT_noexcept;
+
+
+
+
+
+AGT_agent_api void         AGT_stdcall agt_yield(agt_self_t self) AGT_noexcept;
+
 
 /**
  * Signals normal termination of an agent.
@@ -330,7 +394,7 @@ AGT_agent_api void         AGT_stdcall agt_abort(agt_self_t self) AGT_noexcept;
  *       certain they're totally incompatible at the ABI level. At the very least there's no guarantee of compatibility.
  * */
 
-AGT_agent_api void         AGT_stdcall agt_resume_coroutine(agt_agent_t receiver, void* coroutine, agt_async_t* asyncHandle) AGT_noexcept;
+AGT_agent_api void         AGT_stdcall agt_resume_coroutine(agt_agent_t receiver, void* coroutine, agt_async_t async) AGT_noexcept;
 
 
 

@@ -22,6 +22,13 @@
 #include <agate/core.h>
 
 
+/**
+ * This file represents a potential interface for user modules that provide API hooks and such,
+ * maybe function similarly to Vulkan layers? For best performance, the library initialization
+ * routine would have to then do some dynamic code generation/linking to chain calls together
+ * */
+
+
 #if AGT_compiler_msvc
 # if !defined(AGT_STATIC_IMPORT_USER_MODULE)
 #  define AGT_module_api __declspec(dllexport)
@@ -68,7 +75,7 @@ typedef struct agtmod_object_header_t {
 typedef struct agtmod_loader_interface_t {
   void (* setState)(agtmod_loader_t loader, void* state);
   void (* addHooks)(agtmod_loader_t loader, const agtmod_hook_t* pHooks, size_t hookCount);
-  void (* )();
+  // TODO: Add more interface functions??
 } agtmod_loader_interface_t;
 
 typedef struct agtmod_load_info_t {
@@ -76,7 +83,7 @@ typedef struct agtmod_load_info_t {
   const agt_attr_t*                attributes;
   agt_size_t                       attributeCount;
   const void*                      moduleFilePath; ///< Not necessarily const char*, to accommodate for goddamn utf16 encoded windows paths.....
-  agt_attr_type_t                  filePathType;   ///< STRING or WIDE_STRING, determines char type of moduleFilePath.
+  agt_value_type_t                 filePathType;   ///< STRING or WIDE_STRING, determines char type of moduleFilePath.
 } agtmod_load_info_t;
 
 typedef enum   agtmod_log_severity_t {

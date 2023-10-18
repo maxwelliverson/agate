@@ -18,8 +18,13 @@ typedef enum agt_name_flag_bits_t {
 } agt_name_flag_bits_t;
 typedef agt_flags32_t agt_name_flags_t;
 
+typedef union agt_name_result_t {
+  agt_name_t               name;
+  const agt_object_desc_t* object;
+} agt_name_result_t;
+
 typedef struct agt_name_desc_t {
-  agt_async_t*           async;       ///< [optional]
+  agt_async_t            async;       ///< [optional]
   agt_string_t           name;        ///< See documentation for @refitem agt_string_t
   agt_name_flags_t       flags;       ///< May be any valid bitwise combination of agt_name_flag_bits_t values and an optional (valid) agt_scope_t value.
   agt_object_type_mask_t retainMask;  ///< If flags does not contain AGT_NAME_RETAIN_OBJECT, this field is ignored. Otheriwse, this must be a set of bitwise-or'd agt_object_type_t values, which act as a filter on which types of objects will be retained (important to be careful here, as any retained object must be subsequently released)
@@ -27,7 +32,7 @@ typedef struct agt_name_desc_t {
 } agt_name_desc_t;
 
 typedef struct agt_name_filter_info_t {
-  agt_async_t*           async;
+  agt_async_t            async;
   agt_string_t           filterString;
   agt_scope_mask_t       scopes;
   agt_object_type_mask_t types;
@@ -89,7 +94,7 @@ typedef struct agt_name_filter_info_t {
 * */
 AGT_core_api agt_status_t AGT_stdcall agt_reserve_name(agt_ctx_t ctx, const agt_name_desc_t* pNameDesc, agt_name_result_t* pResult) AGT_noexcept;
 
-AGT_core_api agt_status_t AGT_stdcall agt_lookup_named_object(agt_ctx_t ctx, ) AGT_noexcept;
+// AGT_core_api agt_status_t AGT_stdcall agt_lookup_named_object(agt_ctx_t ctx, ) AGT_noexcept;
 
 
 /**
@@ -119,6 +124,10 @@ AGT_core_api void         AGT_stdcall agt_release_name(agt_ctx_t ctx, agt_name_t
  * */
 AGT_core_api agt_status_t AGT_stdcall agt_bind_name(agt_ctx_t ctx, agt_name_t name, void* object) AGT_noexcept;
 
+
+// TODO: Figure out a good API for named object lookup/enumeration with pattern matching.
+//  This allows for all sorts of very useful behaviours/usage patterns. User defined namespaces,
+//  filtering by type-tags, named object collections, etc.
 
 // AGT_core_api agt_status_t AGT_stdcall agt_lookup_named_object(agt_ctx_t ctx, ) AGT_noexcept;
 

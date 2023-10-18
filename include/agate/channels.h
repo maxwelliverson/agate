@@ -30,7 +30,7 @@ typedef struct agt_channel_t {
 
 
 typedef struct agt_broadcast_queue_desc_t {
-  agt_async_t*     async;             ///< Async handle for allowing deferred creation
+  agt_async_t      async;             ///< Async handle for allowing deferred creation
   agt_name_t       name;              ///< Name token
   agt_scope_t      scope;             ///< Scope of
   size_t           fixedMessageSize;  ///< If 0, message sizes are dynamically sized at the cost of some overhead.
@@ -38,7 +38,7 @@ typedef struct agt_broadcast_queue_desc_t {
 } agt_broadcast_queue_desc_t;
 
 typedef struct agt_ring_queue_desc_t {
-  agt_async_t*     async;             ///<
+  agt_async_t      async;             ///<
   agt_name_t       name;              ///<
   agt_scope_t      scope;             ///<
   size_t           fixedBufferSize;   ///< Size of the fixed buffer;
@@ -87,7 +87,7 @@ AGT_api agt_status_t agt_acquire_msg(agt_sender_t sender, size_t desiredMessageS
 /**
  *
  * */
-AGT_api agt_status_t agt_send_msg(agt_sender_t sender, void* msgBuffer, size_t size, agt_async_t* async) AGT_noexcept;
+AGT_api agt_status_t agt_send_msg(agt_sender_t sender, void* msgBuffer, size_t size, agt_async_t async) AGT_noexcept;
 
 AGT_api agt_status_t agt_receive_msg(agt_receiver_t receiver, void** pMsgBuffer, size_t* pMsgSize, agt_timeout_t timeout) AGT_noexcept;
 

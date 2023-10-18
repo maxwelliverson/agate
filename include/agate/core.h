@@ -130,6 +130,7 @@
 #define AGT_core_api
 #define AGT_agents_api
 #define AGT_async_api
+#define AGT_exec_api     // This isn't a distinct module, but is rather a tag for functions that should only be called from custom executors
 #define AGT_channels_api
 #define AGT_log_api
 #define AGT_network_api
@@ -491,6 +492,14 @@ namespace agtxx {
 #define AGT_INVALID_OBJECT_ID ((agt_object_id_t)-1)
 #define AGT_SYNCHRONIZE ((agt_async_t)AGT_NULL_HANDLE)
 
+#define AGT_INVALID_INSTANCE ((agt_instance_t)AGT_NULL_HANDLE)
+#define AGT_INVALID_CTX ((agt_ctx_t)AGT_NULL_HANDLE)
+
+
+#define AGT_NO_EXECUTOR      ((agt_executor_t)AGT_NULL_HANDLE)
+#define AGT_DEFAULT_EXECUTOR ((agt_executor_t)1)
+#define AGT_EVENT_EXECUTOR   ((agt_executor_t)-1)
+#define AGT_BUSY_EXECUTOR    ((agt_executor_t)-2)
 
 
 #if AGT_system_windows
@@ -567,13 +576,16 @@ typedef agt_u64_t                agt_send_token_t;
 typedef struct agt_instance_st*  agt_instance_t;
 typedef struct agt_ctx_st*       agt_ctx_t;
 
-typedef struct agt_async_t       agt_async_t; // TODO: Refactor agt_async_t such that agt_async_t is a pointer type
+typedef void*                    agt_async_t;
 typedef struct agt_query_t       agt_query_t;
 
+
+typedef void*                    agt_object_t;
 
 typedef struct agt_signal_st*    agt_signal_t;
 
 typedef struct agt_agent_st*     agt_agent_t;
+typedef struct agt_executor_st*  agt_executor_t;
 
 
 
@@ -643,9 +655,18 @@ typedef enum agt_status_t {
   AGT_ERROR_MODULE_NOT_FOUND,
   AGT_ERROR_NOT_A_DIRECTORY,
   AGT_ERROR_CORRUPT_MODULE,
-  AGT_ERROR_BAD_MODULE_VERSION
+  AGT_ERROR_BAD_MODULE_VERSION,
 
+  AGT_ERROR_NO_FIBER_BOUND,       ///< Returned by a procedure that must only be called from within a fiber if it is called from outside of a fiber.
+  AGT_ERROR_ALREADY_FIBER,        ///< Returned by agt_enter_efiber if the calling context is already executing in a fiber.
+  AGT_ERROR_IN_AGENT_CONTEXT,     ///< Returned by procedures that can only be called outside of an Agent Execution Context are called by an agent.
 } agt_status_t;
+
+/*typedef struct agt_batch_status_t {
+  agt_bool_t      complete;
+  size_t          successCount;
+  size_t          errorCount;
+} agt_batch_status_t;*/
 
 typedef enum agt_error_handler_status_t {
   AGT_ERROR_HANDLED,
@@ -659,6 +680,18 @@ typedef enum agt_scope_t {
   AGT_SHARED_SCOPE    = 0x4  ///< Visible to any context created by any instance attached to the same shared instance as the current instance. Roughly analogous to "system" scope.
 } agt_scope_t;
 typedef agt_flags32_t agt_scope_mask_t; // Some bitwise-or combination of agt_scope_t values
+
+
+typedef enum agt_priority_t {
+  AGT_PRIORITY_BACKGROUND = -3,
+  AGT_PRIORITY_VERY_LOW   = -2,
+  AGT_PRIORITY_LOW        = -1,
+  AGT_PRIORITY_NORMAL     = 0,
+  AGT_PRIORITY_HIGH       = 1,
+  AGT_PRIORITY_VERY_HIGH  = 2,
+  AGT_PRIORITY_CRITICAL   = 3
+} agt_priority_t;
+
 
 
 // Specifying this enum as a bit mask allows these values to be used to easily filter operations by type
@@ -675,6 +708,7 @@ typedef enum agt_object_type_t {
   AGT_SHEAP_TYPE           = 0x200,
   AGT_SHPOOL_TYPE          = 0x400,
   AGT_SHMEM_TYPE           = 0x800,
+  AGT_EXECUTOR_TYPE        = 0x1000,
   AGT_UNKNOWN_TYPE         = (-0x7FFFFFFF) - 1 /// Specifying 0x80000000 is implementation defined because the underlying integer type is int, which cannot represent the positive value 0x80000000.
 } agt_object_type_t;
 typedef agt_flags32_t agt_object_type_mask_t;
@@ -712,16 +746,32 @@ typedef void (* AGT_stdcall agt_proc_t)(void);
 
 /// Attribute Types
 
-typedef enum agt_attr_type_t {
-  AGT_ATTR_TYPE_BOOLEAN,
-  AGT_ATTR_TYPE_STRING,      // UTF-8, Null-terminated
-  AGT_ATTR_TYPE_WIDE_STRING, // UTF-16, generally used on Windows only
-  AGT_ATTR_TYPE_UINT32,
-  AGT_ATTR_TYPE_INT32,
-  AGT_ATTR_TYPE_UINT64,
-  AGT_ATTR_TYPE_INT64,
-  AGT_ATTR_TYPE_UNKNOWN = 0x7FFFFFFF
-} agt_attr_type_t;
+typedef enum agt_value_type_t {
+  AGT_TYPE_BOOLEAN,
+  AGT_TYPE_ADDRESS,
+  AGT_TYPE_STRING,
+  AGT_TYPE_WIDE_STRING,
+  AGT_TYPE_UINT32,
+  AGT_TYPE_INT32,
+  AGT_TYPE_UINT64,
+  AGT_TYPE_INT64,
+  AGT_TYPE_FLOAT32,
+  AGT_TYPE_FLOAT64,
+  AGT_TYPE_UNKNOWN = 0x7FFFFFFF
+} agt_value_type_t;
+
+typedef union agt_value_t {
+  agt_bool_t     boolean;
+  const void*    address;
+  const char*    string;
+  const wchar_t* wideString;
+  agt_u32_t      uint32;
+  agt_i32_t      int32;
+  agt_u64_t      uint64;
+  agt_i64_t      int64;
+  float          float32;
+  double         float64;
+} agt_value_t;
 
 typedef enum agt_attr_id_t {
   AGT_ATTR_ASYNC_STRUCT_SIZE,              ///< type: UINT32
@@ -729,6 +779,7 @@ typedef enum agt_attr_id_t {
   AGT_ATTR_LIBRARY_PATH,                   ///< type: STRING or WIDE_STRING
   AGT_ATTR_LIBRARY_VERSION,                ///< type: INT32 or INT32_RANGE
   AGT_ATTR_SHARED_CONTEXT,                 ///< type: BOOLEAN
+  AGT_ATTR_CXX_EXCEPTIONS_ENABLED,         ///< type: BOOLEAN
   AGT_ATTR_SHARED_NAMESPACE,               ///< type: STRING or WIDE_STRING
   AGT_ATTR_CHANNEL_DEFAULT_CAPACITY,       ///< type: UINT32
   AGT_ATTR_CHANNEL_DEFAULT_MESSAGE_SIZE,   ///< type: UINT32
@@ -736,27 +787,16 @@ typedef enum agt_attr_id_t {
   AGT_ATTR_DURATION_UNIT_SIZE_NS,          ///< type: UINT64
   AGT_ATTR_NATIVE_DURATION_UNIT_SIZE_NS,   ///< type: UINT64
   AGT_ATTR_FIXED_CHANNEL_SIZE_GRANULARITY, ///< type: UINT64
+  AGT_ATTR_STACK_SIZE_ALIGNMENT,           ///< type: UINT64
+  AGT_ATTR_DEFAULT_THREAD_STACK_SIZE,      ///< type: UINT64
+  AGT_ATTR_DEFAULT_FIBER_STACK_SIZE,       ///< type: UINT64
+  AGT_ATTR_FULL_STATE_SAVE_MASK,           ///< type: UINT64
 } agt_attr_id_t;
 
 typedef struct agt_attr_t {
-  agt_attr_id_t   id;
-  agt_attr_type_t type;
-  union {
-    const void*  ptr;
-    agt_bool_t   boolean;
-    agt_u32_t    u32;
-    agt_i32_t    i32;
-    agt_u64_t    u64;
-    agt_i64_t    i64;
-    struct {
-      agt_i32_t min;
-      agt_i32_t max;
-    } i32range;
-    struct {
-      agt_u32_t min;
-      agt_u32_t max;
-    } u32range;
-  };
+  agt_attr_id_t    id;
+  agt_value_type_t type;
+  agt_value_t      value;
 } agt_attr_t;
 
 
@@ -764,11 +804,6 @@ typedef struct agt_attr_t {
 /// Name Types
 
 typedef agt_u64_t agt_name_t;
-
-typedef union agt_name_result_t {
-  agt_name_t               name;
-  const agt_object_desc_t* object;
-} agt_name_result_t;
 
 
 
@@ -825,9 +860,32 @@ typedef agt_flags32_t agt_weak_ref_flags_t;
 
 /** ===============[ Core Static API Functions ]=================== **/
 
+
+/**
+ * @param [optional] context If context is AGT_INVALID_CTX,
+ * */
 AGT_static_api agt_instance_t      AGT_stdcall agt_get_instance(agt_ctx_t context) AGT_noexcept;
 
-AGT_static_api agt_ctx_t           AGT_stdcall agt_current_context() AGT_noexcept;
+
+/**
+ * Returns the thread local agate context, or if a context has not
+ * yet been initialized on the current thread, returns AGT_INVALID_CTX.
+ * */
+AGT_static_api agt_ctx_t           AGT_stdcall agt_ctx() AGT_noexcept;
+
+
+/**
+ * Returns a local library context given the passed instance handle.
+ * If an instance is not provided, the instance bound to the current module
+ * is used instead. NOTE: If called from a DLL, an instance must previously have
+ * been bound to the DLL module *specifically*. It is not sufficient to have an
+ * instance bound to a module to which the DLL in question is linked.
+ *
+ * @param [optional] instance May be AGT_INVALID_INSTANCE.
+ * */
+AGT_static_api agt_ctx_t           AGT_stdcall agt_acquire_ctx(agt_instance_t instance) AGT_noexcept;
+
+
 
 /**
  * Returns the API version of the linked library.
@@ -835,21 +893,21 @@ AGT_static_api agt_ctx_t           AGT_stdcall agt_current_context() AGT_noexcep
 AGT_static_api int                 AGT_stdcall agt_get_instance_version(agt_instance_t instance) AGT_noexcept;
 
 
+AGT_static_api int                 AGT_stdcall agt_get_static_version() AGT_noexcept;
 
 AGT_static_api agt_error_handler_t AGT_stdcall agt_get_error_handler(agt_instance_t instance) AGT_noexcept;
 
 AGT_static_api agt_error_handler_t AGT_stdcall agt_set_error_handler(agt_instance_t instance, agt_error_handler_t errorHandlerCallback) AGT_noexcept;
 
 
+AGT_static_api agt_bool_t          AGT_stdcall agt_query_attributes(size_t attrCount, const agt_attr_id_t* pAttrId, agt_value_type_t* pTypes, agt_value_t* pValues) AGT_noexcept;
+
 AGT_static_api agt_status_t        AGT_stdcall agt_query_instance_attributes(agt_instance_t instance, agt_attr_t* pAttributes, size_t attributeCount) AGT_noexcept;
 
-AGT_static_api agt_status_t        AGT_stdcall agt_get_proc_address(agt_ctx_t ctx, const char* symbol, agt_proc_t* pProc, int* pProcVersion) AGT_noexcept;
 
 
 
 /** ===============[ Core API Functions ]=================== **/
-
-
 
 
 /**
@@ -859,13 +917,22 @@ AGT_static_api agt_status_t        AGT_stdcall agt_get_proc_address(agt_ctx_t ct
  *
  * agt_agent_t clone_agent(agt_agent_t src) {
  *   agt_agent_t dst;
- *   agt_dup(src, &dst);
+ *   agt_dup(src, (agt_object_t*)&dst, 1);
  *   return dst;
  * }
+ *
+ * std::vector<agt_agent_t> multiclone_agent(agt_agent_t src, size_t count) {
+ *   std::vector<agt_agent_t> agentArray;
+ *   agentArray.resize(count);
+ *   agt_dup(src, (agt_object_t*)agentArray.data(), count);
+ *   return agentArray; // C++17 and beyond guarantees copy ellision here, but in C++11 or C++14, we would want to std::move the vector
+ * }
  * */
-AGT_core_api agt_status_t AGT_stdcall agt_dup(void* srcObject, void* pDstObject, size_t dstObjectCount) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_dup(agt_object_t srcObject, agt_object_t* pDstObject, size_t dstObjectCount) AGT_noexcept;
 
 AGT_core_api void         AGT_stdcall agt_close(void* object) AGT_noexcept;
+
+
 
 /**
  * Imports an object from a generic, sharable handle.
@@ -880,8 +947,28 @@ AGT_core_api void         AGT_stdcall agt_close(void* object) AGT_noexcept;
  * */
 AGT_core_api agt_status_t AGT_stdcall agt_import_handle(agt_ctx_t ctx, agt_handle_t handle, agt_object_type_mask_t typeMask, agt_object_desc_t* pObjectDesc) AGT_noexcept;
 
-AGT_core_api agt_status_t AGT_stdcall agt_export_handle(agt_ctx_t ctx, void* object, agt_handle_t* pHandle) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_export_handle(agt_ctx_t ctx, agt_object_t object, agt_handle_t* pHandle) AGT_noexcept;
 
+
+/**
+ * Returns an opaque, platform dependent timestamp that has the following properties:
+ *  - Monotonic: It increases as time advances; If timestamp A is acquired before timestamp B,
+ *               the raw value of B will be greater than or equal to A. Timestamps can thus be
+ *               compared and sorted with respect to value.
+ *  - Process Local: Agate timestamp values only remain coherent within a given process;
+ *                   timestamps shared across process boundaries are invalid and do not
+ *                   contain meaningful values.
+ *
+ * The only way to convert these values into anything meaningful is with agt_get_timespec.
+ * */
+AGT_core_api agt_timestamp_t AGT_stdcall agt_now(agt_ctx_t ctx) AGT_noexcept;
+
+/**
+ * Fills the timespec struct (not defined in this library, and is rather provided by either libc or the STL in the <time.h> or <ctime> header files respectively)
+ * with the time elapsed between the UNIX epoch and the time at which the given timestamp was acquired.
+ * To either interpret timestamps, or convert to a persistent value, clients should call agt_get_timespec.
+ * */
+AGT_core_api void            AGT_stdcall agt_get_timespec(agt_ctx_t ctx, agt_timestamp_t timestamp, struct timespec* ts) AGT_noexcept;
 
 
 
