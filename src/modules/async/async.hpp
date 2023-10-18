@@ -12,6 +12,8 @@
 
 namespace agt {
 
+
+
   AGT_virtual_object_type(async_data) {
     agt_u32_t epoch;           // key
     agt_u64_t refCount;

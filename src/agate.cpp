@@ -9,18 +9,22 @@
 
 #include "agate.h"
 
-#include "environment.hpp"
-#include "integer_division.hpp"
-#include "module.hpp"
-#include "sys_string.hpp"
+#include "init.hpp"
 
-#include "priority_queue.hpp"
+#include "agate/environment.hpp"
+#include "agate/integer_division.hpp"
+#include "agate/module.hpp"
+#include "agate/sys_string.hpp"
+
+#include "agate/priority_queue.hpp"
 
 #include "async/async.hpp"
 #include "async/signal.hpp"
 #include "channels/message.hpp"
 #include "core/instance.hpp"
 #include "core/object.hpp"
+#include "core/ctx.hpp"
+#include "core/fiber.hpp"
 
 #include "agents/state.hpp"
 #include "agents/agents.hpp"
@@ -521,6 +525,29 @@ namespace {
 
 
 
+std::span<const agt::proc_entry> generateProcSet() noexcept {
+
+}
+
+const agt::proc_entry* lookupProcSet(const char* procName) noexcept {
+  const agt::proc_entry* procSet = g_lib.pProcSet;
+  agt_u32_t procSetSize = g_lib.procSetSize;
+
+  const size_t procNameLength = std::strlen(procName);
+
+  if (procNameLength > agt::MaxAPINameLength)
+    return nullptr;
+
+  auto procSetEnd = procSet + procSetSize;
+  auto iter = std::lower_bound(procSet, procSetEnd, procName, [procNameLength](const agt::proc_entry& entry, const char* name) {
+    return std::memcmp(&entry.name[0], name, procNameLength) < 0;
+  });
+
+  if (iter == procSetEnd || (std::memcmp(&iter->name[0], procName, procNameLength) != 0))
+    return nullptr;
+  return iter;
+}
+
 
 
 
@@ -547,6 +574,59 @@ extern "C" {
   IpcBlock                 ipcBlock;
 
 };*/
+
+
+AGT_static_api agt_status_t AGT_stdcall agt_init(agt_ctx_t* pLocalContext, agt_config_t loader) AGT_noexcept {
+  if (!pLocalContext || !loader)
+    return AGT_ERROR_INVALID_ARGUMENT;
+
+
+}
+
+
+AGT_static_api agt_status_t AGT_stdcall agt_default_init(agt_ctx_t* pCtx, int headerVersion) AGT_noexcept {
+  return agt_init(pCtx, agt_get_config(AGT_ROOT_LOADER, headerVersion));
+}
+
+AGT_static_api agt_proc_t   AGT_stdcall agt_get_proc_address(const char* symbol) AGT_noexcept {
+  if (auto result = lookupProcSet(symbol))
+    return result->address;
+  return nullptr;
+}
+
+
+
+AGT_static_api agt_bool_t   AGT_stdcall agt_query_attributes(size_t attrCount, const agt_attr_id_t* pAttrId, agt_var_type_t* pTypes, agt_var_t* pVars) AGT_noexcept {
+  if (attrCount == 0)
+    return AGT_TRUE;
+
+  if (!pAttrId || !pTypes || !pVars)
+    return AGT_FALSE;
+
+  uint32_t maxAttrVal = g_lib.attrCount;
+  auto pAttrValues = g_lib.attrValues;
+  auto pAttrTypes  = g_lib.attrTypes;
+
+  agt_bool_t result = AGT_FALSE;
+
+  for (size_t i = 0; i < attrCount; ++i) {
+    uint32_t attrId = pAttrId[i];
+    if (attrId < maxAttrVal) {
+      pVars[i].uint64 = pAttrValues[attrId];
+      pTypes[i]       = pAttrTypes[attrId];
+      result          = AGT_TRUE;
+    }
+    else
+      pTypes[i] = AGT_VAR_TYPE_UNKNOWN;
+  }
+
+  return result;
+}
+
+
+
+
+
 
 
 AGT_api       agt_status_t AGT_stdcall agt_init(agt_ctx_t* pContext, const agt_init_info_t* pInitInfo) AGT_noexcept {
@@ -582,59 +662,6 @@ AGT_api       agt_status_t AGT_stdcall agt_init(agt_ctx_t* pContext, const agt_i
 
 }
 
-
-
-AGT_agent_api agt_status_t AGT_stdcall agt_send(agt_self_t self, agt_agent_t recipientHandle, const agt_send_info_t* pSendInfo) AGT_noexcept {
-
-  assert(pSendInfo != nullptr);
-  assert(recipientHandle != nullptr);
-
-  auto sender    = agt_self();
-  auto recipient = recipientHandle->instance;
-
-  assert(sender != nullptr);
-  assert(recipient != nullptr);
-
-  auto ctx       = agt::tl_state.context;
-
-  auto messageSize = pSendInfo->size;
-
-
-  auto message   = agt::acquire_message(ctx, recipient->messagePool, messageSize);
-  if (!message)
-    return AGT_ERROR_MESSAGE_TOO_LARGE;
-
-
-
-  message->messageType = agt::AGT_CMD_SEND;
-  message->sender      = sender;
-  message->receiver    = recipient;
-  message->payloadSize = static_cast<uint32_t>(messageSize);
-
-  std::memcpy(message->inlineBuffer, pSendInfo->buffer, messageSize);
-
-  if (pSendInfo->asyncHandle) {
-    auto& async = *pSendInfo->asyncHandle;
-    agt::asyncAttachLocal(async, 1, 1);
-    auto asyncData = agt::asyncGetData(async);
-    message->asyncData = asyncData;
-    message->asyncDataKey = agt::asyncDataGetKey(asyncData, nullptr);
-  }
-#if !defined(NDEBUG)
-  else {
-    message->asyncData    = {};
-    message->asyncDataKey = {};
-  }
-#endif
-
-  if (auto enqueueStatus = agt::enqueueMessage(recipient->messageQueue, message)) {
-    agt::release_message(ctx, recipient->messagePool, message);
-    return enqueueStatus;
-  }
-
-  return AGT_SUCCESS;
-}
-
 AGT_agent_api agt_status_t AGT_stdcall agt_send_as(agt_agent_t spoofSender, agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept {
 
 }
@@ -660,6 +687,7 @@ AGT_noinline static agt_status_t agtGetSharedObjectInfoById(agt_ctx_t context, a
 
 extern "C" {
 
+/** ===================[ Static API ]==================== **/
 
 agt_status_t        AGT_stdcall agt_query_instance_attributes(agt_instance_t instance, agt_attr_t* pAttributes, size_t attributeCount) noexcept {
   if (!instance) [[unlikely]]
@@ -677,7 +705,7 @@ agt_status_t        AGT_stdcall agt_query_instance_attributes(agt_instance_t ins
     for (size_t i = 0; i < attributeCount; ++i) {
       auto& attr = pAttributes[i];
       if (attr.id >= attrCount) [[unlikely]] {
-        status = AGT_ERROR_UNKNOWN_ATTRIBUTE;
+        status    = AGT_ERROR_UNKNOWN_ATTRIBUTE;
         attr.type = AGT_ATTR_TYPE_UNKNOWN;
         attr.u64 = 0;
       }
@@ -696,16 +724,473 @@ agt_instance_t      AGT_stdcall agt_get_instance(agt_ctx_t context) noexcept {
   return agt::get_instance(context);
 }
 
-agt_ctx_t           AGT_stdcall agt_current_context() noexcept {
+agt_ctx_t           AGT_stdcall agt_ctx() noexcept {
   return agt::get_ctx();
 }
 
-int                 AGT_stdcall agt_get_instance_version(agt_instance_t instance) noexcept {}
+agt_ctx_t           AGT_stdcall agt_acquire_ctx(agt_instance_t instance) noexcept {
+  return agt::acquire_ctx(instance);
+}
 
-agt_error_handler_t AGT_stdcall agt_get_error_handler(agt_instance_t instance) noexcept {}
+int                 AGT_stdcall agt_get_instance_version(agt_instance_t instance) noexcept {
+  return instance->version.to_i32();
+}
 
-agt_error_handler_t AGT_stdcall agt_set_error_handler(agt_instance_t instance, agt_error_handler_t errorHandlerCallback) noexcept {}
+agt_error_handler_t AGT_stdcall agt_get_error_handler(agt_instance_t instance) noexcept {
+  AGT_assert( instance != AGT_INVALID_INSTANCE );
+  return instance->errorHandler;
+}
 
+agt_error_handler_t AGT_stdcall agt_set_error_handler(agt_instance_t instance, agt_error_handler_t errorHandlerCallback) noexcept {
+  AGT_assert( instance != AGT_INVALID_INSTANCE );
+  auto oldHandler = instance->errorHandler;
+  instance->errorHandler = errorHandlerCallback;
+  return oldHandler;
+}
+
+
+
+/** ==========================[ Agents API ]=========================== **/
+
+AGT_agent_api agt_status_t AGT_stdcall agt_send(agt_self_t self, agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept {
+
+  assert( self      != nullptr );
+  assert( recipient != nullptr );
+  assert( pSendInfo != nullptr );
+
+  return g_lib._pfn_send(self, recipient, pSendInfo);
+}
+
+AGT_agent_api agt_status_t AGT_stdcall agt_send_as(agt_self_t self, agt_agent_t spoofSender, agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept {
+
+  assert( self        != nullptr );
+  assert( spoofSender != nullptr );
+  assert( recipient   != nullptr );
+  assert( pSendInfo   != nullptr );
+
+
+  return g_lib._pfn_send_as(self, spoofSender, recipient, pSendInfo);
+}
+
+AGT_agent_api agt_status_t AGT_stdcall agt_send_many(agt_self_t self, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept {
+  assert( self       != nullptr );
+  assert( agentCount == 0 || recipients != nullptr );
+  assert( pSendInfo  != nullptr );
+
+  if (agentCount == 0)
+    return AGT_SUCCESS; // This is a valid operation.
+
+  return g_lib._pfn_send_many(self, recipients, agentCount, pSendInfo);
+}
+
+AGT_agent_api agt_status_t AGT_stdcall agt_send_many_as(agt_self_t self, agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept {
+  assert( self        != nullptr );
+  assert( spoofSender != nullptr );
+  assert( agentCount == 0 || recipients != nullptr );
+  assert( pSendInfo   != nullptr );
+
+  if (agentCount == 0)
+    return AGT_SUCCESS; // This is a valid operation.
+
+  return g_lib._pfn_send_many_as(self, spoofSender, recipients, agentCount, pSendInfo);
+}
+
+AGT_agent_api agt_status_t AGT_stdcall agt_reply(agt_self_t self, const agt_send_info_t* pSendInfo) AGT_noexcept {
+  assert( self      != nullptr );
+  assert( pSendInfo != nullptr );
+
+  return g_lib._pfn_reply(self, pSendInfo);
+}
+
+AGT_agent_api agt_status_t AGT_stdcall agt_reply_as(agt_self_t self, agt_agent_t spoofReplier, const agt_send_info_t* pSendInfo) AGT_noexcept {
+  assert( self         != nullptr );
+  assert( spoofReplier != nullptr );
+  assert( pSendInfo    != nullptr );
+
+  return g_lib._pfn_reply_as(self, spoofReplier, pSendInfo);
+}
+
+
+
+AGT_agent_api agt_status_t AGT_stdcall agt_raw_acquire(agt_self_t self, agt_agent_t recipient, size_t desiredMessageSize, agt_raw_send_info_t* pRawSendInfo, void** ppRawBuffer) AGT_noexcept {
+  assert( self        != nullptr );
+  assert( recipient   != nullptr );
+  assert( ppRawBuffer != nullptr );
+
+  return g_lib._pfn_raw_acquire();
+}
+
+AGT_agent_api agt_status_t AGT_stdcall agt_raw_send(agt_self_t self, agt_agent_t recipient, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+
+AGT_agent_api agt_status_t AGT_stdcall agt_raw_send_as(agt_self_t self, agt_agent_t spoofSender, agt_agent_t recipient, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+
+AGT_agent_api agt_status_t AGT_stdcall agt_raw_send_many(agt_self_t self, const agt_agent_t* recipients, agt_size_t agentCount, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+
+AGT_agent_api agt_status_t AGT_stdcall agt_raw_send_many_as(agt_self_t self, agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+
+AGT_agent_api agt_status_t AGT_stdcall agt_raw_reply(agt_self_t self, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+
+AGT_agent_api agt_status_t AGT_stdcall agt_raw_reply_as(agt_self_t self, agt_agent_t spoofSender, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+
+
+
+/* ========================= [ Async ] ========================= */
+
+#define AGT_ASYNC_MEMORY_IS_OWNED 0x8000
+
+
+AGT_async_api agt_async_t  AGT_stdcall agt_new_async(agt_ctx_t ctx, agt_async_flags_t flags) AGT_noexcept {
+  assert( ctx != nullptr );
+
+
+  auto asyncBase         = g_lib._pfn_alloc_async(ctx);
+
+  assert( asyncBase->structSize >= sizeof(async_base) );
+
+  asyncBase->ctx         = ctx;
+  asyncBase->flags       = flags | AGT_ASYNC_MEMORY_IS_OWNED;
+  asyncBase->resultValue = 0;
+  asyncBase->status      = AGT_ERROR_NOT_BOUND;
+  g_lib._pfn_init_async(asyncBase);
+
+  return (agt_async_t)asyncBase;
+}
+
+AGT_async_api agt_async_t  AGT_stdcall agt_init_async(agt_inline_async_t* pInlineAsync, agt_async_flags_t flags) AGT_noexcept {
+  assert( pInlineAsync != nullptr );
+  // assert( pInlineAsync->ctx != nullptr );
+
+  auto asyncBase = (async_base*)pInlineAsync;
+  if ( asyncBase->ctx == AGT_INVALID_CTX )
+    asyncBase->ctx = agt::get_ctx();
+  asyncBase->structSize  = static_cast<agt_u32_t>(g_lib.attrValues[AGT_ATTR_ASYNC_STRUCT_SIZE]);
+  asyncBase->flags       = flags;
+  asyncBase->resultValue = 0;
+  asyncBase->status      = AGT_ERROR_NOT_BOUND;
+
+
+  g_lib._pfn_init_async(asyncBase);
+
+  return (agt_async_t)asyncBase;
+}
+
+AGT_async_api void         AGT_stdcall agt_copy_async(agt_async_t from_, agt_async_t to_) AGT_noexcept {
+  assert( from_ != nullptr );
+  assert( to_   != nullptr );
+
+  auto from = (async_base*)from_;
+  auto to   = (async_base*)to_;
+
+  g_lib._pfn_copy_async(from, to);
+}
+
+AGT_async_api void         AGT_stdcall agt_move_async(agt_async_t from_, agt_async_t to_) AGT_noexcept {
+  assert( from_ != nullptr );
+  assert( to_   != nullptr );
+
+  auto from = (async_base*)from_;
+  auto to   = (async_base*)to_;
+
+  g_lib._pfn_move_async(from, to);
+
+
+
+  // if ((from->flags & AGT_ASYNC_MEMORY_IS_OWNED) != 0)
+    // g_lib._pfn_free_async(from->ctx, (agt_async_t)from);
+}
+
+AGT_async_api void         AGT_stdcall agt_clear_async(agt_async_t async) AGT_noexcept {
+
+}
+
+AGT_async_api void         AGT_stdcall agt_destroy_async(agt_async_t async) AGT_noexcept {
+  if (async) {
+    const auto asyncBase      = (async_base*)async;
+    const auto ctx            = asyncBase->ctx;
+    const bool isLibAllocated = (asyncBase->flags & AGT_ASYNC_MEMORY_IS_OWNED) != 0;
+    g_lib._pfn_destroy_async(async);
+    if (isLibAllocated)
+      g_lib._pfn_free_async(ctx, async);
+  }
+}
+
+
+
+AGT_async_api agt_status_t AGT_stdcall agt_async_status(agt_async_t async, agt_u64_t* pResult) AGT_noexcept {
+  assert( async != nullptr );
+
+  auto asyncBase = (async_base*)async;
+
+  agt_status_t status;
+
+  if ((asyncBase->flags & AGT_ASYNC_CACHE_STATUS) != 0) {
+    if (asyncBase->status == AGT_NOT_READY) {
+      if ((status = g_lib._pfn_async_get_status(asyncBase, pResult)) == AGT_SUCCESS && pResult != nullptr)
+        asyncBase->resultValue = *pResult;
+      asyncBase->status = status;
+    }
+    else {
+      status = asyncBase->status;
+      if (pResult != nullptr)
+        *pResult = asyncBase->resultValue;
+    }
+  }
+  else
+    status = g_lib._pfn_async_get_status(asyncBase, pResult);
+
+  return status;
+}
+AGT_async_api agt_status_t AGT_stdcall agt_async_status_all(const agt_async_t* pAsyncs, agt_size_t asyncCount, agt_status_t* pStatuses, agt_u64_t* pResults) AGT_noexcept {
+  assert( asyncCount == 0 || pAsyncs   != nullptr );
+  assert( asyncCount == 0 || pStatuses != nullptr );
+
+  if (asyncCount == 0)
+    return AGT_SUCCESS;
+
+  size_t successCount = 0;
+  size_t errorCount   = 0;
+
+  agt_status_t status;
+  agt_u64_t    resultValue;
+
+  for (size_t i = 0; i < asyncCount; ++i) {
+    auto async = (async_base*)pAsyncs[i];
+
+    if ((async->flags & AGT_ASYNC_CACHE_STATUS) != 0) {
+      if (async->status == AGT_NOT_READY) {
+        if ((status = g_lib._pfn_async_get_status(async, &resultValue)) == AGT_SUCCESS)
+          async->resultValue = resultValue;
+        async->status = status;
+      }
+      else {
+        status = async->status;
+        resultValue = async->resultValue;
+      }
+    }
+    else
+      status = g_lib._pfn_async_get_status(async, &resultValue);
+
+    pStatuses[i] = status;
+    if (pResults)
+      pResults[i] = resultValue;
+
+    switch (status) {
+      case AGT_SUCCESS:
+        ++successCount;
+        break;
+      case AGT_NOT_READY:
+        break;
+      default:
+        ++errorCount;
+    }
+  }
+
+  if (successCount == asyncCount)
+    return AGT_SUCCESS;
+  if (successCount > 0)
+    return AGT_PARTIAL_SUCCESS;
+  if (errorCount == asyncCount)
+    return AGT_FAILURE;
+  return AGT_NOT_READY;
+}
+
+AGT_async_api agt_status_t AGT_stdcall agt_wait(agt_async_t async, agt_u64_t* pResult, agt_timeout_t timeout) AGT_noexcept;
+AGT_async_api agt_status_t AGT_stdcall agt_wait_all(const agt_async_t* pAsyncs, agt_size_t asyncCount, agt_timeout_t timeout) AGT_noexcept;
+AGT_async_api agt_status_t AGT_stdcall agt_wait_any(const agt_async_t* pAsyncs, agt_size_t asyncCount, agt_size_t* pIndex, agt_timeout_t timeout) AGT_noexcept;
+
+
+
+
+/** ==== [ Fibers ] ==== **/
+
+AGT_exec_api agt_status_t AGT_stdcall agt_enter_fiber(agt_ctx_t ctx, const agt_fiber_desc_t* pFiberDesc) AGT_noexcept {
+  /*if (!ctx)
+    ctx = agt::get_ctx();*/
+
+  AGT_assert( ctx != nullptr );
+  AGT_assert( pFiberDesc != nullptr );
+  AGT_assert( pFiberDesc->proc != nullptr );
+
+  if (ctx->boundFiber != nullptr)
+    return AGT_ERROR_ALREADY_FIBER;
+  if (ctx->boundAgent != nullptr)
+    return AGT_ERROR_IN_AGENT_CONTEXT;
+
+  agt::impl::fiber_init_info initInfo {};
+  initInfo.proc = pFiberDesc->proc;
+  initInfo.userData = pFiberDesc->userData;
+
+  auto parent = pFiberDesc->parentFiber;
+
+  if (parent != nullptr) {
+    g_lib._pfn_retain_fiber_pool(ctx, parent->pool);
+    initInfo.root = parent->root;
+    initInfo.pool = parent->pool;
+    initInfo.stateSaveMask = parent->storeStateFlags;
+  }
+  else {
+    size_t stackSize;
+
+    if (pFiberDesc->stackSize != 0) {
+      size_t stackAlignment = g_lib.attrValues[AGT_ATTR_STACK_SIZE_ALIGNMENT];
+      stackSize = pFiberDesc->stackSize;
+      stackSize = align_to(stackSize, stackAlignment);
+    }
+    else
+      stackSize = g_lib.attrValues[AGT_ATTR_DEFAULT_FIBER_STACK_SIZE];
+
+    initInfo.root = nullptr;
+    initInfo.pool = g_lib._pfn_new_fiber_pool(ctx, stackSize, pFiberDesc);
+    initInfo.stateSaveMask = g_lib.attrValues[AGT_ATTR_FULL_STATE_SAVE_MASK];
+  }
+
+  auto status = agt::impl::assembly::afiber_init(ctx, pFiberDesc->flags, pFiberDesc->initialParam, &initInfo);
+
+  g_lib._pfn_release_fiber_pool(ctx, initInfo.pool);
+
+  return status;
+  // return AGT_SUCCESS;
+}
+
+AGT_exec_api void*        AGT_stdcall agt_get_fiber_data(agt_fiber_t fiber) AGT_noexcept {
+  if ( fiber == nullptr )
+    fiber = agt_ctx()->boundFiber;
+  return fiber->privateData->procData;
+}
+
+AGT_exec_api agt_status_t AGT_stdcall agt_new_fiber(agt_ctx_t ctx, agt_fiber_t* pFiber, agt_fiber_proc_t proc, void* userData) AGT_noexcept {
+  AGT_assert( ctx != nullptr );
+  AGT_assert( pFiber != nullptr );
+
+  if (ctx->boundFiber == nullptr)
+    return AGT_ERROR_NO_FIBER_BOUND;
+
+  auto pool = ctx->boundFiber->pool;
+
+  auto status = g_lib._pfn_fiber_pool_alloc(ctx, pool, proc, userData, pFiber);
+
+  if (status == AGT_SUCCESS) {
+    g_lib._pfn_retain_fiber_pool(ctx, pool);
+    (*pFiber)->pool = pool;
+  }
+
+  return status;
+}
+
+AGT_exec_api agt_fiber_t  AGT_stdcall agt_get_current_fiber(agt_ctx_t ctx) AGT_noexcept {
+  AGT_assert( ctx != AGT_INVALID_CTX );
+  return ctx->boundFiber;
+}
+
+AGT_exec_api void         AGT_stdcall agt_destroy_fiber(agt_ctx_t ctx, agt_fiber_t fiber) AGT_noexcept {
+
+}
+
+AGT_exec_api void         AGT_stdcall agt_exit_fiber(agt_ctx_t ctx, int exitCode) AGT_noexcept {
+
+}
+
+
+
+
+AGT_exec_api agt_u64_t    AGT_stdcall agt_fiber_switch(agt_ctx_t ctx, agt_fiber_t fiber, agt_u64_t param, agt_fiber_save_flags_t flags) AGT_noexcept {
+  AGT_assert( ctx != nullptr );
+  AGT_assert( fiber != nullptr );
+
+  namespace x64 = agt::impl::assembly;
+
+  fiber_data saveData;
+
+  // alignas(agt::impl::SaveDataAlignment) char saveStorage[agt::impl::FullSaveDataSize];
+
+  auto currentFiber = ctx->boundFiber;
+  agt_u64_t resultParam;
+
+  if (currentFiber == nullptr) {
+    g_lib._pfn_raise(ctx, AGT_ERROR_NO_FIBER_BOUND, nullptr);
+    return param;
+  }
+
+  if (currentFiber == fiber)
+    return param;
+
+  if (x64::afiber_save(currentFiber, &saveData, &resultParam, flags))
+    return resultParam;
+
+  ctx->boundFiber = fiber;
+
+  x64::afiber_jump(fiber, param, agt::FIBER_JUMP_SWITCH_FIBER);
+}
+
+AGT_exec_api void         AGT_stdcall agt_fiber_jump(agt_ctx_t ctx, agt_fiber_t fiber, agt_u64_t param) AGT_noexcept {
+  AGT_assert( ctx != nullptr );
+  AGT_assert( fiber != nullptr );
+  AGT_assert( ctx->boundFiber != nullptr );
+
+  namespace x64 = agt::impl::assembly;
+
+  if (ctx->boundFiber != nullptr) {
+    g_lib._pfn_raise(ctx, AGT_ERROR_NO_FIBER_BOUND, nullptr);
+    return;
+  }
+
+
+  if (fiber == AGT_CURRENT_FIBER) {
+    x64::afiber_jump(ctx->boundFiber, param, 0);
+  }
+  else {
+    ctx->boundFiber = fiber;
+    x64::afiber_jump(fiber, param, agt::FIBER_JUMP_SWITCH_FIBER);
+  }
+}
+
+AGT_exec_api void         AGT_stdcall agt_push_fiber_section(agt_ctx_t ctx, const agt_fiber_section_info_t* pSectionInfo, agt_fiber_save_flags_t flags) AGT_noexcept {
+  AGT_assert( ctx != nullptr );
+  AGT_assert( pSectionInfo != nullptr );
+
+  namespace x64 = agt::impl::assembly;
+
+  fiber_data saveData;
+
+  auto currentFiber = ctx->boundFiber;
+
+  if (currentFiber == nullptr) {
+    g_lib._pfn_raise(ctx, AGT_ERROR_NO_FIBER_BOUND, nullptr);
+    return;
+  }
+
+  x64::afiber_push_section(currentFiber, pSectionInfo, flags, &saveData);
+}
+
+AGT_exec_api void         AGT_stdcall agt_pop_fiber_section(agt_ctx_t ctx) AGT_noexcept {
+  AGT_assert( ctx != nullptr );
+
+  auto boundFiber = ctx->boundFiber;
+
+  if (boundFiber == nullptr) {
+    g_lib._pfn_raise(ctx, AGT_ERROR_NO_FIBER_BOUND, nullptr);
+    return;
+  }
+
+  boundFiber->privateData = boundFiber->privateData->prevSection;
+}
+
+
+AGT_exec_api agt_fiber_transfer_t AGT_stdcall agt_fiber_switch(agt_fiber_t fiber, agt_fiber_param_t param, agt_fiber_flags_t flags) AGT_noexcept {
+
+}
+
+AGT_exec_api AGT_noreturn void    AGT_stdcall agt_fiber_jump(agt_fiber_t fiber, agt_fiber_param_t param) AGT_noexcept {
+
+}
+
+AGT_exec_api agt_fiber_transfer_t AGT_stdcall agt_fiber_fork(agt_fiber_proc_t proc, agt_fiber_param_t param, agt_fiber_flags_t flags) AGT_noexcept {
+
+}
+
+AGT_exec_api agt_fiber_transfer_t AGT_stdcall agt_fiber_loop(agt_fiber_proc_t proc, agt_u64_t param, agt_fiber_flags_t flags) AGT_noexcept {
+
+}
 
 
 /*

@@ -12,11 +12,49 @@
 
 AGT_export_family {
 
-  AGT_function_entry(p)(agt_agent_t recipient, const agt_send_info_t* pSendInfo) {
+  AGT_function_entry(p)(agt_self_t self_, agt_agent_t recipient_, const agt_send_info_t* pSendInfo) {
 
+    auto self      = (agt::agent_self*)self_;
+    auto recipient = (agt::agent*)recipient_;
+    auto ctx       = agt::get_ctx();
+    // auto ctx       = agt::tl_state.context;
+
+    auto messageSize = pSendInfo->size;
+
+    agt_message_t message   = agt::acquire_message(ctx, recipient->messagePool, messageSize);
+    if (!message)
+      return AGT_ERROR_MESSAGE_TOO_LARGE;
+
+    message->messageType = agt::AGT_CMD_SEND;
+    message->sender      = self;
+    message->receiver    = recipient->receiver;
+    message->payloadSize = static_cast<uint32_t>(messageSize);
+
+    std::memcpy(message->inlineBuffer, pSendInfo->buffer, messageSize);
+
+    if (pSendInfo->asyncHandle) {
+      auto& async = *pSendInfo->asyncHandle;
+      agt::asyncAttachLocal(async, 1, 1);
+      auto asyncData = agt::asyncGetData(async);
+      message->asyncData = asyncData;
+      message->asyncDataKey = agt::asyncDataGetKey(asyncData, nullptr);
+    }
+#if !defined(NDEBUG)
+    else {
+      message->asyncData    = {};
+      message->asyncDataKey = {};
+    }
+#endif
+
+    if (auto enqueueStatus = agt::enqueueMessage(recipient->messageQueue, message)) {
+      agt::release_message(ctx, recipient->messagePool, message);
+      return enqueueStatus;
+    }
+
+    return AGT_SUCCESS;
   }
 
-  AGT_function_entry(s)(agt_agent_t recipient, const agt_send_info_t* pSendInfo) {
+  AGT_function_entry(s)(agt_self_t self, agt_agent_t recipient, const agt_send_info_t* pSendInfo) {
 
   }
 
@@ -27,11 +65,11 @@ AGT_export_family {
 
 AGT_export_family {
 
-  AGT_function_entry(p)(agt_agent_t spoofSender, agt_agent_t recipient, const agt_send_info_t* pSendInfo) {
+  AGT_function_entry(p)(agt_self_t self, agt_agent_t spoofSender, agt_agent_t recipient, const agt_send_info_t* pSendInfo) {
 
   }
 
-  AGT_function_entry(s)(agt_agent_t spoofSender, agt_agent_t recipient, const agt_send_info_t* pSendInfo) {
+  AGT_function_entry(s)(agt_self_t self, agt_agent_t spoofSender, agt_agent_t recipient, const agt_send_info_t* pSendInfo) {
 
   }
 
@@ -43,11 +81,11 @@ AGT_export_family {
 
 AGT_export_family {
 
-    AGT_function_entry(p)(const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) {
+    AGT_function_entry(p)(agt_self_t self, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) {
 
     }
 
-    AGT_function_entry(s)(const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) {
+    AGT_function_entry(s)(agt_self_t self, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) {
 
     }
 
@@ -60,11 +98,11 @@ AGT_export_family {
 
 AGT_export_family {
 
-    AGT_function_entry(p)(agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) {
+    AGT_function_entry(p)(agt_self_t self, agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) {
 
     }
 
-    AGT_function_entry(s)(agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) {
+    AGT_function_entry(s)(agt_self_t self, agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) {
 
     }
 
@@ -76,11 +114,11 @@ AGT_export_family {
 
 AGT_export_family {
 
-    AGT_function_entry(p)(const agt_send_info_t* pSendInfo) {
+    AGT_function_entry(p)(agt_self_t self, const agt_send_info_t* pSendInfo) {
 
     }
 
-    AGT_function_entry(s)(const agt_send_info_t* pSendInfo) {
+    AGT_function_entry(s)(agt_self_t self, const agt_send_info_t* pSendInfo) {
 
     }
 
@@ -93,11 +131,11 @@ AGT_export_family {
 
 AGT_export_family {
 
-    AGT_function_entry(p)(agt_agent_t spoofSender, const agt_send_info_t* pSendInfo) {
+    AGT_function_entry(p)(agt_self_t self, agt_agent_t spoofSender, const agt_send_info_t* pSendInfo) {
 
     }
 
-    AGT_function_entry(s)(agt_agent_t spoofSender, const agt_send_info_t* pSendInfo) {
+    AGT_function_entry(s)(agt_self_t self, agt_agent_t spoofSender, const agt_send_info_t* pSendInfo) {
 
     }
 

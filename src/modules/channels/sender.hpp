@@ -27,10 +27,15 @@ namespace agt {
     sender_kind_max_enum
   };
 
-  struct sender : object {
+
+  AGT_object_type(sender) {
+
+  };
+
+  /*struct sender : object {
     // sender_kind_t kind;
     // agt_u32_t     flags;
-  };
+  };*/
 
 
 

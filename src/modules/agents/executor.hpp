@@ -25,6 +25,8 @@ namespace agt {
   };
 
 
+
+
   AGT_final_object_type(local_busy_executor, extends(executor)) {
     local_mpsc_receiver     receiver;
     agent_self*             agent;

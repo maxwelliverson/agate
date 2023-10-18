@@ -16,7 +16,7 @@ namespace agt {
 
   struct rcpool;
 
-  AGT_virtual_object_type(rc_object) {
+  struct rc_object : object {
     agt_u32_t flags;
     agt_u32_t refCount;
     agt_u32_t epoch;

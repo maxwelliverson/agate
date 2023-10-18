@@ -42,7 +42,7 @@ namespace agt {
 
 extern "C" {
 
-struct agt_async_t {
+struct agt_async_st {
   agt_ctx_t         context;
   agt::async_flags  flags;
   agt_status_t      status;

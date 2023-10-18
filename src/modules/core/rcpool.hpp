@@ -133,10 +133,6 @@ namespace agt {
 
   };
 
-  struct safe_rcpool : rcpool {
-    SRWLOCK lmao;
-
-  };
 
 
   namespace impl {

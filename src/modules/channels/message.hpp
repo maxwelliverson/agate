@@ -172,6 +172,9 @@ namespace agt {
   agt_agent_t getRecipientFromRaw(agt_raw_msg_t msg) noexcept;
 
 
+  void try_return_message(agt_self_t self, agt_message_t message) noexcept;
+
+
   void returnMessage(agt_message_t message) noexcept;
 
   void prepareLocalMessage(agt_message_t message, agt_agent_t receiver, agt_agent_t sender, agt_async_t* async, agent_cmd_t msgCmd) noexcept;

@@ -12,6 +12,8 @@ extern "C" {
 typedef struct agt_async_data_st*   agt_async_data_t;
 typedef struct agt_message_data_st* agt_message_data_t;
 
+typedef struct agt_message_st*      agt_message_t;
+
 }
 
 namespace agt {
@@ -155,7 +157,7 @@ namespace agt {
       AGT_forceinline constexpr void operator()(T* value) const noexcept {
         AGT_invariant(value != nullptr);
         if constexpr (!std::is_trivially_destructible_v<T>)
-          std::destroy_at(value);
+          value->~T();
       }
     };
   }

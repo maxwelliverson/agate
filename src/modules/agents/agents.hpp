@@ -17,6 +17,8 @@
 
 namespace agt {
 
+  struct fiber;
+
   struct agent_properties;
   struct agent_methods;
 
@@ -38,6 +40,8 @@ namespace agt {
     agt_executor_t    executor;
     agt_handle_t      selfHandle; // Exporting and such
     agt_u32_t         agentEpoch;
+    agt_efiber_t      boundFiber;
+    agt_eagent_t      execAgentTag;
     agent_properties* properties;
     agent_methods*    methods;
   };

@@ -5,9 +5,14 @@
 #ifndef AGATE_INTERNAL_CONFIG_HPP
 #define AGATE_INTERNAL_CONFIG_HPP
 
-#define AGT_UNDEFINED_ASYNC_STRUCT
+
 
 #include "agate.h"
+
+
+#if defined(_MSC_VER)
+#pragma warning(disable:4229)
+#endif
 
 
 #if defined(NDEBUG)
@@ -103,6 +108,8 @@ using agt_char_t = char;
 
 #define PP_AGT_impl_VIRTUAL_OBJECT_TYPE_ object
 
+#define PP_AGT_impl_VIRTUAL_OBJECT_TYPE_ref_counted rc_object
+
 #define PP_AGT_impl_VIRTUAL_OBJECT_TYPE_extends_indirect(type) type
 #define PP_AGT_impl_VIRTUAL_OBJECT_TYPE_extends PP_AGT_impl_VIRTUAL_OBJECT_TYPE_extends_indirect
 
@@ -126,7 +133,7 @@ using agt_char_t = char;
 #define AGT_type_id_max(objType) ::agt::impl::obj_types::object_type_range<objType>::maxValue
 
 #include "agate/flags.hpp"
+#include "export_table.hpp"
 #include "fwd.hpp"
-#include "agate/export_table.hpp"
 
 #endif//AGATE_INTERNAL_CONFIG_HPP

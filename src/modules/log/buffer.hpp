@@ -11,6 +11,9 @@
 
 namespace agt {
 
+
+  // Actually dunno if it makes sense to implement logging here or not....
+
   enum log_buffer_flags {
     LOG_BUFFER_ALLOCATED_ON_REQUEST = 0x1,
   };
