@@ -10,7 +10,7 @@
 /* =================[ Types ]================= */
 
 
-#define AGT_ROOT_LOADER ((agt_config_t)AGT_NULL_HANDLE)
+#define AGT_ROOT_CONFIG ((agt_config_t)AGT_NULL_HANDLE)
 
 #define AGT_CORE_MODULE_NAME "core"
 #define AGT_LOG_MODULE_NAME "log"
@@ -191,6 +191,8 @@ AGT_static_api agt_status_t AGT_stdcall agt_init(agt_ctx_t* pLocalContext, agt_c
 
 
 /**
+ * Equivalent to \code agt_init(pCtx, agt_get_config(AGT_ROOT_CONFIG, headerVersion)) \endcode
+ *
  * @param [out] pCtx
  * @param [in]  headerVersion Must be AGT_API_VERSION
  * */

@@ -585,7 +585,7 @@ AGT_static_api agt_status_t AGT_stdcall agt_init(agt_ctx_t* pLocalContext, agt_c
 
 
 AGT_static_api agt_status_t AGT_stdcall agt_default_init(agt_ctx_t* pCtx, int headerVersion) AGT_noexcept {
-  return agt_init(pCtx, agt_get_config(AGT_ROOT_LOADER, headerVersion));
+  return agt_init(pCtx, agt_get_config(AGT_ROOT_CONFIG, headerVersion));
 }
 
 AGT_static_api agt_proc_t   AGT_stdcall agt_get_proc_address(const char* symbol) AGT_noexcept {
