@@ -138,8 +138,9 @@ typedef struct agt_config_st* agt_config_t;
 
 
 
-AGT_static_api agt_config_t AGT_stdcall agt_get_config(agt_config_t config, int headerVersion) AGT_noexcept;
+AGT_static_api agt_config_t AGT_stdcall agt_get_config_(agt_config_t config, int headerVersion) AGT_noexcept;
 
+#define agt_get_config(...) agt_get_config_(__VA_ARGS__, AGT_API_VERSION)
 
 
 AGT_static_api void         AGT_stdcall agt_config_init_modules(agt_config_t config, agt_init_necessity_t necessity, size_t moduleCount, const char* const* pModules) AGT_noexcept;
@@ -196,8 +197,8 @@ AGT_static_api agt_status_t AGT_stdcall agt_init(agt_ctx_t* pLocalContext, agt_c
  * @param [out] pCtx
  * @param [in]  headerVersion Must be AGT_API_VERSION
  * */
-AGT_static_api agt_status_t AGT_stdcall agt_default_init(agt_ctx_t* pCtx, int headerVersion) AGT_noexcept;
-
+AGT_static_api agt_status_t AGT_stdcall agt_default_init_(agt_ctx_t* pCtx, int headerVersion) AGT_noexcept;
+#define agt_default_init(...) agt_default_init_(__VA_ARGS__, AGT_API_VERSION)
 
 /**
  * Closes the provided context. Behaviour of this function depends on how the library was configured

@@ -74,16 +74,17 @@ namespace agt {
     user_plugin_table*      userModules;             ///< Pointer to a table that lists user defined plugin modules loaded. If null, no user defined modules have been loaded.
     agt_instance_t          instance;                ///< Pointer to
 
-    const proc_entry*       pProcSet;                 ///< A database of all the loaded API functions and their addresses.
+    const proc_entry*       pProcSet;                ///< A database of all the loaded API functions and their addresses.
     agt_u32_t               procSetSize;
 
-    export_table*           parentExportTable;       ///< If not null, points to the export table local to the process executable.
+    export_table*           rootExportTable;         ///< If not null, points to the export table local to the process executable.
 
     const uintptr_t*        attrValues;              ///< 64 bit values indexed by agt_attr_id_t. length: attrCount
     const agt_value_type_t* attrTypes;               ///< agt_attr_type_t values indexed by agt_attr_id_t. length: attrCount
     agt_u32_t               attrCount;               ///< Size of attribute table
 
 
+    size_t                  maxAPIIndex;             ///< The maximum valid api index
 
 
     // Version 0.01

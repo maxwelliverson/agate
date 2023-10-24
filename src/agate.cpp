@@ -5,6 +5,8 @@
 // #include "internal.hpp"
 // #include "handle.hpp"
 
+/// THIS IS THE STATIC LOADER!
+
 #define AGT_UNDEFINED_ASYNC_STRUCT
 
 #include "agate.h"
@@ -31,8 +33,6 @@
 
 #include "channels/message_pool.hpp"
 #include "channels/message_queue.hpp"
-
-
 
 
 #define NOMINMAX
@@ -525,34 +525,11 @@ namespace {
 
 
 
-std::span<const agt::proc_entry> generateProcSet() noexcept {
 
+
+inline export_table* agt::init::get_local_export_table() noexcept {
+  return &g_lib;
 }
-
-const agt::proc_entry* lookupProcSet(const char* procName) noexcept {
-  const agt::proc_entry* procSet = g_lib.pProcSet;
-  agt_u32_t procSetSize = g_lib.procSetSize;
-
-  const size_t procNameLength = std::strlen(procName);
-
-  if (procNameLength > agt::MaxAPINameLength)
-    return nullptr;
-
-  auto procSetEnd = procSet + procSetSize;
-  auto iter = std::lower_bound(procSet, procSetEnd, procName, [procNameLength](const agt::proc_entry& entry, const char* name) {
-    return std::memcmp(&entry.name[0], name, procNameLength) < 0;
-  });
-
-  if (iter == procSetEnd || (std::memcmp(&iter->name[0], procName, procNameLength) != 0))
-    return nullptr;
-  return iter;
-}
-
-
-
-
-
-
 
 
 
@@ -576,31 +553,15 @@ extern "C" {
 };*/
 
 
-AGT_static_api agt_status_t AGT_stdcall agt_init(agt_ctx_t* pLocalContext, agt_config_t loader) AGT_noexcept {
-  if (!pLocalContext || !loader)
-    return AGT_ERROR_INVALID_ARGUMENT;
-
-
-}
-
-
-AGT_static_api agt_status_t AGT_stdcall agt_default_init(agt_ctx_t* pCtx, int headerVersion) AGT_noexcept {
-  return agt_init(pCtx, agt_get_config(AGT_ROOT_CONFIG, headerVersion));
-}
-
-AGT_static_api agt_proc_t   AGT_stdcall agt_get_proc_address(const char* symbol) AGT_noexcept {
-  if (auto result = lookupProcSet(symbol))
-    return result->address;
-  return nullptr;
-}
 
 
 
-AGT_static_api agt_bool_t   AGT_stdcall agt_query_attributes(size_t attrCount, const agt_attr_id_t* pAttrId, agt_var_type_t* pTypes, agt_var_t* pVars) AGT_noexcept {
+
+AGT_static_api agt_bool_t   AGT_stdcall agt_query_attributes(size_t attrCount, const agt_attr_id_t* pAttrId, agt_value_type_t* pTypes, agt_value_t* pValues) AGT_noexcept {
   if (attrCount == 0)
     return AGT_TRUE;
 
-  if (!pAttrId || !pTypes || !pVars)
+  if (!pAttrId || !pTypes || !pValues)
     return AGT_FALSE;
 
   uint32_t maxAttrVal = g_lib.attrCount;
@@ -612,12 +573,12 @@ AGT_static_api agt_bool_t   AGT_stdcall agt_query_attributes(size_t attrCount, c
   for (size_t i = 0; i < attrCount; ++i) {
     uint32_t attrId = pAttrId[i];
     if (attrId < maxAttrVal) {
-      pVars[i].uint64 = pAttrValues[attrId];
-      pTypes[i]       = pAttrTypes[attrId];
-      result          = AGT_TRUE;
+      pValues[i].uint64 = pAttrValues[attrId];
+      pTypes[i]         = pAttrTypes[attrId];
+      result            = AGT_TRUE;
     }
     else
-      pTypes[i] = AGT_VAR_TYPE_UNKNOWN;
+      pTypes[i] = AGT_TYPE_UNKNOWN;
   }
 
   return result;
@@ -627,40 +588,6 @@ AGT_static_api agt_bool_t   AGT_stdcall agt_query_attributes(size_t attrCount, c
 
 
 
-
-
-AGT_api       agt_status_t AGT_stdcall agt_init(agt_ctx_t* pContext, const agt_init_info_t* pInitInfo) AGT_noexcept {
-
-  if (pInitInfo == nullptr)
-    return AGT_ERROR_INVALID_ARGUMENT;
-
-  init_options options;
-
-  const auto loaderVersion = version::from_integer(AGT_API_VERSION);
-
-  if (auto status = prepare_init_options(options, *pInitInfo))
-    return status;
-
-
-
-  auto apiVersionInfo = get_version_info(options.apiVersion);
-
-  g_lib._size_of_async_struct      = apiVersionInfo->asyncStructSize;
-  g_lib._size_of_signal_struct     = apiVersionInfo->signalStructSize;
-  g_lib._header_version            = options.apiVersion;
-  g_lib._effective_library_version = ;
-
-  auto libVersionInfo = get_version_info(std::min(AGT_API_VERSION, options.apiVersion));
-
-
-
-
-
-
-  destroy_init_options(options);
-
-
-}
 
 AGT_agent_api agt_status_t AGT_stdcall agt_send_as(agt_agent_t spoofSender, agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept {
 

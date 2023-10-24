@@ -353,9 +353,15 @@ namespace agt::init {
 
     ~module_exports() {
       assert( m_pfnDtor );
-      m_pfnDtor(m_exports);
+      clear();
     }
 
+    void init() noexcept {
+      clear();
+      m_pfnDtor = [](vector<export_info>& exports){
+        exports.destroy_all(); // By wrapping any deallocation in function pointer set by the module that would be doing the allocation; ensuring there's never an issue with mismatched allocators.
+      };
+    }
 
     template <typename Ret, typename ...Args>
     void add_export(const char* name, Ret(* procAddress)(Args...), size_t tableOffset) noexcept {
@@ -370,7 +376,8 @@ namespace agt::init {
     }
 
     void clear() noexcept {
-      m_exports.clear();
+      if (m_pfnDtor)
+        m_pfnDtor(m_exports);
     }
   };
 
@@ -403,16 +410,18 @@ namespace agt::init {
   public:
   };
 
-  struct loader_shared {
-    agt_config_t baseLoader = nullptr;
-    agt::map<void*, agt_config_t>          loaderMap;
+  struct shared_config {
+    agt_config_t                           baseConfig = nullptr;
+    agt::map<void*, agt_config_t>          configMap;
     agt::dictionary<agt_init_necessity_t>  requestedModules;
     agt_allocator_params_t                 allocatorParams = {};
+    agt::vector<agt::vector<agt_config_option_t, 0>, 0> userOptions;
     agt::vector<agt_user_module_info_t, 0> userModules;
     bool                                   hasCustomAllocatorParams = false;
     agt_internal_log_handler_t             logHandler;
     void*                                  logHandlerUserData;
   };
+
 
   using get_exports_proc_t    = void(*)(module_exports& exports, const attributes& attrs);
 
@@ -426,13 +435,13 @@ namespace agt::init {
 extern "C" {
 
 struct agt_config_st {
-  size_t                       loaderSize;
+  size_t                       configSize;
   agt_config_t                 parent;
   int                          headerVersion;
   int                          loaderVersion;
   agt::export_table*           pExportTable;
   void*                        moduleHandle;
-  agt::init::loader_shared*    shared;
+  agt::init::shared_config*    shared;
   agt::vector<agt_config_t, 0> childLoaders;
   agt_internal_log_handler_t   logHandler;
   void*                        logHandlerUserData;

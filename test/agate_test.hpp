@@ -226,7 +226,7 @@ namespace {
     struct agent_builder {
       agt_agent_create_info_t createInfo;
       agt_status_t            status;
-      agt_async_t*            boundAsyncHandle;
+      agt_async_t             boundAsyncHandle;
       agt_agent_t*            returnPtr;
       bool                    setNameToken;
       bool                    setOwner;
@@ -445,38 +445,48 @@ namespace {
     uint32_t  hardwareThreadCount = std::thread::hardware_concurrency();
     uint32_t  minThreadCount = hardwareThreadCount == 1 ? 1 : 2;
 
-    agt_init_attr_t initAttributes[] = {
+    const char* requiredModules[] = {
+        AGT_POOL_MODULE_NAME
+    };
+
+    agt_config_option_t configOptions[] = {
         {// Ensure that the shared library is not loaded to avoid said overhead
          // However, allow environment variable override so that benchmarks can be compared :)
-         .value = {
-             .id      = AGT_ATTR_SHARED_CONTEXT,
-             .type    = AGT_ATTR_TYPE_BOOLEAN,
-             .boolean = AGT_FALSE
-         },
-         .flags = AGT_INIT_ATTR_REQUIRED | AGT_INIT_ATTR_ALLOW_ENVIRONMENT_OVERRIDE
+            .id = AGT_CONFIG_IS_SHARED,
+            .flags = AGT_ALLOW_ENVIRONMENT_OVERRIDE,
+            .necessity = AGT_INIT_REQUIRED,
+            .type = AGT_TYPE_BOOLEAN,
+            .value = {
+                .boolean = AGT_FALSE
+            }
         },
         {// Ensure multithreaded library is loaded, though again, allow for envvar override for benchmarking purposes.
-         .value = {
-             .id      = AGT_ATTR_THREAD_COUNT,
-             .type    = AGT_ATTR_TYPE_UINT32,
-             .u32range = {
-                 .min = minThreadCount,
-                 .max = hardwareThreadCount + 1
-             }
-         },
-         .flags = AGT_INIT_ATTR_REQUIRED | AGT_INIT_ATTR_WITHIN_RANGE | AGT_INIT_ATTR_ALLOW_ENVIRONMENT_OVERRIDE
+            .id = AGT_CONFIG_THREAD_COUNT,
+            .flags = AGT_ALLOW_ENVIRONMENT_OVERRIDE | AGT_VALUE_GREATER_THAN_OR_EQUALS,
+            .necessity = AGT_INIT_REQUIRED,
+            .type = AGT_TYPE_UINT32,
+            .value = {
+                .uint32 = minThreadCount
+            }
+        },
+        {
+            .id = AGT_CONFIG_THREAD_COUNT,
+            .flags = AGT_ALLOW_ENVIRONMENT_OVERRIDE | AGT_VALUE_LESS_THAN_OR_EQUALS,
+            .necessity = AGT_INIT_REQUIRED,
+            .type = AGT_TYPE_UINT32,
+            .value = {
+                .uint32 = hardwareThreadCount
+            }
         }
     };
-    agt_init_info_t initInfo{
-        .flags          = AGT_INIT_AGENTS_MODULE | AGT_INIT_ASYNC_MODULE,
-        .headerVersion  = AGT_API_VERSION,
-        .attributes     = initAttributes,
-        .attributeCount = std::size(initAttributes)
-    };
+
+    auto config = agt_get_config(AGT_ROOT_CONFIG);
+
+    agt_config_init_modules(config, AGT_INIT_REQUIRED, std::size(requiredModules), requiredModules);
+    agt_config_set_options(config, std::size(configOptions), configOptions);
 
 
-
-    agt_status_t result = agt_init(&ctx, &initInfo);
+    agt_status_t result = agt_init(&ctx, config);
     assert( result == AGT_SUCCESS );
 
     return ctx;

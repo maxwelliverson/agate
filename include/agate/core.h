@@ -463,12 +463,6 @@ typedef enum agt_status_t {
   AGT_ERROR_IN_AGENT_CONTEXT,     ///< Returned by procedures that can only be called outside of an Agent Execution Context are called by an agent.
 } agt_status_t;
 
-/*typedef struct agt_batch_status_t {
-  agt_bool_t      complete;
-  size_t          successCount;
-  size_t          errorCount;
-} agt_batch_status_t;*/
-
 typedef enum agt_error_handler_status_t {
   AGT_ERROR_HANDLED,
   AGT_ERROR_IGNORED,
@@ -530,6 +524,8 @@ typedef struct agt_object_desc_t {
   const agt_string_t* name;
   const void*         params; ///< Depends on type
 } agt_object_desc_t;
+
+
 typedef struct AGT_alignas(AGT_OBJECT_PARAMS_BUFFER_ALIGNMENT) agt_object_params_buffer_t {
   agt_u8_t reserved[AGT_OBJECT_PARAMS_BUFFER_SIZE];
 } agt_object_params_buffer_t;
@@ -731,7 +727,7 @@ AGT_static_api agt_status_t        AGT_stdcall agt_query_instance_attributes(agt
  * */
 AGT_core_api agt_status_t AGT_stdcall agt_dup(agt_object_t srcObject, agt_object_t* pDstObject, size_t dstObjectCount) AGT_noexcept;
 
-AGT_core_api void         AGT_stdcall agt_close(void* object) AGT_noexcept;
+AGT_core_api void         AGT_stdcall agt_close(agt_object_t object) AGT_noexcept;
 
 
 

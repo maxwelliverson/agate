@@ -143,18 +143,8 @@ typedef struct agt_thread_pool_executor_create_info_t {
 
 } agt_thread_pool_executor_create_info_t;
 
-typedef struct agt_agent_take_ownership_info_t {
-  const agt_agent_t* agents;
-  size_t             agentCount;
-} agt_agent_take_ownership_info_t;
-
-typedef struct agt_agent_inherit_ownership_info_t {
-
-} agt_agent_inherit_ownership_info_t;
-
 
 typedef struct agt_agent_type_info_t {
-
   agt_agent_init_t         initFn;           ///< [optional] Initial callback executed in the agent's context before it starts receiving messages.
   agt_agent_proc_t         procFn;           ///< Main callback executed in the agent's context
   agt_agent_dtor_t         dtorFn;           ///< [optional] Destructor, called on state when agent is destroyed
@@ -203,6 +193,8 @@ AGT_api agt_status_t AGT_stdcall agt_create_agent(agt_ctx_t ctx, const agt_agent
 AGT_noreturn AGT_api void AGT_stdcall agt_create_busy_agent_on_current_thread(agt_ctx_t ctx, const agt_agent_create_info_t* cpCreateInfo) AGT_noexcept;
 
 AGT_api agt_status_t AGT_stdcall agt_create_executor(agt_ctx_t ctx, const agt_executor_create_info_t* cpCreateInfo, agt_executor_t* pExecutor) AGT_noexcept;
+
+
 
 
 // If agentHandle is null, this is a noop.

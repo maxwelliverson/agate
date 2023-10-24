@@ -336,7 +336,7 @@ namespace agt {
       template<typename It1, typename It2>
       void uninitialized_move(It1 I, It1 E, It2 Dest) noexcept {
         std::uninitialized_move(I, E, Dest);
-        notify_init_range(std::addressof(*Dest), std::ranges::distance(I, E));
+        // this->notify_init_range(std::addressof(*Dest), std::ranges::distance(I, E));
       }
 
       /// Copy the range [I, E) onto the uninitialized memory starting with "Dest",
@@ -388,7 +388,7 @@ namespace agt {
         agt_u64_t new_capacity;
         T *new_elements = malloc_for_grow(num_elements, new_capacity);
         std::uninitialized_fill_n(new_elements, num_elements, element);
-        notify_init_range(new_elements, num_elements);
+        // this->notify_init_range(new_elements, num_elements);
         this->destroy_range(this->begin(), this->end());
         take_allocation_for_grow(new_elements, new_capacity);
         this->set_size(num_elements);
@@ -400,7 +400,7 @@ namespace agt {
         agt_u64_t new_capacity;
         T *new_elements = malloc_for_grow(0, new_capacity);
         ::new ((void *)(new_elements + this->size())) T(std::forward<ArgTypes>(Args)...);
-        notify_init_object(new_elements + this->size());
+        // this->notify_init_object(new_elements + this->size());
         move_elements_for_grow(new_elements);
         take_allocation_for_grow(new_elements, new_capacity);
         this->set_size(this->size() + 1);
@@ -496,7 +496,7 @@ namespace agt {
       /// Copy the range [I, E) onto the uninitialized memory
       /// starting with "Dest", constructing elements into it as needed.
       template <typename T1, typename T2> requires same_as<T1, T2>
-      void uninitialized_copy(T1* I, T1* E, T2* Dest) {
+      static void uninitialized_copy(T1* I, T1* E, T2* Dest) {
         if (I != E)
           std::memcpy(reinterpret_cast<void *>(Dest), I, (E - I) * sizeof(T));
       }
@@ -593,9 +593,9 @@ namespace agt {
 
 
 
-    void notify_init_range(void*, size_t) const noexcept {}
+    // void notify_init_range(void*, size_t) const noexcept {}
 
-    void notify_init_object(void*) const noexcept {}
+    // void notify_init_object(void*) const noexcept {}
 
   public:
     any_vector(const any_vector&) = delete;
@@ -624,7 +624,7 @@ namespace agt {
             new (std::addressof(*I)) T;
           else
             new (std::addressof(*I)) T();
-        this->notify_init_range(this->end(), N - this->size());
+        // this->notify_init_range(this->end(), N - this->size());
         this->set_size(N);
       }
     }
@@ -674,7 +674,7 @@ namespace agt {
       size_type NumInputs = std::distance(in_start, in_end);
       this->reserve(this->size() + NumInputs);
       this->uninitialized_copy(in_start, in_end, this->end());
-      this->notify_init_range(this->end(), NumInputs);
+      // this->notify_init_range(this->end(), NumInputs);
       this->set_size(this->size() + NumInputs);
     }
 
@@ -682,7 +682,7 @@ namespace agt {
     void append(size_type NumInputs, value_param_t Elt) {
       const T *EltPtr = this->reserve_for_param_and_get_address(Elt, NumInputs);
       std::uninitialized_fill_n(this->end(), NumInputs, *EltPtr);
-      this->notify_init_range(this->end(), NumInputs);
+      // this->notify_init_range(this->end(), NumInputs);
       this->set_size(this->size() + NumInputs);
     }
 
@@ -703,7 +703,7 @@ namespace agt {
       std::fill_n(this->begin(), std::min(NumElts, this->size()), Elt);
       if (NumElts > this->size()) {
         std::uninitialized_fill_n(this->end(), NumElts - this->size(), Elt);
-        this->notify_init_range(this->end(), NumElts - this->size());
+        // this->notify_init_range(this->end(), NumElts - this->size());
       }
       else if (NumElts < this->size())
         this->destroy_range(this->begin() + NumElts, this->end());
@@ -874,7 +874,7 @@ namespace agt {
     }
 
     template <typename ItTy> requires std::input_iterator<ItTy>
-      iterator insert(iterator I, ItTy From, ItTy To) {
+    iterator insert(iterator I, ItTy From, ItTy To) {
       // Convert iterator to elt# to avoid invalidating iterator when we reserve()
       size_t InsertElt = I - this->begin();
 
@@ -936,19 +936,20 @@ namespace agt {
       insert(I, IL.begin(), IL.end());
     }
 
-    template <typename... ArgTypes> reference emplace_back(ArgTypes &&... Args) {
+    template <typename... ArgTypes>
+    reference emplace_back(ArgTypes &&... Args) {
       if (this->size() >= this->capacity()) [[unlikely]]
                                             return this->grow_and_emplace_back(std::forward<ArgTypes>(Args)...);
 
       ::new ((void *)this->end()) T(std::forward<ArgTypes>(Args)...);
-      this->notify_init_object(this->end());
+      // this->notify_init_object(this->end());
       this->set_size(this->size() + 1);
       return this->back();
     }
 
-    any_vector&operator=(const any_vector&RHS);
+    any_vector& operator=(const any_vector&RHS);
 
-    any_vector&operator=(any_vector&&RHS) noexcept;
+    any_vector& operator=(any_vector&&RHS) noexcept;
 
     friend bool operator==(const any_vector& a, const any_vector& b) noexcept {
       if (a.size() != b.size())
@@ -1061,7 +1062,7 @@ namespace agt {
       this->begin_ = RHS.begin_;
       this->size_ = RHS.size_;
       this->capacity_ = RHS.capacity_;
-      RHS.resetToSmall();
+      RHS.reset_to_small();
       return *this;
     }
 
@@ -1178,6 +1179,14 @@ namespace agt {
     vector&operator=(std::initializer_list<T> IL) {
       this->assign(IL);
       return *this;
+    }
+
+    void destroy_all() noexcept {
+      this->destroy_range(this->begin(), this->end());
+      if (!this->is_small())
+        _aligned_free(this->begin());
+      this->reset_to_small();
+      this->capacity_ = N;
     }
   };
 

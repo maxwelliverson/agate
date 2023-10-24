@@ -70,10 +70,9 @@ struct supervisor {
   std::chrono::high_resolution_clock::time_point startTime;
   int          left;
 
-  supervisor(agt_ctx_t ctx, agt_async_t& async, int numRings, int repetitions) {
-    agt_new_async(ctx, &async, 0);
+  supervisor(agt_ctx_t ctx, agt_async_t async, int numRings, int repetitions) {
     agt_new_signal(ctx, &signal, AGT_ANONYMOUS, 0);
-    agt_attach_signal(signal, &async);
+    agt_attach_signal(signal, async);
     left = numRings + (numRings * repetitions);
     startTime = std::chrono::high_resolution_clock::now();
   }
@@ -243,6 +242,8 @@ int main(int argc, char** argv) {
 
   agt_async_t async;
   agt_agent_t sv;
+
+  async = agt_new_async(ctx, 0);
 
   auto result = make_agent<supervisor>(
       ctx,

@@ -21,6 +21,33 @@
 
 
 
+namespace {
+  std::span<const agt::proc_entry> generateProcSet() noexcept {
+
+  }
+
+  const agt::proc_entry* lookupProcSet(const char* procName) noexcept {
+    auto lib = agt::init::get_local_export_table();
+    const agt::proc_entry* procSet = lib->pProcSet;
+    agt_u32_t procSetSize          = lib->procSetSize;
+
+    const size_t procNameLength = std::strlen(procName);
+
+    if (procNameLength > agt::MaxAPINameLength)
+      return nullptr;
+
+    auto procSetEnd = procSet + procSetSize;
+    auto iter = std::lower_bound(procSet, procSetEnd, procName, [procNameLength](const agt::proc_entry& entry, const char* name) {
+      return std::memcmp(&entry.name[0], name, procNameLength) < 0;
+    });
+
+    if (iter == procSetEnd || (std::memcmp(&iter->name[0], procName, procNameLength) != 0))
+      return nullptr;
+    return iter;
+  }
+}
+
+
 agt::init::module::module(const char *name, const agt::init::attributes& attr, bool usingCustomSearchPath) noexcept {
   char libName[MAX_PATH];
 
@@ -60,14 +87,11 @@ std::span<const agt::init::export_info> agt::init::module::exports() noexcept {
 }
 
 
-
 struct tmp_export_info {
   size_t     moduleIndex;
   agt_proc_t address;
   size_t     tableOffset;
 };
-
-
 
 struct tmp_loader_data {
   agt::init::attributes            attributes;
@@ -142,50 +166,51 @@ static HMODULE get_dll_handle() noexcept {
 extern "C" {
 
 
-AGT_static_api agt_config_t AGT_stdcall agt_get_config(agt_config_t parentConfig, int headerVersion) AGT_noexcept {
+AGT_static_api agt_config_t AGT_stdcall agt_get_config_(agt_config_t parentConfig, int headerVersion) AGT_noexcept {
 
   HMODULE moduleHandle;
   agt_config_t config;
   agt_config_t baseLoader = parentConfig;
 
-  agt::init::loader_shared *shared;
+  agt::init::shared_config *shared;
 
-  if (config) {
+  if (config != AGT_ROOT_CONFIG) {
     moduleHandle = get_dll_handle();
-    while (baseLoader->parent != nullptr)
+    while (baseLoader->parent != AGT_ROOT_CONFIG)
       baseLoader = baseLoader->parent;
     shared = baseLoader->shared;
-    auto [modIter, modIsNew] = shared->loaderMap.try_emplace(moduleHandle, nullptr);
+    auto [modIter, modIsNew] = shared->configMap.try_emplace(moduleHandle, nullptr);
     if (!modIsNew)
-      return modIter->second;
+      return modIter->second; // This path is taken if a DLL that has already previously acquired a configuration object. In that case, the previous object is used. This ensures that agate enabled DLLs that may be indirectly linked multiple times will only ever initialize agate once, while managing any potentially differing requirements declared by different configurations.
     config = new agt_config_st;
     shared = baseLoader->shared;
     modIter->second = config;
     config->childLoaders.push_back(config);
-  } else {
+  }
+  else {
     moduleHandle = get_exe_handle();
     config = new agt_config_st{};
-    shared = new agt::init::loader_shared;
-    shared->baseLoader = config;
+    shared = new agt::init::shared_config;
+    shared->baseConfig = config;
     shared->requestedModules.insert_or_assign("core", AGT_INIT_REQUIRED);
-    shared->loaderMap[moduleHandle] = config;
+    shared->configMap[moduleHandle] = config;
   }
 
 
-  config->parent = config;
+  config->parent        = parentConfig;
   config->headerVersion = headerVersion;
   config->loaderVersion = AGT_API_VERSION;
-  config->loaderSize = sizeof(agt_config_st);
-  config->pExportTable = agt::init::get_local_export_table();
-  config->moduleHandle = moduleHandle;
-  config->shared = shared;
+  config->configSize    = sizeof(agt_config_st);
+  config->pExportTable  = agt::init::get_local_export_table();
+  config->moduleHandle  = moduleHandle;
+  config->shared        = shared;
 
 
   return config;
 }
 
 
-AGT_static_api void AGT_stdcall agt_config_init_modules(agt_config_t config, agt_init_necessity_t necessity, size_t moduleCount, const char *const *pModules) AGT_noexcept {
+AGT_static_api void         AGT_stdcall agt_config_init_modules(agt_config_t config, agt_init_necessity_t necessity, size_t moduleCount, const char* const* pModules) AGT_noexcept {
   if (config == nullptr)
     return;
 
@@ -203,7 +228,7 @@ AGT_static_api void AGT_stdcall agt_config_init_modules(agt_config_t config, agt
   }
 }
 
-AGT_static_api void AGT_stdcall agt_config_init_user_modules(agt_config_t config, size_t userModuleCount, const agt_user_module_info_t *pUserModuleInfos) AGT_noexcept {
+AGT_static_api void         AGT_stdcall agt_config_init_user_modules(agt_config_t config, size_t userModuleCount, const agt_user_module_info_t *pUserModuleInfos) AGT_noexcept {
   if (config == nullptr)
     return;
 
@@ -213,10 +238,63 @@ AGT_static_api void AGT_stdcall agt_config_init_user_modules(agt_config_t config
   config->shared->userModules.append(pUserModuleInfos, pUserModuleInfos + userModuleCount);
 }
 
-AGT_static_api agt_status_t AGT_stdcall agt_loader_set_attr(agt_config_t config, agt_init_necessity_t necessity, const agt_attr_t *pAttr, agt_init_attr_flags_t flags) AGT_noexcept {
+
+AGT_static_api void         AGT_stdcall agt_config_set_options(agt_config_t config, size_t attrCount, const agt_config_option_t* pConfigOptions) AGT_noexcept {
+  if (!config || attrCount == 0 || !pConfigOptions)
+    return;
+
+  auto shared = config->shared;
+  auto& options = shared->userOptions;
+
+  for (size_t i = 0; i < attrCount; ++i) {
+    auto&& opt = pConfigOptions[i];
+    size_t optId = opt.id;
+    if (options.size() <= optId)
+      options.resize(optId + 1);
+    auto& optVec = options[opt.id];
+    optVec.push_back(opt);
+  }
 }
 
-AGT_static_api void AGT_stdcall agt_config_set_options(agt_config_t config, size_t attrCount, const agt_init_attr_t *pInitAttrs) AGT_noexcept {
+
+AGT_static_api agt_status_t AGT_stdcall agt_init(agt_ctx_t* pLocalContext, agt_config_t config) AGT_noexcept {
+  if (!pLocalContext || !config)
+    return AGT_ERROR_INVALID_ARGUMENT;
+
+
+
+  init_options options;
+
+
+
+
+  if (auto status = prepare_init_options(options, *pInitInfo))
+    return status;
+
+
+
+  auto apiVersionInfo = get_version_info(options.apiVersion);
+
+  g_lib._size_of_async_struct      = apiVersionInfo->asyncStructSize;
+  g_lib._size_of_signal_struct     = apiVersionInfo->signalStructSize;
+  g_lib._header_version            = options.apiVersion;
+  g_lib._effective_library_version = ;
+
+  auto libVersionInfo = get_version_info(std::min(AGT_API_VERSION, options.apiVersion));
+
+
+  destroy_init_options(options);
+}
+
+
+AGT_static_api agt_status_t AGT_stdcall agt_default_init_(agt_ctx_t* pCtx, int headerVersion) AGT_noexcept {
+  return agt_init(pCtx, agt_get_config_(AGT_ROOT_CONFIG, headerVersion));
+}
+
+AGT_static_api agt_proc_t   AGT_stdcall agt_get_proc_address(const char* symbol) AGT_noexcept {
+  if (auto result = lookupProcSet(symbol))
+    return result->address;
+  return nullptr;
 }
 
 
