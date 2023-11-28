@@ -6,100 +6,102 @@
 #include "agate/atomic.hpp"
 
 #include "agate/flags.hpp"
-#include "modules/channels/message.hpp"
-#include "modules/core/instance.hpp"
-#include "modules/core/object.hpp"
+#include "channels/message.hpp"
+#include "instance.hpp"
+#include "object.hpp"
 
 
-#include <utility>
 #include <cmath>
-
+#include <utility>
 
 
 using namespace agt;
 
 namespace {
 
-  inline agt::async_data*        localAsyncData(async_data_t asyncData) noexcept {
-    return (static_cast<std::underlying_type_t<async_data_t>>(asyncData) & 0x1)
-               ? nullptr
-               : reinterpret_cast<agt::async_data*>(asyncData);
-  }
 
-  inline agt::shared_async_data* sharedAsyncData(agt_ctx_t context, async_data_t asyncData) noexcept {
-    return (agt::shared_async_data*) ctxMapSharedAsyncData(context, asyncData);
-  }
+  inline constexpr agt_u64_t IncNonWaiterRef = 0x0000'0000'0000'0001ULL;
+  inline constexpr agt_u64_t IncWaiterRef    = 0x0000'0001'0000'0001ULL;
+  inline constexpr agt_u64_t DecNonWaiterRef = 0xFFFF'FFFF'FFFF'FFFFULL;
+  inline constexpr agt_u64_t DecWaiterRef    = 0xFFFF'FFFE'FFFF'FFFFULL;
+  inline constexpr agt_u64_t DetachWaiter    = 0xFFFF'FFFF'0000'0000ULL;
+  inline constexpr agt_u64_t AttachWaiter    = 0x0000'0001'0000'0000ULL;
+
+  inline constexpr agt_u64_t ArrivedResponse = 0x0000'0000'0000'0001ULL;
+  inline constexpr agt_u64_t DroppedResponse = 0x0000'0001'0000'0001ULL;
 
 
-  inline agt_u64_t        droppedResponses(agt_u64_t i) noexcept {
+  agt::shared_async_data* get_shared_async_data(agt_ctx_t ctx, async_data_t data) noexcept;
+
+
+  agt_u64_t async_dropped_responses(agt_u64_t i) noexcept {
     return i >> 32;
   }
 
-  inline agt_u64_t        totalResponses(agt_u64_t i) noexcept {
+  agt_u64_t async_total_responses(agt_u64_t i) noexcept {
     return i & 0xFFFF'FFFF;
   }
 
-  inline agt_u64_t        successfulResponses(agt_u64_t i) noexcept {
-    return totalResponses(i) - droppedResponses(i);
+  agt_u64_t async_successful_responses(agt_u64_t i) noexcept {
+    return async_total_responses(i) - async_dropped_responses(i);
   }
 
-
-  inline agt_u64_t totalWaiters(agt_u64_t refCount) noexcept {
+  agt_u64_t async_total_waiters(agt_u64_t refCount) noexcept {
     return refCount >> 32;
   }
 
-  inline agt_u64_t totalReferences(agt_u64_t refCount) noexcept {
+  agt_u64_t async_total_references(agt_u64_t refCount) noexcept {
     return refCount & 0xFFFF'FFFF;
   }
 
 
-  inline void      asyncDataAttachWaiter(agt::async_data* data) noexcept {
-    impl::atomicExchangeAdd(data->refCount, AttachWaiter);
+  void      async_data_attach_waiter(agt::async_data* data) noexcept {
+    agt::atomicExchangeAdd(data->refCount, AttachWaiter);
   }
-  inline void      asyncDataDetachWaiter(agt::async_data* data) noexcept {
-    impl::atomicExchangeAdd(data->refCount, DetachWaiter);
+  void      async_data_detach_waiter(agt::async_data* data) noexcept {
+    agt::atomicExchangeAdd(data->refCount, DetachWaiter);
   }
 
-  inline void      asyncDataModifyRefCount(agt_ctx_t ctx, async_data_t data_, agt_u64_t diff) noexcept {
-    if (auto data = localAsyncData(data_))
-      impl::atomicExchangeAdd(data->refCount, diff);
+  void      async_data_modify_ref_count(agt_ctx_t ctx, async_data_t data_, agt_u64_t diff) noexcept {
+    if (auto data = handle_cast<local_async_data>(data_))
+      agt::atomicExchangeAdd(data->refCount, diff);
     else
-      impl::atomicExchangeAdd(sharedAsyncData(ctx, data_)->refCount, diff);
+      agt::atomicExchangeAdd(get_shared_async_data(ctx, data_)->refCount, diff);
   }
 
-  inline void      asyncDataAttachWaiter(agt_ctx_t ctx, async_data_t data) noexcept {
-    asyncDataModifyRefCount(ctx, data, AttachWaiter);
+  void      async_data_attach_waiter(agt_ctx_t ctx, async_data_t data) noexcept {
+    async_data_modify_ref_count(ctx, data, AttachWaiter);
   }
 
-  inline void      asyncDataDetatchWaiter(agt_ctx_t ctx, async_data_t data) noexcept {
-    asyncDataModifyRefCount(ctx, data, DetatchWaiter);
-  }
-
-
-  inline void      asyncDataAdvanceEpoch(agt::async_data* data) noexcept {
-    data->currentKey = (async_key_t)((std::underlying_type_t<async_key_t>)data->currentKey + 1);
-    impl::atomicStore(data->responseCounter, 0);
+  void      async_data_detach_waiter(agt_ctx_t ctx, async_data_t data) noexcept {
+    async_data_modify_ref_count(ctx, data, DetachWaiter);
   }
 
 
+  void      async_data_advance_epoch(agt::async_data* data) noexcept {
+    ++data->epoch;
+    // data->currentKey = (async_key_t)((std::underlying_type_t<async_key_t>)data->currentKey + 1);
+    agt::atomicRelaxedStore(data->responseCounter, 0);
+  }
 
 
-  agt_status_t     asyncDataStatus(agt::async_data* data, agt_u32_t expectedCount) noexcept {
+
+
+  agt_status_t     async_data_status(agt::async_data* data, agt_u32_t expectedCount) noexcept {
     if (expectedCount != 0) [[likely]] {
-      agt_u64_t responseCount = agt::impl::atomicLoad(data->responseCounter);
-      if (totalResponses(responseCount) >= expectedCount) {
+      agt_u64_t responseCount = agt::atomicLoad(data->responseCounter);
+      if (async_total_responses(responseCount) >= expectedCount) {
         // FIXME: (Probably fine) The following line may or may not need to be here depending on when waiters are attached, so to speak
-        agt::impl::atomicExchangeAdd(data->refCount, DetatchWaiter);
-        return hasDroppedResponses(responseCount) ? AGT_ERROR_PARTNER_DISCONNECTED : AGT_SUCCESS;
+        async_data_detach_waiter(data);
+        return async_successful_responses(responseCount) >= expectedCount ? AGT_SUCCESS : AGT_ERROR_PARTNER_DISCONNECTED;
       }
       return AGT_NOT_READY;
     }
-
     return AGT_ERROR_NOT_BOUND;
   }
 
-  agt_status_t     asyncDataStatus(agt::shared_async_data* data, agt_u32_t expectedCount) noexcept {
-    if (expectedCount != 0) [[likely]] {
+  agt_status_t     async_data_status(agt::shared_async_data* data, agt_u32_t expectedCount) noexcept {
+    /*if (expectedCount != 0) [[likely]] {
       agt_u64_t responseCount = agt::impl::atomicLoad(data->responseCounter);
       if (totalResponses(responseCount) >= expectedCount) {
         // FIXME: agt::impl::atomicExchangeAdd(asyncData->refCount, DetatchWaiter);
@@ -109,26 +111,28 @@ namespace {
       return AGT_NOT_READY;
     }
 
-    return AGT_ERROR_NOT_BOUND;
+    return AGT_ERROR_NOT_BOUND;*/
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
   }
 
-  agt_status_t     asyncDataWait(agt::async_data* data, agt_u32_t expectedCount, agt_timeout_t timeout) noexcept {
-    if (expectedCount != 0) [[likely]] {
+  agt_status_t     async_data_wait(agt_ctx_t ctx, agt::async_data* data, agt_u32_t expectedCount, agt_timeout_t timeout) noexcept {
+    /*if (expectedCount != 0) [[likely]] {
       if (!data->responseCount.waitFor(expectedCount, timeout))
         return false;
     }
-    return true;
+    return true;*/
   }
 
-  agt_status_t     asyncDataWait(agt::shared_async_data* data, agt_u32_t expectedCount, agt_timeout_t timeout) noexcept {
-    if (expectedCount != 0) [[likely]] {
+  agt_status_t     async_data_wait(agt_ctx_t ctx, agt::shared_async_data* data, agt_u32_t expectedCount, agt_timeout_t timeout) noexcept {
+    /*if (expectedCount != 0) [[likely]] {
       if (!data->responseCount.waitFor(expectedCount, timeout))
         return false;
     }
-    return true;
+    return true;*/
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
   }
 
-  void             asyncDataDestroy(agt_ctx_t context, agt::async_data* data) noexcept {
+  void             async_data_destroy(agt_ctx_t context, agt::async_data* data) noexcept {
 
     AGT_assert(impl::atomicLoad(data->refCount) == 0);
 
@@ -142,7 +146,7 @@ namespace {
     }*/
   }
 
-  void             asyncDataDestroy(agt_ctx_t context, agt::shared_async_data* data, async_data_t handle) noexcept {
+  void             async_data_destroy(agt_ctx_t context, agt::shared_async_data* data, async_data_t handle) noexcept {
 
     AGT_assert(impl::atomicLoad(data->refCount) == 0);
 
@@ -156,7 +160,7 @@ namespace {
     }*/
   }
 
-  agt::async_data* createAsyncData(agt_ctx_t context, agt_u64_t initialRefCount) noexcept {
+  agt::async_data* create_async_data(agt_ctx_t context, agt_u64_t initialRefCount) noexcept {
     auto data = (agt::async_data*)agt::ctxAcquireLocalAsyncData(context);
 
     data->next = nullptr; // TODO: the next parameter isn't actually used while the data is allocated,

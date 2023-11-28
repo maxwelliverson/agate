@@ -123,6 +123,7 @@ namespace agt::init {
     size_t                  m_attrCount;
     const agt_value_type_t* m_attrType;
     const uintptr_t*        m_attrValue;
+    bool                    m_usingNativeUnit;
 
   public:
 
@@ -170,12 +171,26 @@ namespace agt::init {
     [[nodiscard]] size_t size() const noexcept {
       return m_attrCount;
     }
+
+
+    [[nodiscard]] bool using_native_unit() const noexcept {
+      return m_usingNativeUnit;
+    }
   };
+
+  inline constexpr static uint32_t eExportIsPublic   = 0x1;
+  inline constexpr static uint32_t eExportIsExternal = 0x2;
+
+
+  inline constexpr static uint32_t ePublicExport = eExportIsPublic | eExportIsExternal;
+  inline constexpr static uint32_t ePrivateExport = eExportIsExternal;
+  inline constexpr static uint32_t eVirtualExport = eExportIsPublic;
 
   struct export_info {
     const char* procName;
     agt_proc_t  address;
     size_t      tableOffset;
+    uint32_t    flags;
   };
 
 
@@ -358,11 +373,12 @@ namespace agt::init {
 
 
     template <typename Ret, typename ...Args>
-    void add_export(const char* name, Ret(* procAddress)(Args...), size_t tableOffset) noexcept {
+    void add_export(uint32_t kind, const char* name, Ret(* procAddress)(Args...), size_t tableOffset) noexcept {
       auto& info       = m_exports.emplace_back();
       info.procName    = name;
       info.address     = (agt_proc_t)procAddress;
       info.tableOffset = tableOffset;
+      info.flags       = kind;
     }
 
     [[nodiscard]] std::span<const export_info> exports() const noexcept {

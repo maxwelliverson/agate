@@ -183,6 +183,7 @@ namespace agt {
     agt_status_t (* AGT_stdcall _pfn_fiber_pool_alloc)(agt_ctx_t ctx, fiber_pool* pool, agt_fiber_proc_t proc, void* userData, agt_fiber_t* pResult);
 
 
+    void                 (* AGT_stdcall _pfn_fiber_init)(agt_fiber_t fiber, agt_fiber_proc_t proc, bool isConvertingThread);
     agt_fiber_transfer_t (* AGT_stdcall _pfn_fiber_switch)(agt_fiber_t fiber, agt_fiber_param_t param, agt_fiber_flags_t flags);
     void                 (* AGT_stdcall _pfn_fiber_jump)(agt_fiber_t fiber, agt_fiber_param_t param);
     agt_fiber_transfer_t (* AGT_stdcall _pfn_fiber_fork)(agt_fiber_proc_t proc, agt_fiber_param_t param, agt_fiber_flags_t flags);

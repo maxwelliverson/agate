@@ -169,6 +169,7 @@ add_agate_module(
         core
             PRIVATE
             SOURCES
+                async.cpp
                 ctx.cpp
                 error.cpp
                 fiber.cpp
@@ -193,15 +194,6 @@ add_agate_module(
                 executor.cpp
                 state.cpp
                 send.cpp
-)
-
-add_agate_module(
-        async
-            PRIVATE
-            SOURCES
-                async.cpp
-                signal.cpp
-                wait.cpp
 )
 
 add_agate_module(

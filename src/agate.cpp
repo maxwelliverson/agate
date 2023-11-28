@@ -1181,7 +1181,7 @@ AGT_exec_api agt_fiber_transfer_t AGT_stdcall agt_fiber_switch(agt_fiber_t fiber
 }
 
 AGT_exec_api AGT_noreturn void    AGT_stdcall agt_fiber_jump(agt_fiber_t fiber, agt_fiber_param_t param) AGT_noexcept {
-
+  g_lib._pfn_fiber_jump(fiber, param);
 }
 
 AGT_exec_api agt_fiber_transfer_t AGT_stdcall agt_fiber_fork(agt_fiber_proc_t proc, agt_fiber_param_t param, agt_fiber_flags_t flags) AGT_noexcept {

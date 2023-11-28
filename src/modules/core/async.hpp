@@ -5,19 +5,48 @@
 #ifndef JEMSYS_AGATE2_ASYNC_HPP
 #define JEMSYS_AGATE2_ASYNC_HPP
 
-#include "fwd_decl.hpp"
+#include "config.hpp"
+#include "agate/cast.hpp"
+#include "core/object.hpp"
+#include "core/rc.hpp"
 
 #include <utility>
 #include <span>
 
 namespace agt {
 
+  AGT_BITFLAG_ENUM(async_flags, agt_u32_t) {
+    eUnbound       = 0x0,
+    eBound         = 0x100,
+    eReady         = 0x200,
+    eWaiting       = 0x400,
+    eMemoryIsOwned = 0x8000,
+};
+
+
+  inline constexpr async_flags eAsyncNoFlags = { };
+  inline constexpr async_flags eAsyncUnbound = async_flags::eUnbound;
+  inline constexpr async_flags eAsyncBound   = async_flags::eBound;
+  inline constexpr async_flags eAsyncReady   = async_flags::eBound | async_flags::eReady;
+  inline constexpr async_flags eAsyncWaiting = async_flags::eBound | async_flags::eWaiting;
+  inline constexpr async_flags eAsyncMemoryIsOwned = async_flags::eMemoryIsOwned;
+
+
+  struct async {
+    agt_ctx_t    ctx;
+    agt_u32_t    structSize;
+    async_flags  flags;
+    agt_u64_t    resultValue;
+    agt_status_t status;
+    agt_u8_t     reserved[AGT_ASYNC_STRUCT_SIZE - 28];
+  };
 
 
   AGT_virtual_object_type(async_data) {
     agt_u32_t epoch;           // key
     agt_u64_t refCount;
     agt_u64_t responseCounter;
+    agt_u64_t resultValue;
   };
 
   AGT_final_object_type(local_async_data, extends(async_data)) {
@@ -54,54 +83,6 @@ namespace agt {
   };
 
 
-  inline agt_u64_t async_dropped_responses(agt_u64_t i) noexcept {
-    return i >> 32;
-  }
-
-  inline agt_u64_t async_total_responses(agt_u64_t i) noexcept {
-    return i & 0xFFFF'FFFF;
-  }
-
-  inline agt_u64_t async_successful_responses(agt_u64_t i) noexcept {
-    return async_total_responses(i) - async_dropped_responses(i);
-  }
-
-  inline agt_u64_t async_total_waiters(agt_u64_t refCount) noexcept {
-    return refCount >> 32;
-  }
-
-  inline agt_u64_t async_total_references(agt_u64_t refCount) noexcept {
-    return refCount & 0xFFFF'FFFF;
-  }
-
-
-  inline void      asyncDataAttachWaiter(agt::async_data* data) noexcept {
-    impl::atomicExchangeAdd(data->refCount, AttachWaiter);
-  }
-  inline void      asyncDataDetachWaiter(agt::async_data* data) noexcept {
-    impl::atomicExchangeAdd(data->refCount, DetachWaiter);
-  }
-
-  inline void      asyncDataModifyRefCount(agt_ctx_t ctx, async_data_t data_, agt_u64_t diff) noexcept {
-    if (auto data = localAsyncData(data_))
-      impl::atomicExchangeAdd(data->refCount, diff);
-    else
-      impl::atomicExchangeAdd(sharedAsyncData(ctx, data_)->refCount, diff);
-  }
-
-  inline void      asyncDataAttachWaiter(agt_ctx_t ctx, async_data_t data) noexcept {
-    asyncDataModifyRefCount(ctx, data, AttachWaiter);
-  }
-
-  inline void      asyncDataDetatchWaiter(agt_ctx_t ctx, async_data_t data) noexcept {
-    asyncDataModifyRefCount(ctx, data, DetatchWaiter);
-  }
-
-
-  inline void      asyncDataAdvanceEpoch(agt::async_data* data) noexcept {
-    data->currentKey = (async_key_t)((std::underlying_type_t<async_key_t>)data->currentKey + 1);
-    impl::atomicStore(data->responseCounter, 0);
-  }
 
 
   imported_async_data* get_imported_async_data() noexcept {
@@ -121,14 +102,9 @@ namespace agt {
   void         async_data_drop(agt_ctx_t ctx,   async_data_t asyncData, async_key_t key) noexcept;
   void         async_data_arrive(agt_ctx_t ctx, async_data_t asyncData, async_key_t key) noexcept;
 
-
-
-  agt_ctx_t    async_get_ctx(const agt_async_t& async) noexcept;
-  async_data_t async_get_data(const agt_async_t& async) noexcept;
-
-  void         async_copy_to(const agt_async_t& fromAsync, agt_async_t& toAsync) noexcept;
-  void         async_clear(agt_async_t& async) noexcept;
-  void         async_destroy(agt_async_t& async, bool wipeMemory = true) noexcept;
+  void         async_copy_to(const async& fromAsync, async& toAsync) noexcept;
+  void         async_clear(async& async) noexcept;
+  void         async_destroy(async& async, bool wipeMemory = true) noexcept;
 
 
   template <size_t AsyncSize>
