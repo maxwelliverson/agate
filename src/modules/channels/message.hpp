@@ -9,14 +9,18 @@
 
 #include "config.hpp"
 #include "agate/flags.hpp"
-#include "async/async.hpp"
+#include "agate/time.hpp"
+#include "core/async.hpp"
+
 
 #include <utility>
 
 namespace agt {
 
 
-  enum class agent_handle : agt_u64_t;
+  struct agent_self;
+
+  // enum class agent_handle : agt_u64_t;
 
 
   enum cmd_t : agt_u16_t {
@@ -73,13 +77,23 @@ namespace agt {
   };
 
 
-  enum msg_layout_t {
-    AGT_MSG_LAYOUT_BASIC,
-    AGT_MSG_LAYOUT_INDIRECT,
-    AGT_MSG_LAYOUT_AGENT_CMD,
-    AGT_MSG_LAYOUT_AGENT_INDIRECT_CMD,
-    AGT_MSG_LAYOUT_RPC_INVOCATION,
-    AGT_MSG_LAYOUT_PACKET
+  enum msg_layout_t : agt_u8_t {
+    AGT_MSG_LAYOUT_BASIC,              ///< Basic layout that contains standard info, but minimal slots for arbitrary data (Eg. PING)
+    AGT_MSG_LAYOUT_SIGNAL,             ///< A barebones layout that contains no info or data other than the cmd code (Eg. NOOP, KILL, etc.)
+    AGT_MSG_LAYOUT_EXTENDED,           ///< Like the basic layout, but with a couple additional arbitrary data slots. (Eg. ATTACH_AGENT, DETACH_AGENT)
+    AGT_MSG_LAYOUT_INDIRECT,           ///< Used when broadcasting a message to multiple receivers; contains little more than a reference to a shared broadcast message
+    AGT_MSG_LAYOUT_AGENT_CMD,          ///< Used by the agent invocation commands; allows for arbitrary amounts of extra data to be sent, depending on the specific command (Eg. SEND, SEND_AS)
+    AGT_MSG_LAYOUT_AGENT_INDIRECT_CMD, ///< Almost the exact same as LAYOUT_INDIRECT, except has an extra data slot to hold the receiving agent
+    AGT_MSG_LAYOUT_RPC_INVOCATION,     ///< Contains all the necessarily data to invoke an RPC. Not yet implemented
+    AGT_MSG_LAYOUT_PACKET              ///< Contains an IP packet. Subject to change, not yet implemented.
+  };
+
+  enum msg_state_t : agt_u8_t {
+    AGT_MSG_STATE_INITIAL,
+    AGT_MSG_STATE_QUEUED,
+    AGT_MSG_STATE_ACTIVE,
+    AGT_MSG_STATE_PINNED,
+    AGT_MSG_STATE_COMPLETE
   };
 
 
@@ -113,7 +127,8 @@ namespace agt {
     isAgentInvocation   = 0x80,
     isShared            = 0x100,
     shouldDoFastCleanup = 0x200,
-    indirectMsgIsShared = 0x400
+    indirectMsgIsShared = 0x400,
+    asyncIsBound        = 0x800,
   };
 
   AGT_BITFLAG_ENUM(message_state, agt_u32_t) {
@@ -125,40 +140,214 @@ namespace agt {
   inline constexpr static message_state default_message_state = {};
 
 
-  struct message {
+  struct message_header {
+    message_header* next;
+    msg_state_t     state;
+    msg_layout_t    layout;
+    message_flags   flags;
+    agt_ecmd_t      cmd;
+  };
+
+  struct basic_message : message_header {
+    agt_timestamp_t sendTime;
+    async_data_t    asyncData;
+    async_key_t     asyncKey;
+  };
+
+  struct agent_binding_message : message_header {
+    agt_timestamp_t sendTime;
+    async_data_t    asyncData;
+    async_key_t     asyncKey;
+    agent_self*     agent;
+    agt_executor_t  targetExecutor;
+  };
+
+  struct agent_message : message_header {
+    agt_timestamp_t sendTime;
+    async_data_t    asyncData;
+    async_key_t     asyncKey;
+    agt_u32_t       extraData;
+    agent_self*     sender;
+    agent_self*     receiver;
+    uint32_t        userDataOffset;
+    uint32_t        payloadSize;
+    inline_buffer   buffer[];
+  };
+
+  struct indirect_message;
+  struct broadcast_message;
+
+  struct broadcast_agent_message;
+
+  struct indirect_message : message_header {
+    broadcast_message* msg;
+  };
+
+  struct indirect_agent_message : indirect_message {
+    agent_self* receiver;
+  };
+
+  struct broadcast_message : message_header {
+    agt_timestamp_t          sendTime;
+    async_data_t             asyncData;
+    async_key_t              asyncKey;
+    agt_u32_t                extraData;
+  };
+
+  struct broadcast_agent_message : broadcast_message {
+    agent_self*              sender;
+    agt_u64_t                extraData2;
+    uint32_t                 userDataOffset;
+    uint32_t                 payloadSize;
+    inline_buffer            buffer[];
+  };
+
+  /*struct message {
     message*        next;
     uint32_t        bufferOffset;
     cmd_t           cmd;
     message_flags   flags;
-    agent_handle    sender;
-    agent_handle    receiver;
+    agent_self*     sender;
+    agent_self*     receiver;
     agt_timestamp_t sendTime;
     agt_u64_t       extraData;
     async_data_t    asyncData;
     async_key_t     asyncKey;
     uint32_t        payloadSize;
     inline_buffer   buffer[];
+  };*/
+
+
+  class message {
+    message_header* pMsg;
+
+    template <typename T>
+    static void destroy_message(T* msg) noexcept {}
+
+  public:
+
+
+    void init(msg_layout_t layout, agt_ecmd_t cmd, message_flags flags = {}) const noexcept {
+      pMsg->layout = layout;
+      pMsg->state  = AGT_MSG_STATE_INITIAL;
+      pMsg->flags  = flags;
+      pMsg->cmd    = cmd;
+    }
+
+    void bind_async_local(async& async, agt_u32_t expectedCount = 1) noexcept {
+      assert(pMsg != nullptr);
+      auto msg = reinterpret_cast<basic_message*>(pMsg);
+      auto [data, key] = async_attach_local(async, expectedCount, 1);
+      msg->asyncData = data;
+      msg->asyncKey  = key;
+      msg->flags    |= message_flags::asyncIsBound;
+    }
+
+    void write_send_time() noexcept {
+      reinterpret_cast<basic_message*>(pMsg)->sendTime = now();
+    }
+
+    template <bool SharedIsEnabled>
+    void drop(agt_status_t dropReason, agt_ctx_t ctx = agt::get_ctx()) noexcept {
+      if (test(pMsg->flags, message_flags::asyncIsBound)) {
+        const auto msg = reinterpret_cast<basic_message*>(pMsg);
+        async_drop<SharedIsEnabled>(ctx, msg->asyncData, msg->asyncKey, dropReason);
+      }
+      else if (pMsg->layout == AGT_MSG_LAYOUT_INDIRECT) {
+        const auto msg = reinterpret_cast<indirect_message*>(pMsg);
+        const auto broadcastMsg = msg->msg;
+        bool shouldDestroy;
+        if (test(broadcastMsg->flags, message_flags::asyncIsBound))
+          shouldDestroy = async_drop<SharedIsEnabled>(ctx, broadcastMsg->asyncData, broadcastMsg->asyncKey, dropReason);
+        else
+          shouldDestroy = atomicDecrement(broadcastMsg->extraData) == 0;
+        if (shouldDestroy)
+          destroy_message(broadcastMsg);
+      }
+      pMsg->state = AGT_MSG_STATE_COMPLETE;
+    }
+
+    template <bool SharedIsEnabled>
+    void complete(agt_ctx_t ctx = agt::get_ctx()) noexcept {
+      if (test(pMsg->flags, message_flags::asyncIsBound)) {
+        const auto msg = reinterpret_cast<basic_message*>(pMsg);
+        async_arrive<SharedIsEnabled>(ctx, msg->asyncData, msg->asyncKey);
+      }
+      else if (pMsg->layout == AGT_MSG_LAYOUT_INDIRECT) {
+        const auto msg = reinterpret_cast<indirect_message*>(pMsg);
+        const auto broadcastMsg = msg->msg;
+        bool shouldDestroy;
+        if (test(broadcastMsg->flags, message_flags::asyncIsBound))
+          shouldDestroy = async_arrive<SharedIsEnabled>(ctx, broadcastMsg->asyncData, broadcastMsg->asyncKey);
+        else
+          shouldDestroy = atomicDecrement(broadcastMsg->extraData) == 0;
+        if (shouldDestroy)
+          destroy_message(broadcastMsg);
+      }
+      pMsg->state = AGT_MSG_STATE_COMPLETE;
+    }
+
+    template <bool SharedIsEnabled>
+    void complete_with_result(agt_u64_t result, agt_ctx_t ctx = agt::get_ctx()) noexcept {
+      if (test(pMsg->flags, message_flags::asyncIsBound)) {
+        const auto msg = reinterpret_cast<basic_message*>(pMsg);
+        async_arrive_with_result<SharedIsEnabled>(ctx, msg->asyncData, msg->asyncKey, result);
+      }
+      else if (pMsg->layout == AGT_MSG_LAYOUT_INDIRECT) {
+        const auto msg = reinterpret_cast<indirect_message*>(pMsg);
+        const auto broadcastMsg = msg->msg;
+        bool shouldDestroy;
+        if (test(broadcastMsg->flags, message_flags::asyncIsBound))
+          shouldDestroy = async_arrive_with_result<SharedIsEnabled>(ctx, broadcastMsg->asyncData, broadcastMsg->asyncKey, result);
+        else
+          shouldDestroy = atomicDecrement(broadcastMsg->extraData) == 0;
+        if (shouldDestroy)
+          destroy_message(broadcastMsg);
+      }
+      pMsg->state = AGT_MSG_STATE_COMPLETE;
+    }
+
+    void try_release() noexcept {
+
+    }
+
+    [[nodiscard]] msg_layout_t layout() const noexcept {
+      return pMsg->layout;
+    }
+
+    [[nodiscard]] agt_ecmd_t   cmd() const noexcept {
+      return pMsg->cmd;
+    }
+
+
+    template <typename T>
+    [[nodiscard]] T* get_as() const noexcept {
+      return static_cast<T*>(pMsg);
+    }
+
+    explicit operator bool() const noexcept {
+      return pMsg != nullptr;
+    }
+
+    [[nodiscard]] bool operator==(std::nullptr_t) const noexcept {
+      return pMsg == nullptr;
+    }
   };
 
 
-  static_assert(sizeof(message) == AGT_CACHE_LINE);
+  // static_assert(sizeof(message) == AGT_CACHE_LINE);
 
-
-  static inline void signal_message_completion(agt_ctx_t ctx, message& msg) noexcept {
-    if (async_data_is_attached(msg.asyncData))
-      async_data_arrive(ctx, msg.asyncData, msg.asyncKey);
-  }
 
 
   /**
    * @returns true if successful, false if there was an allocation error
    * */
-  bool  initMessageArray(local_channel_header* owner) noexcept;
+  /*bool  initMessageArray(local_channel_header* owner) noexcept;*/
 
   /**
    * @returns the address of the message array if successful, or a null point on allocation error
    * */
-  void* initMessageArray(shared_handle_header* owner, shared_channel_header* channel) noexcept;
+  /*void* initMessageArray(shared_handle_header* owner, shared_channel_header* channel) noexcept;
 
   void initMessage(agt_message_t message) noexcept;
 
@@ -187,7 +376,7 @@ namespace agt {
 
   void writeUserMessage(agt_message_t message, const agt_send_info_t& sendInfo) noexcept;
 
-  void writeIndirectUserMessage(agt_message_t message, agt_message_t indirectMsg) noexcept;
+  void writeIndirectUserMessage(agt_message_t message, agt_message_t indirectMsg) noexcept;*/
 }
 
 /*struct agt_message_st {
