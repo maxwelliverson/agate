@@ -9,8 +9,10 @@
 
 AGT_begin_c_namespace
 
-typedef struct agt_equeue_st*  agt_equeue_t;
-typedef void*                  agt_eagent_t;
+typedef struct agt_equeue_st* agt_equeue_t;
+typedef void*                 agt_eagent_t;
+typedef struct agt_fiber_st*  agt_fiber_t;
+typedef struct agt_thread_st* agt_thread_t;
 
 typedef struct agt_receiver_st* agt_receiver_t;
 
@@ -69,7 +71,8 @@ typedef enum agt_executor_kind_t {
   AGT_DEFAULT_EXECUTOR_KIND,
   AGT_EVENT_EXECUTOR_KIND,
   AGT_BUSY_EXECUTOR_KIND,
-  AGT_PARALLEL_EXECUTOR_KIND
+  AGT_PARALLEL_EXECUTOR_KIND,
+
 } agt_executor_kind_t;
 
 
@@ -79,7 +82,7 @@ typedef enum agt_executor_flag_bits_t {
 typedef agt_flags32_t agt_executor_flags_t;
 
 
-typedef void      (* AGT_stdcall agt_executor_proc_t)(agt_ctx_t ctx, agt_equeue_t equeue, void* userData);
+typedef void (* AGT_stdcall agt_executor_proc_t)(agt_ctx_t ctx, agt_equeue_t equeue, void* userData);
 
 
 
@@ -91,7 +94,7 @@ typedef struct agt_eagent_header_t {
   };
 } agt_eagent_header_t;
 
-typedef struct agt_agent_info_t {
+typedef struct agt_agent_info_t  {
   agt_agent_flags_t flags;
   agt_string_t      name;
   agt_scope_t       scope;
@@ -118,7 +121,7 @@ typedef struct agt_executor_desc_t {
   agt_u32_t            maxBoundAgents;
   agt_u32_t            stackSize;
   agt_u32_t            maxConcurrency;
-  const void*          customParams; // type depends on value of agt_executor_desc_t::kind
+  const void*          params; // type depends on value of agt_executor_desc_t::kind
 } agt_executor_desc_t;
 
 typedef struct agt_custom_executor_params_t {
