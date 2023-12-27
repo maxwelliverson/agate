@@ -112,19 +112,19 @@ namespace agt {
       { cb.value() } noexcept -> std::same_as<const typename B::value_type&>;
     };
 
-    template <typename T>
+    template <typename Info, typename Val>
     concept has_member_bucket_type = requires {
-      typename T::bucket_type;
-    } && is_bucket_type<typename T::bucket_type>;
+      typename Info::template bucket_type<Val>;
+    } && is_bucket_type<typename Info::template bucket_type<Val>>;
 
 
     template <typename Info, typename Key, typename Val>
     struct get_bucket {
       using type = bucket<key_t<Info, Key>, Val>;
     };
-    template <has_member_bucket_type Info, typename Key, typename Val>
+    template <typename Key, typename Val, has_member_bucket_type<Val> Info>
     struct get_bucket<Info, Key, Val> {
-      using type = typename Info::bucket_type;
+      using type = typename Info::template bucket_type<Val>;
     };
 
     template <typename Info, typename Key, typename Val>
@@ -135,7 +135,7 @@ namespace agt {
 
   template <typename Key,
             typename Val,
-            typename Info    = map_key_info<Key>,
+            typename Info    = key_info<Key>,
             bool     IsConst = false>
   class map_iterator;
 
@@ -265,6 +265,12 @@ namespace agt {
         return lookup_bucket_for(val, bucket) ? 1 : 0;
       }
 
+      template <typename LookupKey>
+      AGT_nodiscard size_type count(const LookupKey& val) const noexcept {
+        const bucket_type* bucket;
+        return lookup_bucket_for(val, bucket) ? 1 : 0;
+      }
+
       iterator       find(const_arg_type_t<key_type> val) noexcept {
         bucket_type* bucket;
         if (lookup_bucket_for(val, bucket))
@@ -349,6 +355,16 @@ namespace agt {
         return std::make_pair(_make_iterator(bucket, true), true);
       }
 
+      template <typename LookupKey, typename ...T> requires (!std::same_as<LookupKey, key_type>)
+      std::pair<iterator, bool> try_emplace(const LookupKey& lookupKey, T&& ...args) noexcept {
+        bucket_type* bucket;
+        if (lookup_bucket_for(lookupKey, bucket))
+          return std::make_pair(_make_iterator(bucket, true), false);
+
+        bucket = _insert_into_bucket(bucket, lookupKey, std::forward<T>(args)...);
+        return std::make_pair(_make_iterator(bucket, true), true);
+      }
+
       /// Alternate version of insert() which allows a different, and possibly
       /// less expensive, key type.
       /// The DenseMapInfo is responsible for supplying methods
@@ -417,6 +433,9 @@ namespace agt {
       }
 
     protected:
+
+      inline constexpr static bool IsSet = std::same_as<mapped_type, no_value>;
+
       basic_map() = default;
 
       void destroy_all() noexcept {
@@ -432,7 +451,8 @@ namespace agt {
               if (!Info::is_equal(pos->key(), empty) && !Info::is_equal(pos->key(), tombstone))
                 pos->value().~mapped_type();
             }
-            pos->key().~key_type();
+            if constexpr (!std::is_trivially_destructible_v<key_type>)
+              pos->key().~key_type();
           }
         }
       }
@@ -469,7 +489,8 @@ namespace agt {
             (void)found; // silence warning.
             assert(!found && "Key already in new map?");
             dst->key() = std::move(b->key());
-            ::new (&dst->value()) mapped_type(std::move(b->value()));
+            if constexpr (!IsSet)
+              ::new (&dst->value()) mapped_type(std::move(b->value()));
             _increment_entry_count();
 
             // Free the value.
@@ -500,8 +521,12 @@ namespace agt {
 
           for (size_t i = 0; i < _get_bucket_count(); ++i) {
             ::new (&buckets[i].key()) key_type(otherBuckets[i].key());
-            if (!(Info::is_equal(buckets[i].key(), empty) || Info::is_equal(buckets[i].key(), tombstone)))
-              ::new (&buckets[i].value()) mapped_type(otherBuckets[i].value());
+
+            // Optimization for sets, ignore anything to do with the mapped values.
+            if constexpr (!IsSet) {
+              if (!(Info::is_equal(buckets[i].key(), empty) || Info::is_equal(buckets[i].key(), tombstone)))
+                ::new (&buckets[i].value()) mapped_type(otherBuckets[i].value());
+            }
           }
         }
       }
@@ -609,12 +634,20 @@ namespace agt {
         static_cast<Derived*>(this)->shrink_and_clear();
       }
 
+      // This is called to insert a NEW element into a bucket.
       template <typename KeyArg, typename... ValueArgs>
       bucket_type* _insert_into_bucket(bucket_type* bucket, KeyArg&& key, ValueArgs&& ...values) noexcept {
+
+        assert( bucket != nullptr ); // A bucket should already have been found by lookup;
+
         bucket = this->_insert_into_bucket_impl(/*key, */key, bucket);
 
-        bucket->key() = std::forward<KeyArg>(key);
-        ::new (&bucket->value()) mapped_type(std::forward<ValueArgs>(values)...);
+        if constexpr (!std::same_as<std::remove_cvref_t<KeyArg>, key_type>)
+          bucket->key() = key_type(std::forward<KeyArg>(key));
+        else
+          bucket->key() = std::forward<KeyArg>(key);
+        if constexpr (!IsSet)
+          ::new (&bucket->value()) mapped_type(std::forward<ValueArgs>(values)...);
         return bucket;
       }
 
@@ -627,20 +660,26 @@ namespace agt {
         return bucket;
       }
 
+
+      // This function is responsible for growing/rehashing the table if necessary, and returns a bucket valid for insertion
       template <typename LookupKeyT>
       bucket_type* _insert_into_bucket_impl(/*const key_type& key, */const LookupKeyT& lookup, bucket_type* bucket) noexcept {
         increment_epoch();
 
+        // This only
+
         uint32_t newEntryCount = _get_entry_count() + 1;
         uint32_t bucketCount   = _get_bucket_count();
 
+        // If at least 3/4ths of the table will be full following the insertion, double the table size.
         if (newEntryCount * 4 >= bucketCount * 3) [[unlikely]] {
           this->_grow(bucketCount * 2);
           lookup_bucket_for(lookup, bucket);
           bucketCount = _get_bucket_count();
         }
+        // If less than 1/8th of the buckets in the table are empty, rehash the table (thus removing all the tombstones)
         else if (bucketCount - (newEntryCount + _get_tombstone_count()) <= (bucketCount / 8)) [[unlikely]] {
-          this->_grow(bucketCount);
+          this->_grow(bucketCount); // grow always rehashes, so growing to the current size is equivalent to a rehash operation.
           lookup_bucket_for(lookup, bucket);
         }
 
@@ -731,7 +770,7 @@ namespace agt {
 
   template <typename Key,
             typename Val,
-            typename KeyInfo = map_key_info<Key>>
+            typename KeyInfo = key_info<Key>>
   class map : public impl::basic_map<map<Key, Val, KeyInfo>, Key, Val, KeyInfo> {
 
     friend class impl::basic_map<map<Key, Val, KeyInfo>, Key, Val, KeyInfo>;

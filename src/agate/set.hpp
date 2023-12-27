@@ -32,8 +32,8 @@ namespace agt {
       using const_arg_type_t = typename const_pointer_or_const_ref<T>::type;
 
     public:
-      using key_type   = ValueType;
-      using value_type = ValueType;
+      // using key_type   = typename map_type::key_type;
+      using value_type = typename map_type::key_type;
       using size_type  = uint32_t;
 
       explicit basic_set(unsigned InitialReserve = 0) : mapInst(InitialReserve) {}
@@ -66,11 +66,26 @@ namespace agt {
       }
 
       /// Return 1 if the specified key is in the set, 0 otherwise.
-      AGT_nodiscard size_type count(const_arg_type_t<ValueType> V) const noexcept {
+      AGT_nodiscard size_type count(const_arg_type_t<value_type> V) const noexcept {
         return mapInst.count(V);
       }
 
-      bool erase(const ValueType& V) noexcept {
+      template <typename LookupKey>
+      AGT_nodiscard size_type count_as(const LookupKey& lookup) const noexcept {
+        return mapInst.count(lookup);
+      }
+
+      AGT_nodiscard bool      contains(const_arg_type_t<value_type> val) const noexcept {
+        return count(val) != 0;
+      }
+
+      template <typename LookupKey> requires (!std::same_as<LookupKey, value_type>)
+      AGT_nodiscard bool      contains(const LookupKey& lookup) const noexcept {
+        return mapInst.count(lookup) != 0;
+      }
+
+
+      bool erase(const value_type& V) noexcept {
         return mapInst.erase(V);
       }
 
@@ -141,8 +156,8 @@ namespace agt {
       AGT_nodiscard iterator       end() noexcept { return Iterator(mapInst.end()); }
       AGT_nodiscard const_iterator end() const noexcept { return ConstIterator(mapInst.end()); }
 
-      AGT_nodiscard iterator find(const_arg_type_t<ValueType> V) noexcept { return Iterator(mapInst.find(V)); }
-      AGT_nodiscard const_iterator find(const_arg_type_t<ValueType> V) const noexcept {
+      AGT_nodiscard iterator find(const_arg_type_t<value_type> V) noexcept { return Iterator(mapInst.find(V)); }
+      AGT_nodiscard const_iterator find(const_arg_type_t<value_type> V) const noexcept {
         return ConstIterator(mapInst.find(V));
       }
 
@@ -176,13 +191,19 @@ namespace agt {
       /// Alternative version of insert that uses a different (and possibly less
       /// expensive) key type.
       template <typename LookupKeyT>
-      std::pair<iterator, bool> insert_as(const ValueType &V, const LookupKeyT &LookupKey) noexcept {
+      std::pair<iterator, bool> insert_as(const value_type& V, const LookupKeyT& LookupKey) noexcept {
         return mapInst.insert_as({V, no_value{}}, LookupKey);
       }
       template <typename LookupKeyT>
-      std::pair<iterator, bool> insert_as(ValueType &&V, const LookupKeyT &LookupKey) noexcept {
+      std::pair<iterator, bool> insert_as(value_type&& V, const LookupKeyT& LookupKey) noexcept {
         return mapInst.insert_as({std::move(V), no_value{}}, LookupKey);
       }
+
+      template <typename LookupKeyT>
+      std::pair<iterator, bool> insert_as(const LookupKeyT& lookupKey) noexcept {
+        return mapInst.try_emplace(lookupKey);
+      }
+
 
       // Range insertion of values.
       template<typename InputIt>
@@ -193,7 +214,7 @@ namespace agt {
     };
   }
 
-  template <typename T, typename KeyInfo = map_key_info<T>>
+  template <typename T, typename KeyInfo = key_info<T>>
   class set : public impl::basic_set<T, map<T, impl::no_value, KeyInfo>, KeyInfo> {
     using map_type  = map<T, impl::no_value, KeyInfo>;
     using base_type = impl::basic_set<T, map_type, KeyInfo>;
