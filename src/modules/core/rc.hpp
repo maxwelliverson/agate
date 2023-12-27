@@ -6,6 +6,7 @@
 #define AGATE_CORE_TRANSIENT_HPP
 
 #include "agate/atomic.hpp"
+#include "agate/key_info.hpp"
 #include "config.hpp"
 #include "object.hpp"
 
@@ -122,7 +123,7 @@ namespace agt {
 
 
   template <thread_safety SafetyModel>
-  [[nodiscard]] inline rc_object* alloc_rc_object(rcpool& pool, agt_u32_t initialRefCount) noexcept {
+  [[nodiscard]] inline rc_object* alloc_rc_object(rcpool& pool, agt_u32_t initialRefCount = 1) noexcept {
 
     auto obj        = impl::_alloc_from_rcpool<SafetyModel>(pool);
 
@@ -134,7 +135,7 @@ namespace agt {
     return obj;
   }
   template <thread_safety SafetyModel>
-  inline void                     release_rc_object(rc_object& obj, agt_u32_t releaseCount) noexcept {
+  inline void                     release_rc_object(rc_object& obj, agt_u32_t releaseCount = 1) noexcept {
     constexpr static bool IsThreadSafe = test(SafetyModel, thread_safe);
     constexpr static bool IsUserSafe   = test(SafetyModel, thread_user_safe);
 
@@ -397,6 +398,7 @@ namespace agt {
     public:
 
       owner_ref_base() = default;
+      owner_ref_base(std::nullptr_t) noexcept : m_ptr(nullptr) { }
       owner_ref_base(const owner_ref_base&) = delete;
       owner_ref_base(owner_ref_base&& other) noexcept
           : m_ptr(std::exchange(other.m_ptr, nullptr)) { }
@@ -673,6 +675,77 @@ namespace agt {
         return (*pfn)(std::forward<OArgs>(args)...);
       }
     };
+
+
+
+    template <typename T, typename Dtor, thread_safety SafetyModel>
+    class owner_ref_key : Dtor {
+
+      inline static T* _tombstone_ptr() noexcept {
+        return reinterpret_cast<T*>(static_cast<uintptr_t>(-1));
+      }
+    public:
+
+      using pointer = T*;
+      using reference = T&;
+      using destructor = Dtor;
+
+
+      owner_ref_key() = default;
+      explicit owner_ref_key(pointer ptr) noexcept requires std::default_initializable<destructor> : destructor(), m_ptr(ptr) { }
+      explicit owner_ref_key(pointer p, const destructor& dtor) noexcept requires std::copy_constructible<destructor>
+        : destructor(dtor), m_ptr(p) {
+        static_assert(std::derived_from<T, rc_object>, "Type parameter T of agt::owner_ref<T, ...> must derive from agt::rc_object");
+        static_assert(std::invocable<destructor, T*>, "Type parameter Dtor of agt::owner_ref<T, Dtor, ...> must be an object type callable with one argument of type T*");
+      }
+      explicit owner_ref_key(pointer p, destructor&& dtor) noexcept requires std::move_constructible<destructor>
+          : destructor(std::move(dtor)), m_ptr(p) {
+        static_assert(std::derived_from<T, rc_object>, "Type parameter T of agt::owner_ref<T, ...> must derive from agt::rc_object");
+        static_assert(std::invocable<destructor, T*>, "Type parameter Dtor of agt::owner_ref<T, Dtor, ...> must be an object type callable with one argument of type T*");
+      }
+
+      owner_ref_key(owner_ref_key&& other) noexcept : m_ptr(std::exchange(other.m_ptr, nullptr)) { }
+
+      ~owner_ref_key() {
+        if (*this) {
+          if constexpr (!is_trivial_dtor<Dtor>)
+            release_rc_object<SafetyModel>(*m_ptr, 1, std::forward<Dtor>(*this));
+          else
+            release_rc_object<SafetyModel>(*m_ptr);
+        }
+      }
+
+
+
+      static owner_ref_key empty_key()     noexcept {
+        return {};
+      }
+
+      static owner_ref_key tombstone_key() noexcept {
+        return owner_ref_key(_tombstone_ptr());
+      }
+
+
+      [[nodiscard]] pointer get() const noexcept {
+        return m_ptr;
+      }
+
+
+      [[nodiscard]] bool is_empty() const noexcept {
+        return m_ptr == nullptr;
+      }
+
+      [[nodiscard]] bool is_tombstone() const noexcept {
+        return m_ptr == _tombstone_ptr();
+      }
+
+
+      [[nodiscard]] inline explicit operator bool() const noexcept {
+        return !is_empty() && !is_tombstone();
+      }
+    private:
+      pointer m_ptr = nullptr;
+    };
   }
 
   template <auto PFN>
@@ -699,6 +772,7 @@ namespace agt {
     using destructor = Dtor;
 
     owner_ref() = default;
+    owner_ref(std::nullptr_t) noexcept : m_val() { }
     explicit owner_ref(pointer p) noexcept
         : m_val(p) {
       static_assert(std::derived_from<T, rc_object>, "Type parameter T of agt::owner_ref<T, ...> must derive from agt::rc_object");
@@ -929,6 +1003,91 @@ namespace agt {
   private:
     base_type m_val;
   };
+
+
+
+
+  namespace impl {
+    template <typename Key, typename Value>
+    struct owner_ref_bucket {
+      using key_type   = Key;
+      using pointer_type = typename key_type::pointer;
+      using value_type = Value;
+
+      owner_ref_bucket() = default;
+      template <typename ...Args>
+      owner_ref_bucket(pointer_type ptr, Args&& ...args) noexcept
+        : first(ptr), second(std::forward<Args>(args)...) { }
+
+      key_type   first;
+      value_type second;
+
+      key_type&         key()         noexcept { return first; }
+      const key_type&   key()   const noexcept { return first; }
+      value_type&       value()       noexcept { return second; }
+      const value_type& value() const noexcept { return second; }
+    };
+
+    template <typename Key>
+    struct owner_ref_bucket<Key, no_value> : no_value {
+      using key_type   = Key;
+      using pointer_type = typename key_type::pointer;
+      using value_type = no_value;
+
+      owner_ref_bucket() = default;
+      owner_ref_bucket(pointer_type ptr) noexcept
+        : first(ptr) { }
+
+      key_type   first;
+
+      key_type&         key()         noexcept { return first; }
+      const key_type&   key()   const noexcept { return first; }
+      value_type&       value()       noexcept { return *this; }
+      const value_type& value() const noexcept { return *this; }
+    };
+  }
+
+
+
+  template <typename T, typename Dtor, thread_safety Safety>
+  struct key_info<owner_ref<T, Dtor, Safety>> {
+    using key_type = impl::owner_ref_key<T, Dtor, Safety>;
+
+    template <typename Val>
+    using bucket_type = impl::owner_ref_bucket<key_type, Val>;
+
+    static inline key_type get_empty_key()     noexcept {
+      return key_type::empty_key();
+    }
+    static inline key_type get_tombstone_key() noexcept {
+      return key_type::tombstone_key();
+    }
+
+    static unsigned        get_hash_value(const T* val) noexcept {
+      return key_info<T*>::get_hash_value(val);
+    }
+    static unsigned        get_hash_value(const key_type& val) noexcept {
+      return get_hash_value(val.get());
+    }
+    static bool            is_equal(const key_type& a, const key_type& b) noexcept {
+      return a.get() == b.get();
+    }
+    static bool            is_equal(const T* a, const key_type& b) noexcept {
+      return a == b.get();
+    }
+    static bool            is_equal(const key_type& a, const T* b) noexcept {
+      return a.get() == b;
+    }
+  };
 }
+
+
+// #define PP_AGT_impl_REF_COUNTED_DTOR(signature_)
+
+#define AGT_ref_counted_dtor(type_, name_) \
+  template <> struct ::agt::impl::default_destroy<type_> { \
+    inline void operator()(type_* name_) const noexcept;\
+  };\
+  inline void ::agt::impl::default_destroy<type_>::operator()(type_* name_) const noexcept
 
 #endif//AGATE_CORE_TRANSIENT_HPP
