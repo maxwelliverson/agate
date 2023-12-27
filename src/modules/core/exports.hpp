@@ -31,16 +31,16 @@ namespace agt {
   agt_fiber_transfer_t AGT_stdcall fiber_switch_except(agt_fiber_t fiber, agt_fiber_param_t param, agt_fiber_flags_t flags) noexcept;
 
 
-  async_base*  AGT_stdcall alloc_async(agt_ctx_t ctx);
-  void         AGT_stdcall free_async(async_base* async);
+  async*       AGT_stdcall alloc_async(agt_ctx_t ctx);
+  void         AGT_stdcall free_async(async* async);
 
   void         AGT_stdcall init_async_private(async* pAsyncBuffer);
   void         AGT_stdcall init_async_shared(async* pAsyncBuffer);
-  void         AGT_stdcall copy_async_private(const async_base* from, async_base* to);
-  void         AGT_stdcall copy_async_shared(const async_base* from, async_base* to);
-  void         AGT_stdcall move_async(async_base* from, async_base* to);
-  void         AGT_stdcall clear_async(async_base* async);
-  void         AGT_stdcall destroy_async(async_base* async);
+  void         AGT_stdcall copy_async_private(const async* from, async* to);
+  void         AGT_stdcall copy_async_shared(const async* from, async* to);
+  void         AGT_stdcall move_async(async* from, async* to);
+  void         AGT_stdcall clear_async(async* async);
+  void         AGT_stdcall destroy_async(async* async);
 
   agt_status_t AGT_stdcall async_get_status_private(async* async, agt_u64_t* pResult);
   agt_status_t AGT_stdcall async_get_status_shared(async* async, agt_u64_t* pResult);

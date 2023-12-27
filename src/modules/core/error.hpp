@@ -11,6 +11,18 @@ namespace agt {
 
   namespace err {
 
+    enum class code {
+      badFiberExit
+    };
+
+
+
+    struct fiber_exit_info {
+      agt_status_t returnCode;
+      int          exitCode;
+      agt_string_t name;
+    };
+
     struct overflow_info {
       void*       obj;
       const char* msg;

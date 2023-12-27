@@ -80,17 +80,10 @@ using agt_char_t = char;
 #define PP_AGT_impl_DELAY PP_AGT_impl_DELAY_indirect
 #define AGT_delay_macro(...) PP_AGT_impl_DELAY(__VA_ARGS__)
 
-#if defined(AGT_BUILD_SHARED)
-# if defined(AGT_BUILD_STATIC)
-#  error Compilation may not define both AGT_BUILD_SHARED and AGT_BUILD_STATIC.
-# endif
-# define AGT_api_call(func, ctx) ((ctx)->exports->_##func)
-#else
-# if !defined(AGT_BUILD_STATIC)
-#  error Compilation must define either AGT_BUILD_SHARED or AGT_BUILD_STATIC.
-# endif
-# define AGT_api_call(func, ctx) AGT_delay_macro(agt_##func)
-#endif
+
+
+#define AGT_ctx_api(func, ctx) ((ctx)->exports->_pfn_##func)
+#define AGT_api(func) ((::agt::get_ctx())->exports->_pfn_##func)
 
 
 

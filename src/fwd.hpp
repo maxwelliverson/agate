@@ -6,7 +6,6 @@
 #define JEMSYS_AGATE2_FWD_HPP
 
 
-
 extern "C" {
 
 typedef struct agt_async_data_st*   agt_async_data_t;
@@ -154,12 +153,25 @@ namespace agt {
   namespace impl {
     template <typename T>
     struct default_destroy {
+      inline constexpr static bool is_default_impl = true;
       AGT_forceinline constexpr void operator()(T* value) const noexcept {
         AGT_invariant(value != nullptr);
         if constexpr (!std::is_trivially_destructible_v<T>)
           value->~T();
       }
     };
+
+    template <typename Dtor>
+    struct is_trivial_dtor_st {
+      inline constexpr static bool value = false;
+    };
+    template <typename T> requires (requires{ { default_destroy<T>::is_default_impl } -> std::convertible_to<bool>; } && default_destroy<T>::is_default_impl)
+    struct is_trivial_dtor_st<default_destroy<T>> {
+      inline constexpr static bool value = std::is_trivially_destructible_v<T>;
+    };
+
+    template <typename Dtor>
+    inline constexpr static bool is_trivial_dtor = is_trivial_dtor_st<Dtor>::value;
   }
 
 

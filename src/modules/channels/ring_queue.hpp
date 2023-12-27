@@ -131,7 +131,7 @@ namespace agt {
   void         _send_msg(local_sp_ring_queue_sender* sender, void* msgBuffer, agt_async_t* async) noexcept {
     AGT_invariant(msgBuffer != nullptr);
 
-    AGT_api_call(async_attach, sender->ctx)();
+    AGT_api(async_attach, sender->ctx)();
   }
 }
 

@@ -131,20 +131,13 @@
 #define AGT_agents_api
 #define AGT_async_api
 #define AGT_exec_api     // This isn't a distinct module, but is rather a tag for functions that should only be called from custom executors
+#define AGT_shmem_api
 #define AGT_channels_api
 #define AGT_log_api
 #define AGT_network_api
 #define AGT_pool_api
 
 #if defined(_MSC_VER) || defined(__MINGW32__)
-# if !defined(AGT_SHARED_LIB)
-#  define AGT_api
-# elif defined(AGT_SHARED_LIB_EXPORT)
-#  define AGT_api __declspec(dllexport)
-# else
-#  define AGT_api __declspec(dllimport)
-# endif
-#
 # if defined(__MINGW32__)
 #  define AGT_restricted
 # else
@@ -186,7 +179,6 @@
 # define AGT_stdcall
 # define AGT_vectorcall
 # define AGT_may_alias    __attribute__((may_alias))
-# define AGT_api          __attribute__((visibility("default")))
 # define AGT_restricted
 # define AGT_malloc       __attribute__((malloc))
 # define AGT_noinline     __attribute__((noinline))
@@ -223,7 +215,6 @@
 # define AGT_cdecl
 # define AGT_stdcall
 # define AGT_vectorcall
-# define AGT_api
 # define AGT_may_alias
 # define AGT_restricted
 # define AGT_malloc
@@ -446,9 +437,6 @@ namespace agtxx {
 #define AGT_page_aligned      AGT_alignas(AGT_PHYSICAL_PAGE_SIZE)
 
 
-#define AGT_agent_api AGT_api
-
-
 /* =================[ Macro Functions ]================= */
 
 
@@ -615,6 +603,7 @@ typedef enum agt_status_t {
   AGT_ERROR_NOT_BOUND,
   AGT_ERROR_FOREIGN_SENDER,
   AGT_ERROR_STATUS_NOT_SET,
+  AGT_ERROR_AT_CAPACITY,
   AGT_ERROR_UNKNOWN_MESSAGE_TYPE,
   AGT_ERROR_INVALID_CMD /** < The given handle does not implement the called function. eg. agt_receive_message cannot be called on a channel sender*/,
   AGT_ERROR_INVALID_FLAGS,
@@ -647,7 +636,9 @@ typedef enum agt_status_t {
   AGT_ERROR_NOT_YET_IMPLEMENTED,
   AGT_ERROR_CORRUPTED_MESSAGE,
   AGT_ERROR_COULD_NOT_REACH_ALL_TARGETS,
-  AGT_ERROR_INTERNAL_OVERFLOW,            /** < Indicates an internal overflow error that was caught and corrected but that caused the requested operation to fail. */
+  AGT_ERROR_INTERNAL_OVERFLOW,            ///< Indicates an internal overflow error that was caught and corrected but that caused the requested operation to fail.
+  AGT_ERROR_OBJECT_IS_BUSY,               ///< Indicates that the requested operation failed because the receiving object is doing something else at the moment.
+
 
   AGT_ERROR_UNKNOWN_ATTRIBUTE,
   AGT_ERROR_INVALID_ATTRIBUTE_VALUE,
@@ -660,6 +651,7 @@ typedef enum agt_status_t {
   AGT_ERROR_NO_FIBER_BOUND,       ///< Returned by a procedure that must only be called from within a fiber if it is called from outside of a fiber.
   AGT_ERROR_ALREADY_FIBER,        ///< Returned by agt_enter_efiber if the calling context is already executing in a fiber.
   AGT_ERROR_IN_AGENT_CONTEXT,     ///< Returned by procedures that can only be called outside of an Agent Execution Context are called by an agent.
+  AGT_ERROR_FCTX_EXCEPTION,       ///< Returned by agt_enter_fctx when the fctx undergoes abnormal termination (most frequently by a call to agt_exit_fctx with an exit code other than 0)
 } agt_status_t;
 
 /*typedef struct agt_batch_status_t {

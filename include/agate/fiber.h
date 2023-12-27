@@ -165,43 +165,55 @@ typedef struct agt_fctx_desc_t {
  *
  * @param [optional, out] pExitCode If not null, the value of the exitCode argument used in the call to agt_exit_fctx that exits this fctx will be written to the specified address.
  * */
-AGT_exec_api agt_status_t AGT_stdcall agt_enter_fctx(agt_ctx_t ctx, const agt_fctx_desc_t* pFCtxDesc, int* pExitCode) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_enter_fctx(agt_ctx_t ctx, const agt_fctx_desc_t* pFCtxDesc, int* pExitCode) AGT_noexcept;
 
-AGT_exec_api void         AGT_stdcall agt_exit_fctx(agt_ctx_t ctx, int exitCode) AGT_noexcept;
-
-
-
-AGT_exec_api agt_status_t AGT_stdcall agt_new_fiber(agt_ctx_t ctx, agt_fiber_t* pFiber, agt_fiber_proc_t proc, agt_u64_t initialParam, void* userData) AGT_noexcept;
-
-AGT_exec_api void         AGT_stdcall agt_destroy_fiber(agt_ctx_t ctx, agt_fiber_t fiber) AGT_noexcept;
+AGT_core_api void         AGT_stdcall agt_exit_fctx(agt_ctx_t ctx, int exitCode) AGT_noexcept;
 
 
+/**
+ * Creates a new fiber within the current fiber context. The new fiber is created in a
+ * suspended state, and will not execute until jumped to with either \ref agt_fiber_jump
+ * or \ref agt_fiber_switch
+ *
+ *
+ * This may only be called from within a fiber context; otherwise an error is returned.
+ *
+ * \note Unlike \ref agt_enter_fctx, there's no initial parameter set to be passed to proc.
+ *       This is because the new fiber is created in a suspended state, and does not run until
+ *       jumped to, and a jump operation always has a parameter. Therefore, the initial
+ *       parameter to proc will be the parameter passed the first time the fiber is jumped to.
+ */
+AGT_core_api agt_status_t AGT_stdcall agt_new_fiber(agt_ctx_t ctx, agt_fiber_t* pFiber, agt_fiber_proc_t proc, void* userData) AGT_noexcept;
 
-AGT_exec_api void*        AGT_stdcall agt_set_fiber_data(agt_fiber_t fiber, void* userData) AGT_noexcept;
+AGT_core_api void         AGT_stdcall agt_destroy_fiber(agt_ctx_t ctx, agt_fiber_t fiber) AGT_noexcept;
 
-AGT_exec_api void*        AGT_stdcall agt_get_fiber_data(agt_fiber_t fiber) AGT_noexcept;
 
-AGT_exec_api agt_fiber_t  AGT_stdcall agt_get_current_fiber() AGT_noexcept;
+
+AGT_core_api void*        AGT_stdcall agt_set_fiber_data(agt_fiber_t fiber, void* userData) AGT_noexcept;
+
+AGT_core_api void*        AGT_stdcall agt_get_fiber_data(agt_fiber_t fiber) AGT_noexcept;
+
+AGT_core_api agt_fiber_t  AGT_stdcall agt_get_current_fiber() AGT_noexcept;
 
 
 
 // Save current context, jump to another.
 // Returns the param value used to jump back to this context
 // If @param fiber is the currently bound fiber, this returns @param param immediately
-AGT_exec_api agt_fiber_transfer_t AGT_stdcall agt_fiber_switch(agt_fiber_t fiber, agt_fiber_param_t param, agt_fiber_flags_t flags) AGT_noexcept;
+AGT_core_api agt_fiber_transfer_t AGT_stdcall agt_fiber_switch(agt_fiber_t fiber, agt_fiber_param_t param, agt_fiber_flags_t flags) AGT_noexcept;
 
 // Jumps to another fiber context with @param param
 // Does not save current context
 // If fiber is AGT_CURRENT_FIBER, the context will jump back to the previous context save in this fiber,
 //   whether by agt_fiber_divert,
-AGT_exec_api AGT_noreturn void    AGT_stdcall agt_fiber_jump(agt_fiber_t fiber, agt_fiber_param_t param) AGT_noexcept;
+AGT_core_api AGT_noreturn void    AGT_stdcall agt_fiber_jump(agt_fiber_t fiber, agt_fiber_param_t param) AGT_noexcept;
 
 // Saves current context,
 // After saving, calls @param proc with @param param
 // Expectation is that proc does not return, and later calls agt_fiber_jump
 // Return value is the param argument passed to the call to agt_fiber_jump/agt_fiber_switch used to jump back to this save point
 // If @param proc DOES return, the value that is returned by this call is equal to @param param
-AGT_exec_api agt_fiber_transfer_t AGT_stdcall agt_fiber_fork(agt_fiber_proc_t proc, agt_fiber_param_t param, agt_fiber_flags_t flags) AGT_noexcept;
+AGT_core_api agt_fiber_transfer_t AGT_stdcall agt_fiber_fork(agt_fiber_proc_t proc, agt_fiber_param_t param, agt_fiber_flags_t flags) AGT_noexcept;
 
 
 /// Saves current context,
@@ -213,7 +225,7 @@ AGT_exec_api agt_fiber_transfer_t AGT_stdcall agt_fiber_fork(agt_fiber_proc_t pr
 ///   the fctx saved by agt_fiber_loop again calls @param proc.
 /// Returns the value returned by proc. Unlike agt_fiber_fork, this does not need to be an
 ///   agt_fiber_transfer_t, because control can only ever return from the current fiber.
-AGT_exec_api agt_fiber_transfer_t AGT_stdcall agt_fiber_loop(agt_fiber_proc_t proc, agt_fiber_param_t param, agt_fiber_flags_t flags) AGT_noexcept;
+AGT_core_api agt_fiber_transfer_t AGT_stdcall agt_fiber_loop(agt_fiber_proc_t proc, agt_fiber_param_t param, agt_fiber_flags_t flags) AGT_noexcept;
 
 
 

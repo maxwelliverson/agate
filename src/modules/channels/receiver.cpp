@@ -6,20 +6,21 @@
 #include "message_queue.hpp"
 
 
-agt_message_t agt::receiveLocalSPSCQueue(receiver_t receiver,  agt_timeout_t timeout) noexcept {
-  AGT_assert( receiver->kind == local_spsc_receiver_kind );
+agt_status_t agt::receiveLocalSPSCQueue(receiver_t receiver, message*& message, agt_timeout_t timeout) noexcept {
   auto r = static_cast<agt::local_spsc_receiver*>(receiver);
 
-  agt_message_st* msg = nullptr;
 
-  if (atomicWaitFor(r->head, msg, timeout, nullptr)) {
-    atomicStore(r->head, msg->next);
-    auto newTail = &msg->next;
-    atomicCompareExchange(r->tail, newTail, &r->head);
+  if (atomicWaitFor(r->head, message, timeout, nullptr)) {
+    atomicStore(r->head, message->next);
+    auto newTail = &message->next;
+    atomicCompareExchange(*r->pTail, newTail, &r->head); // ie. if the sender's tail points to message->next, then set tail to point to r->head.
+
+    return AGT_SUCCESS;
   }
 
-  return msg;
+  return AGT_NOT_READY;
 }
+
 agt_message_t agt::receiveLocalMPSCQueue(receiver_t receiver,  agt_timeout_t timeout) noexcept;
 agt_message_t agt::receiveLocalSPMCQueue(receiver_t receiver,  agt_timeout_t timeout) noexcept;
 agt_message_t agt::receiveLocalMPMCQueue(receiver_t receiver,  agt_timeout_t timeout) noexcept;

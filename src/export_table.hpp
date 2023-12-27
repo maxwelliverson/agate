@@ -28,7 +28,9 @@ namespace agt {
 
   struct fiber_pool;
 
-  struct alignas(AGT_ASYNC_STRUCT_ALIGNMENT) async_base {
+  struct async;
+
+  /*struct alignas(AGT_ASYNC_STRUCT_ALIGNMENT) async_base {
     agt_ctx_t         ctx;
     agt_u32_t         structSize;
     agt_async_flags_t flags;
@@ -36,7 +38,7 @@ namespace agt {
     fiber*            boundFiber;
     agt_status_t      status;
     agt_u8_t          reserved[AGT_ASYNC_STRUCT_SIZE - 36];
-  };
+  };*/
 
 
   /**
@@ -96,7 +98,7 @@ namespace agt {
     agt_status_t (* AGT_stdcall _pfn_bind_name)(agt_ctx_t ctx, agt_name_t name, void* object);
 
 
-    async_base*  (* AGT_stdcall _pfn_alloc_async)(agt_ctx_t ctx);
+    async*       (* AGT_stdcall _pfn_alloc_async)(agt_ctx_t ctx);
     void         (* AGT_stdcall _pfn_free_async)(agt_ctx_t ctx, agt_async_t async);
 
 
@@ -105,17 +107,17 @@ namespace agt {
 
     /* ========================= [ Async 0.01 ] ========================= */
 
-    void         (* AGT_stdcall _pfn_init_async)(async_base* pAsyncBuffer);
+    void         (* AGT_stdcall _pfn_initialize_async)(async* pAsyncBuffer);
 
-    void         (* AGT_stdcall _pfn_copy_async)(const async_base* from, async_base* to);
-    void         (* AGT_stdcall _pfn_move_async)(async_base* from, async_base* to);
+    void         (* AGT_stdcall _pfn_copy_async)(const async* from, async* to);
+    void         (* AGT_stdcall _pfn_move_async)(async* from, async* to);
 
     void         (* AGT_stdcall _pfn_clear_async)(agt_async_t async);
     void         (* AGT_stdcall _pfn_destroy_async)(agt_async_t async);
 
-    agt_status_t (* AGT_stdcall _pfn_async_get_status)(async_base* async, agt_u64_t* pResult);
+    agt_status_t (* AGT_stdcall _pfn_async_get_status)(async* async, agt_u64_t* pResult);
 
-    agt_status_t (* AGT_stdcall _pfn_wait)(agt_async_t async, agt_u64_t* pResult, agt_timeout_t timeout);
+    agt_status_t (* AGT_stdcall _pfn_wait)(async* async, agt_u64_t* pResult, agt_timeout_t timeout);
     agt_status_t (* AGT_stdcall _pfn_wait_all)(const agt_async_t*, agt_size_t, agt_timeout_t);
     agt_status_t (* AGT_stdcall _pfn_wait_any)(const agt_async_t*, agt_size_t, agt_size_t*, agt_timeout_t);
 
@@ -176,12 +178,19 @@ namespace agt {
 
 
 
-    fiber_pool*  (* AGT_stdcall _pfn_new_fiber_pool)(agt_ctx_t ctx, size_t stackSize, const agt_fiber_desc_t* fiberDesc);
-    void         (* AGT_stdcall _pfn_retain_fiber_pool)(agt_ctx_t ctx, fiber_pool* pool);
-    void         (* AGT_stdcall _pfn_release_fiber_pool)(agt_ctx_t ctx, fiber_pool* pool);
+    fiber_pool*          (* AGT_stdcall _pfn_new_fiber_pool)(agt_ctx_t ctx, const agt_fctx_desc_t* fiberDesc);
+    void                 (* AGT_stdcall _pfn_retain_fiber_pool)(agt_ctx_t ctx, fiber_pool* pool);
+    void                 (* AGT_stdcall _pfn_release_fiber_pool)(agt_ctx_t ctx, fiber_pool* pool);
 
-    agt_status_t (* AGT_stdcall _pfn_fiber_pool_alloc)(agt_ctx_t ctx, fiber_pool* pool, agt_fiber_proc_t proc, void* userData, agt_fiber_t* pResult);
+    agt_status_t         (* AGT_stdcall _pfn_fiber_pool_alloc)(agt_ctx_t ctx, fiber_pool* pool, agt_fiber_proc_t proc, void* userData, agt_fiber_t* pResult);
 
+
+    agt_status_t         (* AGT_stdcall _pfn_enter_fctx)(agt_ctx_t ctx, const agt_fctx_desc_t* pFCtxDesc, int* pExitCode);
+    void                 (* AGT_stdcall _pfn_exit_fctx)(agt_ctx_t ctx, int exitCode);
+
+    agt_status_t         (* AGT_stdcall _pfn_new_fiber)(agt_ctx_t ctx, agt_fiber_t* pFiber, agt_fiber_proc_t proc, void* userData);
+
+    void                 (* AGT_stdcall _pfn_destroy_fiber)(agt_ctx_t ctx, agt_fiber_t fiber);
 
     void                 (* AGT_stdcall _pfn_fiber_init)(agt_fiber_t fiber, agt_fiber_proc_t proc, bool isConvertingThread);
     agt_fiber_transfer_t (* AGT_stdcall _pfn_fiber_switch)(agt_fiber_t fiber, agt_fiber_param_t param, agt_fiber_flags_t flags);

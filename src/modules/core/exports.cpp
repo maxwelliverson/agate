@@ -10,13 +10,12 @@
 extern "C" void agatelib_get_exports(agt::init::module_exports& moduleExports, const agt::init::attributes& attributes) noexcept {
   bool exceptionsEnabled = true;
   bool isShared = false;
-  bool usingNativeUnit = ;
+  bool usingNativeUnit = attributes.using_native_unit();
+
   if (auto maybeExceptionsEnabled = attributes.get_as<bool>(AGT_ATTR_CXX_EXCEPTIONS_ENABLED))
     exceptionsEnabled = *maybeExceptionsEnabled;
   if (auto maybeIsShared = attributes.get_as<bool>(AGT_ATTR_SHARED_CONTEXT))
     isShared = *maybeIsShared;
-
-  if (auto maybeHasNativeUnit = attributes.get_as<uintptr_t>(AGT_ATTR_DURATION_UNIT_SIZE_NS))
 
 
   if (exceptionsEnabled) {
@@ -34,7 +33,18 @@ extern "C" void agatelib_get_exports(agt::init::module_exports& moduleExports, c
   }
 
   if (isShared) {
-    AGT_add_public_export();
+    AGT_add_private_export(initialize_async, agt::init_async_shared);
+    AGT_add_public_export(copy_async, agt::copy_async_shared);
+    if (usingNativeUnit)
+      AGT_add_public_export(wait, agt::async_wait_native_unit_shared);
+    else
+      AGT_add_public_export(wait, agt::async_wait_foreign_unit_shared);
+  }
+  else {
+    if (usingNativeUnit)
+      AGT_add_public_export(wait, agt::async_wait_native_unit_private);
+    else
+      AGT_add_public_export(wait, agt::async_wait_foreign_unit_private);
   }
 
 }

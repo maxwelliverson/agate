@@ -14,6 +14,9 @@
 #include "core/object.hpp"
 
 
+#include <memory>
+
+
 #if !defined(AGT_POOL_BASIC_UNIT_SIZE)
 #define AGT_POOL_BASIC_UNIT_SIZE 8
 #endif

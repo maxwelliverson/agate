@@ -12,12 +12,12 @@ AGT_begin_c_namespace
 /* ============[ Fixed Size Memory Pool ]============ */
 
 
-AGT_api agt_status_t        AGT_stdcall agt_new_pool(agt_ctx_t ctx, agt_pool_t* pPool, agt_size_t fixedSize, agt_pool_flags_t flags) AGT_noexcept;
-AGT_api agt_status_t        AGT_stdcall agt_reset_pool(agt_pool_t pool) AGT_noexcept;
-AGT_api void                AGT_stdcall agt_destroy_pool(agt_pool_t pool) AGT_noexcept;
+AGT_core_api agt_status_t        AGT_stdcall agt_new_pool(agt_ctx_t ctx, agt_pool_t* pPool, agt_size_t fixedSize, agt_pool_flags_t flags) AGT_noexcept;
+AGT_core_api agt_status_t        AGT_stdcall agt_reset_pool(agt_pool_t pool) AGT_noexcept;
+AGT_core_api void                AGT_stdcall agt_destroy_pool(agt_pool_t pool) AGT_noexcept;
 
-AGT_api void*               AGT_stdcall agt_pool_alloc(agt_pool_t pool) AGT_noexcept;
-AGT_api void                AGT_stdcall agt_pool_free(agt_pool_t pool, void* allocation) AGT_noexcept;
+AGT_core_api void*               AGT_stdcall agt_pool_alloc(agt_pool_t pool) AGT_noexcept;
+AGT_core_api void                AGT_stdcall agt_pool_free(agt_pool_t pool, void* allocation) AGT_noexcept;
 
 
 
@@ -116,13 +116,13 @@ AGT_api void                AGT_stdcall agt_pool_free(agt_pool_t pool, void* all
 
 
 
-AGT_api agt_status_t        AGT_stdcall agt_new_rcpool(agt_ctx_t ctx, agt_rcpool_t* pPool, agt_size_t fixedSize, agt_pool_flags_t flags) AGT_noexcept;
-AGT_api void                AGT_stdcall agt_destroy_rcpool(agt_rcpool_t pool) AGT_noexcept;
+AGT_core_api agt_status_t        AGT_stdcall agt_new_rcpool(agt_ctx_t ctx, agt_rcpool_t* pPool, agt_size_t fixedSize, agt_pool_flags_t flags) AGT_noexcept;
+AGT_core_api void                AGT_stdcall agt_destroy_rcpool(agt_rcpool_t pool) AGT_noexcept;
 
 /**
  * Acquire ownership over a new rc allocation from the specified pool.
  * */
-AGT_api void*               AGT_stdcall agt_rc_alloc(agt_rcpool_t pool, agt_u32_t initialRefCount) AGT_noexcept;
+AGT_core_api void*               AGT_stdcall agt_rc_alloc(agt_rcpool_t pool, agt_u32_t initialRefCount) AGT_noexcept;
 /**
  * Release ownership of the specified allocation, and acquire another from the pool from which it was allocated
  *
@@ -132,15 +132,15 @@ AGT_api void*               AGT_stdcall agt_rc_alloc(agt_rcpool_t pool, agt_u32_
  * agt_rc_release(allocation);
  * result = agt_rc_alloc(pool);
  * */
-AGT_api void*               AGT_stdcall agt_rc_recycle(void* allocation, agt_u32_t releasedCount, agt_u32_t acquiredCount) AGT_noexcept;
-AGT_api void*               AGT_stdcall agt_rc_retain(void* allocation, agt_u32_t count) AGT_noexcept;
-AGT_api void                AGT_stdcall agt_rc_release(void* allocation, agt_u32_t count) AGT_noexcept;
+AGT_core_api void*               AGT_stdcall agt_rc_recycle(void* allocation, agt_u32_t releasedCount, agt_u32_t acquiredCount) AGT_noexcept;
+AGT_core_api void*               AGT_stdcall agt_rc_retain(void* allocation, agt_u32_t count) AGT_noexcept;
+AGT_core_api void                AGT_stdcall agt_rc_release(void* allocation, agt_u32_t count) AGT_noexcept;
 
 
-AGT_api agt_weak_ref_t      AGT_stdcall agt_weak_ref_take(void* rcObj, agt_epoch_t* pEpoch, agt_u32_t count) AGT_noexcept;
-AGT_api agt_weak_ref_t      AGT_stdcall agt_weak_ref_retain(agt_weak_ref_t ref, agt_epoch_t epoch, agt_u32_t count) AGT_noexcept;
-AGT_api void                AGT_stdcall agt_weak_ref_drop(agt_weak_ref_t token, agt_u32_t count) AGT_noexcept;
-AGT_api void*               AGT_stdcall agt_acquire_from_weak_ref(agt_weak_ref_t token, agt_epoch_t epoch, agt_weak_ref_flags_t flags) AGT_noexcept;
+AGT_core_api agt_weak_ref_t      AGT_stdcall agt_weak_ref_take(void* rcObj, agt_epoch_t* pEpoch, agt_u32_t count) AGT_noexcept;
+AGT_core_api agt_weak_ref_t      AGT_stdcall agt_weak_ref_retain(agt_weak_ref_t ref, agt_epoch_t epoch, agt_u32_t count) AGT_noexcept;
+AGT_core_api void                AGT_stdcall agt_weak_ref_drop(agt_weak_ref_t token, agt_u32_t count) AGT_noexcept;
+AGT_core_api void*               AGT_stdcall agt_acquire_from_weak_ref(agt_weak_ref_t token, agt_epoch_t epoch, agt_weak_ref_flags_t flags) AGT_noexcept;
 
 
 

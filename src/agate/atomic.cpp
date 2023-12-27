@@ -237,28 +237,28 @@ agt_u8_t  agt::atomicDecrement(agt_u8_t& value) noexcept {
 #if AGT_system_windows
   return (agt_u8_t)_InterlockedExchangeAdd8((char*)&value, (char)-1) - 1;
 #else
-  return __atomic_sub_fetch(&value, 1, __ATOMIC_SEQ_CST);
+  return __atomic_sub_fetch(&value, 1, __ATOMIC_SEQ_CST) - 1;
 #endif
 }
 agt_u16_t agt::atomicDecrement(agt_u16_t& value) noexcept {
 #if AGT_system_windows
   return (agt_u16_t)_InterlockedDecrement16((agt_i16_t*)&value);
 #else
-  return __atomic_sub_fetch(&value, 1, __ATOMIC_SEQ_CST);
+  return __atomic_sub_fetch(&value, 1, __ATOMIC_SEQ_CST) - 1;
 #endif
 }
 agt_u32_t agt::atomicDecrement(agt_u32_t& value) noexcept {
 #if AGT_system_windows
   return _InterlockedDecrement(&value);
 #else
-  return __atomic_sub_fetch(&value, 1, __ATOMIC_SEQ_CST);
+  return __atomic_sub_fetch(&value, 1, __ATOMIC_SEQ_CST) - 1;
 #endif
 }
 agt_u64_t agt::atomicDecrement(agt_u64_t& value) noexcept {
 #if AGT_system_windows
   return _InterlockedDecrement(&value);
 #else
-  return __atomic_sub_fetch(&value, 1, __ATOMIC_SEQ_CST);
+  return __atomic_sub_fetch(&value, 1, __ATOMIC_SEQ_CST) - 1;
 #endif
 }
 

@@ -203,7 +203,7 @@ result<agt_executor_t> make_executor(Args&& ...args) noexcept {
       .maxBoundAgents = execInfo.maxBoundAgents,
       .stackSize      = execInfo.stackSize,
       .maxConcurrency = execInfo.maxConcurrency,
-      .customParams   = &customParams
+      .params   = &customParams
   };
 
 

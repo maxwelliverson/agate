@@ -41,7 +41,7 @@ typedef struct agt_timer_desc_t {
 
 
 
-AGT_api agt_status_t AGT_stdcall agt_new_timer(agt_ctx_t ctx, agt_timer_t* pTimer, agt_name_t name, const agt_timer_desc_t* pTimerDesc) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_new_timer(agt_ctx_t ctx, agt_timer_t* pTimer, agt_name_t name, const agt_timer_desc_t* pTimerDesc) AGT_noexcept;
 
 
 

@@ -205,7 +205,7 @@ AGT_static_api agt_status_t AGT_stdcall agt_default_init(agt_ctx_t* pCtx, int he
  * TODO: Decide whether to provide another API call with differing behaviour depending on whether or not
  *       one wishes to wait for processing to finish.
  * */
-AGT_api agt_status_t        AGT_stdcall agt_finalize(agt_ctx_t context) AGT_noexcept;
+AGT_core_api agt_status_t        AGT_stdcall agt_finalize(agt_ctx_t context) AGT_noexcept;
 
 
 

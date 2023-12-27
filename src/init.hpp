@@ -19,7 +19,7 @@
 #include <optional>
 
 /*template <>
-struct agt::map_key_info<agt_attr_id_t> {
+struct agt::key_info<agt_attr_id_t> {
   [[nodiscard]] static uint32_t get_hash_value(agt_attr_id_t attrId) noexcept {
     *//*return (((uint32_t)attrId) >> 4) ^ (((uint32_t)attrId) >> 9);
     return (unsigned((uintptr_t)val) >> 4) ^

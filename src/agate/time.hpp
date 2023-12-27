@@ -35,6 +35,10 @@ namespace agt {
     QueryPerformanceCounter(&largeInteger);
     return largeInteger.QuadPart;
   }
+
+  AGT_forceinline static agt_timestamp_t now() noexcept {
+    return get_fast_timestamp();
+  }
 }
 
 #endif//AGATE_INTERNAL_TIME_HPP

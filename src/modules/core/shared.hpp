@@ -12,6 +12,47 @@ namespace agt {
   struct shared_ctx;
 
 
+  struct shared_cb;
+  struct shared_cache;
+
+  struct tmem_cb; // Transient memory control block; is a normal shared allocation
+
+
+
+  enum class shared_mem  : agt_u64_t; // Normal allocation; does not move, may be indefinitely cached.
+  enum class shared_tmem : agt_u64_t; // Transient memory;  may move and/or change size, may not be indefinitely cached
+
+  struct imported_transient_memory {
+    void*       localAddress;
+    agt_u32_t   epoch;
+    agt_u32_t   flags;
+    tmem_cb*    cb;
+    shared_tmem handle;
+  };
+
+
+  struct shared_allocator;
+
+
+
+  struct shared_allocation {
+    agt_shmem_t handle;
+    void*       localAddress;
+  };
+
+
+
+  void         alloc_tmem(agt_ctx_t ctx, imported_transient_memory* memory, size_t size, size_t alignment) noexcept;
+
+
+
+  void         free_tmem(agt_ctx_t ctx, imported_transient_memory* memory) noexcept;
+
+
+  void*        map_tmem(agt_ctx_t ctx, imported_transient_memory* memory) noexcept;
+
+  void         unmap_tmem(agt_ctx_t ctx, imported_transient_memory* memory) noexcept;
+
 
   agt_status_t sharedControlBlockInit(shared_ctx* pSharedCtx) noexcept;
 

@@ -22,14 +22,18 @@ namespace agt {
   };
 
   enum class object_type : agt_u16_t {
+
+    agent_self,
+
     local_agent,
     proxy_agent,
     shared_agent,
     imported_agent,
 
     local_busy_executor,
-    local_single_thread_executor,
-    local_pool_executor,
+    local_event_executor,
+    local_user_executor,
+    local_parallel_executor,
     local_proxy_executor,
     shared_busy_executor,
     shared_single_thread_executor,
@@ -60,15 +64,15 @@ namespace agt {
     shared_mpmc_sized_message_pool,
 
 
-    local_spsc_queue_sender,
-    local_mpsc_queue_sender,
-    local_spmc_queue_sender,
-    local_mpmc_queue_sender,
-    shared_spsc_queue_sender,
-    shared_mpsc_queue_sender,
-    shared_spmc_queue_sender,
-    shared_mpmc_queue_sender,
-    private_queue_sender,
+    local_spsc_sender,
+    local_mpsc_sender,
+    local_spmc_sender,
+    local_mpmc_sender,
+    shared_spsc_sender,
+    shared_mpsc_sender,
+    shared_spmc_sender,
+    shared_mpmc_sender,
+    private_sender,
     local_sp_ring_queue_sender,
     local_mp_ring_queue_sender,
     shared_sp_ring_queue_sender,
@@ -78,15 +82,15 @@ namespace agt {
     shared_sp_bqueue_sender,
     shared_mp_bqueue_sender,
 
-    local_spsc_queue_receiver,
-    local_mpsc_queue_receiver,
-    local_spmc_queue_receiver,
-    local_mpmc_queue_receiver,
-    shared_spsc_queue_receiver,
-    shared_mpsc_queue_receiver,
-    shared_spmc_queue_receiver,
-    shared_mpmc_queue_receiver,
-    private_queue_receiver,
+    local_spsc_receiver,
+    local_mpsc_receiver,
+    local_spmc_receiver,
+    local_mpmc_receiver,
+    shared_spsc_receiver,
+    shared_mpsc_receiver,
+    shared_spmc_receiver,
+    shared_mpmc_receiver,
+    private_receiver,
     local_sp_ring_queue_receiver,
     local_mp_ring_queue_receiver,
     shared_sp_ring_queue_receiver,
@@ -126,10 +130,10 @@ namespace agt {
     executor_begin = local_busy_executor,
     executor_end   = shared_proxy_executor,
 
-    sender_begin   = local_spsc_queue_sender,
+    sender_begin   = local_spsc_sender,
     sender_end     = shared_mp_bqueue_sender,
 
-    receiver_begin = local_spsc_queue_receiver,
+    receiver_begin = local_spsc_receiver,
     receiver_end   = shared_mp_bqueue_receiver,
 
     object_pool_begin = private_object_pool,

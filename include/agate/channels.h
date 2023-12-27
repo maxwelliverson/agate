@@ -47,15 +47,15 @@ typedef struct agt_ring_queue_desc_t {
 
 
 
-AGT_api agt_status_t agt_create_broadcast_queue(agt_ctx_t ctx, agt_sender_t* pSender, const agt_broadcast_queue_desc_t* pBQueue) AGT_noexcept;
+AGT_core_api agt_status_t agt_create_broadcast_queue(agt_ctx_t ctx, agt_sender_t* pSender, const agt_broadcast_queue_desc_t* pBQueue) AGT_noexcept;
 
 // Only a receiver is returned, given that only
-AGT_api agt_status_t agt_create_ring_queue(agt_ctx_t ctx, agt_receiver_t* pReceiver, const agt_ring_queue_desc_t* pRingQueue) AGT_noexcept;
+AGT_core_api agt_status_t agt_create_ring_queue(agt_ctx_t ctx, agt_receiver_t* pReceiver, const agt_ring_queue_desc_t* pRingQueue) AGT_noexcept;
 
 
-AGT_api agt_status_t agt_open_senders(agt_receiver_t toReceiver, agt_sender_t* pSender, size_t senderCount) AGT_noexcept;
+AGT_core_api agt_status_t agt_open_senders(agt_receiver_t toReceiver, agt_sender_t* pSender, size_t senderCount) AGT_noexcept;
 
-AGT_api agt_status_t agt_open_receivers(agt_sender_t toSender, agt_receiver_t* pReceiver, size_t receiverCount) AGT_noexcept;
+AGT_core_api agt_status_t agt_open_receivers(agt_sender_t toSender, agt_receiver_t* pReceiver, size_t receiverCount) AGT_noexcept;
 
 
 
@@ -82,14 +82,14 @@ AGT_api agt_status_t agt_open_receivers(agt_sender_t toSender, agt_receiver_t* p
  * */
 
 
-AGT_api agt_status_t agt_acquire_msg(agt_sender_t sender, size_t desiredMessageSize, void** ppMsgBuffer, agt_timeout_t timeout) AGT_noexcept;
+AGT_core_api agt_status_t agt_acquire_msg(agt_sender_t sender, size_t desiredMessageSize, void** ppMsgBuffer, agt_timeout_t timeout) AGT_noexcept;
 
 /**
  *
  * */
-AGT_api agt_status_t agt_send_msg(agt_sender_t sender, void* msgBuffer, size_t size, agt_async_t async) AGT_noexcept;
+AGT_core_api agt_status_t agt_send_msg(agt_sender_t sender, void* msgBuffer, size_t size, agt_async_t async) AGT_noexcept;
 
-AGT_api agt_status_t agt_receive_msg(agt_receiver_t receiver, void** pMsgBuffer, size_t* pMsgSize, agt_timeout_t timeout) AGT_noexcept;
+AGT_core_api agt_status_t agt_receive_msg(agt_receiver_t receiver, void** pMsgBuffer, size_t* pMsgSize, agt_timeout_t timeout) AGT_noexcept;
 
 
 

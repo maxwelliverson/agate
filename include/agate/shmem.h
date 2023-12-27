@@ -30,7 +30,7 @@ typedef agt_flags32_t agt_shmem_alloc_flags_t;
 
 typedef enum agt_sheap_flag_bits_t {
   AGT_SHEAP_SHARED_OWNERSHIP    = 0x1, ///< If specified, this sheap may be imported (and used) by other instances. This incurs a potentially not-insignificant overhead for allocation operations, so the behaviour is explicitly opt-in.
-  AGT_SHEAP_FIXED_ADDRESS_SPACE = 0x2, ///< If specified, this sheap has a limited, fixed-size address space. While this means that memory exhaustion (and subsequently, allocation failure) is much more likely to occur, it guarantees that any fixed allocations made from the same sheap will have constant offsets from each other, allowing for very fast internal references.
+  AGT_SHEAP_FIXED_ADDRESS_SPACE = 0x2, ///< If specified, this sheap has a limited, fixed-size address space. While this means that memory exhaustion (and subsequently, allocation failure) is much more likely to occur, it guarantees that any fixed allocations made from the same sheap will have constant offsets from each other, allowing for very efficient internal references.
   AGT_SHEAP_TRANSIENT           = 0x4, ///< If specified, this sheap makes transient allocations, which are resizable at the expense of not having a
 } agt_sheap_flag_bits_t;
 typedef agt_flags32_t agt_sheap_flags_t;
@@ -72,31 +72,31 @@ typedef struct agt_shmem_mapping_t {
 /**
  * If size is 0, the whole range (starting from the specified offset) will be mapping, and the mapped range returned
  * */
-AGT_api agt_status_t agt_shmem_map(agt_ctx_t ctx, agt_shmem_t mem, size_t size, size_t offset, agt_shmem_mapping_t* pMappingInfo) AGT_noexcept;
+AGT_shmem_api agt_status_t agt_shmem_map(agt_ctx_t ctx, agt_shmem_t mem, size_t size, size_t offset, agt_shmem_mapping_t* pMappingInfo) AGT_noexcept;
 /**
  * */
-AGT_api void         agt_shmem_unmap(agt_ctx_t ctx, void* address) AGT_noexcept;
+AGT_shmem_api void         agt_shmem_unmap(agt_ctx_t ctx, void* address) AGT_noexcept;
 /**
  * Will also unmap any local mappings.
  * */
-AGT_api void         agt_shmem_free(agt_ctx_t ctx, agt_shmem_t shmem) AGT_noexcept;
+AGT_shmem_api void         agt_shmem_free(agt_ctx_t ctx, agt_shmem_t shmem) AGT_noexcept;
 
 
 
-AGT_api agt_status_t agt_new_sheap(agt_ctx_t ctx, agt_sheap_t* pSheap, const agt_sheap_create_info_t* pCreateInfo, agt_sheap_flags_t flags) AGT_noexcept;
-AGT_api void         agt_destroy_sheap(agt_sheap_t heap) AGT_noexcept;
+AGT_shmem_api agt_status_t agt_new_sheap(agt_ctx_t ctx, agt_sheap_t* pSheap, const agt_sheap_create_info_t* pCreateInfo, agt_sheap_flags_t flags) AGT_noexcept;
+AGT_shmem_api void         agt_destroy_sheap(agt_sheap_t heap) AGT_noexcept;
 
-AGT_api agt_status_t agt_sheap_alloc(agt_sheap_t heap, agt_shmem_t* mem, size_t size, size_t alignment, agt_shmem_mapping_t* pMapping) AGT_noexcept;
-AGT_api agt_status_t agt_sheap_realloc(agt_sheap_t heap, agt_shmem_t* mem, size_t size, size_t alignment, agt_shmem_mapping_t* pMapping) AGT_noexcept;
-
-
+AGT_shmem_api agt_status_t agt_sheap_alloc(agt_sheap_t heap, agt_shmem_t* mem, size_t size, size_t alignment, agt_shmem_mapping_t* pMapping) AGT_noexcept;
+AGT_shmem_api agt_status_t agt_sheap_realloc(agt_sheap_t heap, agt_shmem_t* mem, size_t size, size_t alignment, agt_shmem_mapping_t* pMapping) AGT_noexcept;
 
 
-AGT_api agt_status_t agt_new_shpool(agt_ctx_t ctx, agt_shpool_t* pShPool, const agt_shpool_create_info_t* pCreateInfo, agt_shpool_flags_t flags) AGT_noexcept;
-AGT_api void         agt_destroy_shpool(agt_shpool_t pool) AGT_noexcept;
 
-AGT_api agt_status_t agt_shpool_alloc(agt_shpool_t pool, agt_shmem_t* mem, agt_shmem_mapping_t* pMapping) AGT_noexcept;
-AGT_api void         agt_shpool_reset(agt_shpool_t pool) AGT_noexcept;
+
+AGT_shmem_api agt_status_t agt_new_shpool(agt_ctx_t ctx, agt_shpool_t* pShPool, const agt_shpool_create_info_t* pCreateInfo, agt_shpool_flags_t flags) AGT_noexcept;
+AGT_shmem_api void         agt_destroy_shpool(agt_shpool_t pool) AGT_noexcept;
+
+AGT_shmem_api agt_status_t agt_shpool_alloc(agt_shpool_t pool, agt_shmem_t* mem, agt_shmem_mapping_t* pMapping) AGT_noexcept;
+AGT_shmem_api void         agt_shpool_reset(agt_shpool_t pool) AGT_noexcept;
 
 
 AGT_end_c_namespace

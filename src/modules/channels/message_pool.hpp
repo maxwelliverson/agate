@@ -12,6 +12,8 @@
 
 namespace agt {
 
+  struct message;
+
 
   // Assume message_pool_t has infinite capacity. Acquiring a message should never fail due to the pool
   // having "run out of messages".
@@ -137,9 +139,12 @@ namespace agt {
   agt_status_t createInstance(shared_spmc_sized_message_pool*& poolRef, agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
   agt_status_t createInstance(shared_spmc_message_pool*& poolRef,       agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
 
-  agt_message_t acquire_message(agt_ctx_t ctx, private_sized_message_pool* pool) noexcept;
-  void          release_message(agt_ctx_t ctx, private_sized_message_pool* pool, agt_message_t message) noexcept;
-  void          release_message_pool(agt_ctx_t ctx, private_sized_message_pool* pool) noexcept;
+  message* acquire_message(agt_ctx_t ctx, private_sized_message_pool* pool) noexcept;
+  void     release_message(agt_ctx_t ctx, private_sized_message_pool* pool, message* message) noexcept;
+  void     release_message_pool(agt_ctx_t ctx, private_sized_message_pool* pool) noexcept;
+
+  message*      acquire_message(agt_ctx_t ctx, local_spmc_message_pool* pool, size_t size) noexcept;
+  void          release_message(agt_ctx_t ctx, local_spmc_message_pool* pool, size_t size, message* message) noexcept;
 
 
 

@@ -33,26 +33,31 @@ namespace agt {
 
 
 
-  struct agent_self : rc_object {
+  AGT_final_object_type(agent_self, ref_counted) {
     agt_agent_proc_t  proc;
     agt_agent_dtor_t  dtor;
     void*             state;
     agt_executor_t    executor;
-    agt_handle_t      selfHandle; // Exporting and such
     agt_u32_t         agentEpoch;
-    agt_efiber_t      boundFiber;
+    agt_u32_t         padding;    // ???
+    agt_handle_t      selfHandle; // Exporting and such
+    agt_fiber_t       boundFiber;
     agt_eagent_t      execAgentTag;
     agent_properties* properties;
     agent_methods*    methods;
   };
 
+  AGT_ref_counted_dtor(agent_self, value) {
+    value->dtor(reinterpret_cast<agt_self_t>(value), value->state);
+  }
+
   AGT_virtual_object_type(agent) {
-    agent_flags                  flags;
-    agent_self*                  self;
-    agent_self*                  refOwner;
-    receiver_t                   receiver;
-    const agt_u32_t*             pAgentEpoch;
-    agt_u32_t                    agentEpoch;
+    agent_flags      flags;
+    agent_self*      self;
+    agent_self*      refOwner;
+    sender_t         sender;
+    const agt_u32_t* pAgentEpoch; // points to self->agentEpoch; compare against value of cached agentEpoch to check if the cached epoch is out of date
+    agt_u32_t        agentEpoch;
   };
 
 
@@ -113,6 +118,12 @@ namespace agt {
   agt_status_t waitAny(blocked_queue& queue, agt_async_t* const * ppAsyncs, size_t asyncCount, agt_timeout_t timeout) noexcept;
 
   agt_status_t waitMany(blocked_queue& queue, agt_async_t* const * ppAsyncs, size_t asyncCount, size_t waitForCount, size_t& index, agt_timeout_t timeout) noexcept;
+
+
+  inline void advance_agent_epoch(agent_self* self) noexcept {
+    atomicIncrement(self->agentEpoch);
+  }
+
 }
 
 

@@ -177,9 +177,9 @@ typedef struct agt_agent_create_info_t {
 /* =================[ Agent Types ]================= */
 
 
-// AGT_api agt_status_t AGT_stdcall agt_register_type(agt_ctx_t ctx, const agt_agent_type_create_info_t* cpCreateInfo, agt_typeid_t* pId) AGT_noexcept;
+// agt_status_t AGT_stdcall agt_register_type(agt_ctx_t ctx, const agt_agent_type_create_info_t* cpCreateInfo, agt_typeid_t* pId) AGT_noexcept;
 
-// AGT_api size_t       AGT_stdcall agt_enumerate_types(agt_ctx_t ctx, const char* pattern, size_t patternLength, agt_type_enumerator_t enumerator, void* userData) AGT_noexcept;
+// size_t       AGT_stdcall agt_enumerate_types(agt_ctx_t ctx, const char* pattern, size_t patternLength, agt_type_enumerator_t enumerator, void* userData) AGT_noexcept;
 
 
 
@@ -188,9 +188,9 @@ typedef struct agt_agent_create_info_t {
 
 /***/
 
-AGT_api agt_status_t AGT_stdcall agt_create_agent(agt_ctx_t ctx, const agt_agent_create_info_t* cpCreateInfo, agt_agent_t* pAgent) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_create_agent(agt_ctx_t ctx, const agt_agent_create_info_t* cpCreateInfo, agt_agent_t* pAgent) AGT_noexcept;
 
-// AGT_api agt_status_t AGT_stdcall agt_create_agent_from_type(agt_ctx_t ctx, ) AGT_noexcept;
+// agt_status_t AGT_stdcall agt_create_agent_from_type(agt_ctx_t ctx, ) AGT_noexcept;
 
 
 /**
@@ -200,31 +200,31 @@ AGT_api agt_status_t AGT_stdcall agt_create_agent(agt_ctx_t ctx, const agt_agent
  * followed by a call to this function to start the execution of the system.
  * This function may *not* be called within an agent context
  * */
-AGT_noreturn AGT_api void AGT_stdcall agt_create_busy_agent_on_current_thread(agt_ctx_t ctx, const agt_agent_create_info_t* cpCreateInfo) AGT_noexcept;
+AGT_noreturn AGT_core_api void AGT_stdcall agt_create_busy_agent_on_current_thread(agt_ctx_t ctx, const agt_agent_create_info_t* cpCreateInfo) AGT_noexcept;
 
-AGT_api agt_status_t AGT_stdcall agt_create_executor(agt_ctx_t ctx, const agt_executor_create_info_t* cpCreateInfo, agt_executor_t* pExecutor) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_create_executor(agt_ctx_t ctx, const agt_executor_create_info_t* cpCreateInfo, agt_executor_t* pExecutor) AGT_noexcept;
 
 
 // If agentHandle is null, this is a noop.
 // If agentHandle is detached (ie. does not, and cannot have an owner), this fails with AGT_ERROR_AGENT_IS_DETACHED
-AGT_api       agt_status_t AGT_stdcall agt_transfer_owner(agt_ctx_t ctx, agt_agent_t agentHandle, agt_agent_t newOwner) AGT_noexcept;
+AGT_core_api       agt_status_t AGT_stdcall agt_transfer_owner(agt_ctx_t ctx, agt_agent_t agentHandle, agt_agent_t newOwner) AGT_noexcept;
 
 // If agent
-AGT_agent_api agt_status_t AGT_stdcall agt_take_ownership(agt_self_t self, agt_agent_t agent) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_take_ownership(agt_self_t self, agt_agent_t agent) AGT_noexcept;
 
 /* =============[ Queries ]============= */
 
 /**
  * If agent is null, then the executor for self is returned instead.
  * */
-AGT_agent_api agt_status_t AGT_stdcall agt_get_executor(agt_self_t self, agt_agent_t agent, agt_executor_t* pResult) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_get_executor(agt_self_t self, agt_agent_t agent, agt_executor_t* pResult) AGT_noexcept;
 
 
 /* ========================= [ Agents ] ========================= */
 
-AGT_agent_api agt_self_t   AGT_stdcall agt_self(agt_ctx_t ctx) AGT_noexcept;
+AGT_core_api agt_self_t   AGT_stdcall agt_self(agt_ctx_t ctx) AGT_noexcept;
 
-AGT_agent_api agt_ctx_t    AGT_stdcall agt_self_ctx(agt_self_t self) AGT_noexcept;
+AGT_core_api agt_ctx_t    AGT_stdcall agt_self_ctx(agt_self_t self) AGT_noexcept;
 
 /**
  * Optimized equivalent to the following:
@@ -238,27 +238,27 @@ AGT_agent_api agt_ctx_t    AGT_stdcall agt_self_ctx(agt_self_t self) AGT_noexcep
  * Obviously, only works within an agent execution context.
  * Calling this function outside of an agent execution context results in undefined behaviour (how'd you even get a self object??)
  * */
-AGT_agent_api agt_handle_t AGT_stdcall agt_export_self(agt_self_t self) AGT_noexcept;
+AGT_core_api agt_handle_t AGT_stdcall agt_export_self(agt_self_t self) AGT_noexcept;
 
-AGT_agent_api agt_agent_t  AGT_stdcall agt_retain_sender(agt_self_t self) AGT_noexcept;
+AGT_core_api agt_agent_t  AGT_stdcall agt_retain_sender(agt_self_t self) AGT_noexcept;
 
-AGT_agent_api agt_status_t AGT_stdcall agt_retain(agt_agent_t* pNewAgent, agt_agent_t agent) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_retain(agt_agent_t* pNewAgent, agt_agent_t agent) AGT_noexcept;
 
-AGT_agent_api agt_status_t AGT_stdcall agt_retain_self(agt_self_t self, agt_agent_t* pSelfAgent) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_retain_self(agt_self_t self, agt_agent_t* pSelfAgent) AGT_noexcept;
 
 
 
-AGT_agent_api agt_status_t AGT_stdcall agt_send(agt_self_t self, agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_send(agt_self_t self, agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept;
 
-AGT_agent_api agt_status_t AGT_stdcall agt_send_as(agt_self_t self, agt_agent_t spoofSender, agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_send_as(agt_self_t self, agt_agent_t spoofSender, agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept;
 
-AGT_agent_api agt_status_t AGT_stdcall agt_send_many(agt_self_t self, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_send_many(agt_self_t self, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept;
 
-AGT_agent_api agt_status_t AGT_stdcall agt_send_many_as(agt_self_t self, agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_send_many_as(agt_self_t self, agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept;
 
-AGT_agent_api agt_status_t AGT_stdcall agt_reply(agt_self_t self, const agt_send_info_t* pSendInfo) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_reply(agt_self_t self, const agt_send_info_t* pSendInfo) AGT_noexcept;
 
-AGT_agent_api agt_status_t AGT_stdcall agt_reply_as(agt_self_t self, agt_agent_t spoofReplier, const agt_send_info_t* pSendInfo) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_reply_as(agt_self_t self, agt_agent_t spoofReplier, const agt_send_info_t* pSendInfo) AGT_noexcept;
 
 
 
@@ -288,30 +288,30 @@ AGT_agent_api agt_status_t AGT_stdcall agt_reply_as(agt_self_t self, agt_agent_t
  * @param [in]  desiredMessageSize Desired size of the message. The buffer returned is guaranteed to be valid for at least this many bytes
  * @param [out] pRawMsg Handle for raw message. Used as a parameter in a subsequent send call.
  * */
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_acquire(agt_self_t self, agt_agent_t recipient, size_t desiredMessageSize, agt_raw_send_info_t* pRawSendInfo, void** ppRawBuffer) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_raw_acquire(agt_self_t self, agt_agent_t recipient, size_t desiredMessageSize, agt_raw_send_info_t* pRawSendInfo, void** ppRawBuffer) AGT_noexcept;
 
 /***/
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_send(agt_self_t self, agt_agent_t recipient, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_raw_send(agt_self_t self, agt_agent_t recipient, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
 
 /***/
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_send_as(agt_self_t self, agt_agent_t spoofSender, agt_agent_t recipient, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_raw_send_as(agt_self_t self, agt_agent_t spoofSender, agt_agent_t recipient, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
 
 /***/
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_send_many(agt_self_t self, const agt_agent_t* recipients, agt_size_t agentCount, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_raw_send_many(agt_self_t self, const agt_agent_t* recipients, agt_size_t agentCount, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
 
 /***/
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_send_many_as(agt_self_t self, agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_raw_send_many_as(agt_self_t self, agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
 
 /***/
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_reply(agt_self_t self, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_raw_reply(agt_self_t self, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
 
 /***/
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_reply_as(agt_self_t self, agt_agent_t spoofSender, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_raw_reply_as(agt_self_t self, agt_agent_t spoofSender, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
 
 
 
 
-AGT_agent_api void         AGT_stdcall agt_delegate(agt_self_t self, agt_agent_t recipient) AGT_noexcept;
+AGT_core_api void         AGT_stdcall agt_delegate(agt_self_t self, agt_agent_t recipient) AGT_noexcept;
 
 
 /**
@@ -320,10 +320,10 @@ AGT_agent_api void         AGT_stdcall agt_delegate(agt_self_t self, agt_agent_t
  * If a message does not call this function, by default, it will still "return" upon
  * the agent proc callback returning, but no value will be sent to any waiting parties.
  * */
-AGT_agent_api void         AGT_stdcall agt_return(agt_self_t self, agt_u64_t value) AGT_noexcept;
+AGT_core_api void         AGT_stdcall agt_return(agt_self_t self, agt_u64_t value) AGT_noexcept;
 
 
-AGT_agent_api void         AGT_stdcall agt_release(agt_self_t self, agt_agent_t agent) AGT_noexcept;
+AGT_core_api void         AGT_stdcall agt_release(agt_self_t self, agt_agent_t agent) AGT_noexcept;
 
 
 
@@ -335,50 +335,50 @@ AGT_agent_api void         AGT_stdcall agt_release(agt_self_t self, agt_agent_t 
  *
  * If the set mode is equal to the current mode, this is a noop.
  * */
-AGT_agent_api void            AGT_stdcall agt_set_exec_mode(agt_self_t self, agt_exec_mode_t mode) AGT_noexcept;
+AGT_core_api void            AGT_stdcall agt_set_exec_mode(agt_self_t self, agt_exec_mode_t mode) AGT_noexcept;
 
-AGT_agent_api agt_exec_mode_t AGT_stdcall agt_get_exec_mode(agt_self_t self) AGT_noexcept;
-
-
-
-
-
-
-AGT_agent_api agt_msg_t    AGT_stdcall agt_msg_retain(agt_self_t self) AGT_noexcept;
-
-AGT_agent_api void         AGT_stdcall agt_msg_get_info(agt_self_t self, agt_msg_t msg, agt_msg_info_t* pMsgInfo) AGT_noexcept;
-
-AGT_agent_api agt_status_t AGT_stdcall agt_msg_reply(agt_self_t self, agt_msg_t msg, const agt_send_info_t* pSendInfo) AGT_noexcept;
-
-AGT_agent_api agt_status_t AGT_stdcall agt_msg_reply_as(agt_self_t self, agt_msg_t msg, agt_agent_t spoofReplier, const agt_send_info_t* pSendInfo) AGT_noexcept;
-
-AGT_agent_api agt_status_t AGT_stdcall agt_msg_raw_reply(agt_self_t self, agt_msg_t msg, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
-
-AGT_agent_api agt_status_t AGT_stdcall agt_msg_raw_reply_as(agt_self_t self, agt_msg_t msg, agt_agent_t spoofSender, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
-
-AGT_agent_api void         AGT_stdcall agt_msg_delegate(agt_self_t self, agt_msg_t msg, agt_agent_t recipient) AGT_noexcept;
-
-AGT_agent_api void         AGT_stdcall agt_msg_return(agt_self_t self, agt_msg_t msg, agt_u64_t value) AGT_noexcept;
-
-AGT_agent_api void         AGT_stdcall agt_msg_release(agt_self_t self, agt_msg_t msg) AGT_noexcept;
+AGT_core_api agt_exec_mode_t AGT_stdcall agt_get_exec_mode(agt_self_t self) AGT_noexcept;
 
 
 
 
 
-AGT_agent_api void         AGT_stdcall agt_yield(agt_self_t self) AGT_noexcept;
+
+AGT_core_api agt_msg_t    AGT_stdcall agt_msg_retain(agt_self_t self) AGT_noexcept;
+
+AGT_core_api void         AGT_stdcall agt_msg_get_info(agt_self_t self, agt_msg_t msg, agt_msg_info_t* pMsgInfo) AGT_noexcept;
+
+AGT_core_api agt_status_t AGT_stdcall agt_msg_reply(agt_self_t self, agt_msg_t msg, const agt_send_info_t* pSendInfo) AGT_noexcept;
+
+AGT_core_api agt_status_t AGT_stdcall agt_msg_reply_as(agt_self_t self, agt_msg_t msg, agt_agent_t spoofReplier, const agt_send_info_t* pSendInfo) AGT_noexcept;
+
+AGT_core_api agt_status_t AGT_stdcall agt_msg_raw_reply(agt_self_t self, agt_msg_t msg, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+
+AGT_core_api agt_status_t AGT_stdcall agt_msg_raw_reply_as(agt_self_t self, agt_msg_t msg, agt_agent_t spoofSender, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+
+AGT_core_api void         AGT_stdcall agt_msg_delegate(agt_self_t self, agt_msg_t msg, agt_agent_t recipient) AGT_noexcept;
+
+AGT_core_api void         AGT_stdcall agt_msg_return(agt_self_t self, agt_msg_t msg, agt_u64_t value) AGT_noexcept;
+
+AGT_core_api void         AGT_stdcall agt_msg_release(agt_self_t self, agt_msg_t msg) AGT_noexcept;
+
+
+
+
+
+AGT_core_api void         AGT_stdcall agt_yield(agt_self_t self) AGT_noexcept;
 
 
 /**
  * Signals normal termination of an agent.
  *
  * */
-AGT_agent_api void         AGT_stdcall agt_exit(agt_self_t self, int exitCode) AGT_noexcept;
+AGT_core_api void         AGT_stdcall agt_exit(agt_self_t self, int exitCode) AGT_noexcept;
 
 /**
  * Signals abnormal termination
  * */
-AGT_agent_api void         AGT_stdcall agt_abort(agt_self_t self) AGT_noexcept;
+AGT_core_api void         AGT_stdcall agt_abort(agt_self_t self) AGT_noexcept;
 
 
 
@@ -394,7 +394,7 @@ AGT_agent_api void         AGT_stdcall agt_abort(agt_self_t self) AGT_noexcept;
  *       certain they're totally incompatible at the ABI level. At the very least there's no guarantee of compatibility.
  * */
 
-AGT_agent_api void         AGT_stdcall agt_resume_coroutine(agt_agent_t receiver, void* coroutine, agt_async_t async) AGT_noexcept;
+AGT_core_api void         AGT_stdcall agt_resume_coroutine(agt_agent_t receiver, void* coroutine, agt_async_t async) AGT_noexcept;
 
 
 

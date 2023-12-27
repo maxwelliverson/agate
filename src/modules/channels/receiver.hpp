@@ -6,11 +6,13 @@
 #define AGATE_RECEIVER_HPP
 
 #include "config.hpp"
-#include "modules/core/object.hpp"
+#include "core/object.hpp"
+#include "core/rc.hpp"
 
 namespace agt {
 
   struct receiver;
+  struct message;
 
   enum receiver_kind_t {
     local_spsc_receiver_kind,
@@ -29,29 +31,34 @@ namespace agt {
     receiver_kind_max_enum
   };
 
-  struct receiver : object {
-    /*receiver_kind_t kind;
-    agt_u32_t       flags;*/
+
+  AGT_virtual_object_type(receiver, ref_counted) {
+
   };
 
+  /*struct receiver : object {
+    /*receiver_kind_t kind;
+    agt_u32_t       flags;#1#
+  };*/
 
-  agt_status_t receiveLocalSPSCQueue(receiver_t receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receiveLocalMPSCQueue(receiver_t receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receiveLocalSPMCQueue(receiver_t receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receiveLocalMPMCQueue(receiver_t receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receiveSharedSPSCQueue(receiver_t receiver, agt_message_t& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receiveSharedMPSCQueue(receiver_t receiver, agt_message_t& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receiveSharedSPMCQueue(receiver_t receiver, agt_message_t& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receiveSharedMPMCQueue(receiver_t receiver, agt_message_t& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receivePrivateQueue(receiver_t receiver,    agt_message_t& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receiveSpLocalBQueue(receiver_t receiver,   agt_message_t& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receiveMpLocalBQueue(receiver_t receiver,   agt_message_t& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receiveSpSharedBQueue(receiver_t receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receiveMpSharedBQueue(receiver_t receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept;
+
+  agt_status_t receiveLocalSPSCQueue(receiver_t receiver,  message*& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receiveLocalMPSCQueue(receiver_t receiver,  message*& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receiveLocalSPMCQueue(receiver_t receiver,  message*& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receiveLocalMPMCQueue(receiver_t receiver,  message*& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receiveSharedSPSCQueue(receiver_t receiver, message*& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receiveSharedMPSCQueue(receiver_t receiver, message*& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receiveSharedSPMCQueue(receiver_t receiver, message*& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receiveSharedMPMCQueue(receiver_t receiver, message*& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receivePrivateQueue(receiver_t receiver,    message*& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receiveSpLocalBQueue(receiver_t receiver,   message*& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receiveMpLocalBQueue(receiver_t receiver,   message*& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receiveSpSharedBQueue(receiver_t receiver,  message*& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receiveMpSharedBQueue(receiver_t receiver,  message*& message, agt_timeout_t timeout) noexcept;
 
   
-  inline agt_status_t receive(receiver_t r, agt_message_t& message, agt_timeout_t timeout) noexcept {
-    using receive_pfn = agt_status_t(*)(receiver_t, agt_message_t&, agt_timeout_t);
+  inline agt_status_t receive(receiver_t r, message*& message, agt_timeout_t timeout) noexcept {
+    using receive_pfn = agt_status_t(*)(receiver_t, agt::message*&, agt_timeout_t);
     constexpr static receive_pfn jmp_table[] = {
         receiveLocalSPSCQueue,
         receiveLocalMPSCQueue,

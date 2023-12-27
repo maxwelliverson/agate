@@ -18,8 +18,9 @@
 
 #include "agate/priority_queue.hpp"
 
-#include "async/async.hpp"
-#include "async/signal.hpp"
+#include "core/async.hpp"
+#include "core/attr.hpp"
+#include "core/signal.hpp"
 #include "channels/message.hpp"
 #include "core/instance.hpp"
 #include "core/object.hpp"
@@ -41,14 +42,13 @@
 
 #pragma comment(lib, "mincore")
 
-
-#include <cstring>
-#include <string_view>
-#include <optional>
-#include <charconv>
 #include <algorithm>
-#include <memory>
 #include <bit>
+#include <charconv>
+#include <cstring>
+#include <memory>
+#include <optional>
+#include <string_view>
 
 #define GET_MODULE_VERSION_FUNCTION_NAME "_agt_get_module_version"
 
@@ -629,48 +629,15 @@ AGT_static_api agt_bool_t   AGT_stdcall agt_query_attributes(size_t attrCount, c
 
 
 
-AGT_api       agt_status_t AGT_stdcall agt_init(agt_ctx_t* pContext, const agt_init_info_t* pInitInfo) AGT_noexcept {
-
-  if (pInitInfo == nullptr)
-    return AGT_ERROR_INVALID_ARGUMENT;
-
-  init_options options;
-
-  const auto loaderVersion = version::from_integer(AGT_API_VERSION);
-
-  if (auto status = prepare_init_options(options, *pInitInfo))
-    return status;
-
-
-
-  auto apiVersionInfo = get_version_info(options.apiVersion);
-
-  g_lib._size_of_async_struct      = apiVersionInfo->asyncStructSize;
-  g_lib._size_of_signal_struct     = apiVersionInfo->signalStructSize;
-  g_lib._header_version            = options.apiVersion;
-  g_lib._effective_library_version = ;
-
-  auto libVersionInfo = get_version_info(std::min(AGT_API_VERSION, options.apiVersion));
-
-
-
-
-
-
-  destroy_init_options(options);
-
+AGT_core_api agt_status_t AGT_stdcall agt_send_as(agt_agent_t spoofSender, agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept {
 
 }
 
-AGT_agent_api agt_status_t AGT_stdcall agt_send_as(agt_agent_t spoofSender, agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept {
+AGT_core_api agt_status_t AGT_stdcall agt_send_many(const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept {
 
 }
 
-AGT_agent_api agt_status_t AGT_stdcall agt_send_many(const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept {
-
-}
-
-AGT_agent_api agt_status_t AGT_stdcall agt_send_many_as(agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept {
+AGT_core_api agt_status_t AGT_stdcall agt_send_many_as(agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept {
 
 }
 
@@ -752,7 +719,7 @@ agt_error_handler_t AGT_stdcall agt_set_error_handler(agt_instance_t instance, a
 
 /** ==========================[ Agents API ]=========================== **/
 
-AGT_agent_api agt_status_t AGT_stdcall agt_send(agt_self_t self, agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept {
+AGT_core_api agt_status_t AGT_stdcall agt_send(agt_self_t self, agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept {
 
   assert( self      != nullptr );
   assert( recipient != nullptr );
@@ -761,7 +728,7 @@ AGT_agent_api agt_status_t AGT_stdcall agt_send(agt_self_t self, agt_agent_t rec
   return g_lib._pfn_send(self, recipient, pSendInfo);
 }
 
-AGT_agent_api agt_status_t AGT_stdcall agt_send_as(agt_self_t self, agt_agent_t spoofSender, agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept {
+AGT_core_api agt_status_t AGT_stdcall agt_send_as(agt_self_t self, agt_agent_t spoofSender, agt_agent_t recipient, const agt_send_info_t* pSendInfo) AGT_noexcept {
 
   assert( self        != nullptr );
   assert( spoofSender != nullptr );
@@ -772,7 +739,7 @@ AGT_agent_api agt_status_t AGT_stdcall agt_send_as(agt_self_t self, agt_agent_t 
   return g_lib._pfn_send_as(self, spoofSender, recipient, pSendInfo);
 }
 
-AGT_agent_api agt_status_t AGT_stdcall agt_send_many(agt_self_t self, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept {
+AGT_core_api agt_status_t AGT_stdcall agt_send_many(agt_self_t self, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept {
   assert( self       != nullptr );
   assert( agentCount == 0 || recipients != nullptr );
   assert( pSendInfo  != nullptr );
@@ -783,7 +750,7 @@ AGT_agent_api agt_status_t AGT_stdcall agt_send_many(agt_self_t self, const agt_
   return g_lib._pfn_send_many(self, recipients, agentCount, pSendInfo);
 }
 
-AGT_agent_api agt_status_t AGT_stdcall agt_send_many_as(agt_self_t self, agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept {
+AGT_core_api agt_status_t AGT_stdcall agt_send_many_as(agt_self_t self, agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) AGT_noexcept {
   assert( self        != nullptr );
   assert( spoofSender != nullptr );
   assert( agentCount == 0 || recipients != nullptr );
@@ -795,14 +762,14 @@ AGT_agent_api agt_status_t AGT_stdcall agt_send_many_as(agt_self_t self, agt_age
   return g_lib._pfn_send_many_as(self, spoofSender, recipients, agentCount, pSendInfo);
 }
 
-AGT_agent_api agt_status_t AGT_stdcall agt_reply(agt_self_t self, const agt_send_info_t* pSendInfo) AGT_noexcept {
+AGT_core_api agt_status_t AGT_stdcall agt_reply(agt_self_t self, const agt_send_info_t* pSendInfo) AGT_noexcept {
   assert( self      != nullptr );
   assert( pSendInfo != nullptr );
 
   return g_lib._pfn_reply(self, pSendInfo);
 }
 
-AGT_agent_api agt_status_t AGT_stdcall agt_reply_as(agt_self_t self, agt_agent_t spoofReplier, const agt_send_info_t* pSendInfo) AGT_noexcept {
+AGT_core_api agt_status_t AGT_stdcall agt_reply_as(agt_self_t self, agt_agent_t spoofReplier, const agt_send_info_t* pSendInfo) AGT_noexcept {
   assert( self         != nullptr );
   assert( spoofReplier != nullptr );
   assert( pSendInfo    != nullptr );
@@ -812,7 +779,7 @@ AGT_agent_api agt_status_t AGT_stdcall agt_reply_as(agt_self_t self, agt_agent_t
 
 
 
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_acquire(agt_self_t self, agt_agent_t recipient, size_t desiredMessageSize, agt_raw_send_info_t* pRawSendInfo, void** ppRawBuffer) AGT_noexcept {
+AGT_core_api agt_status_t AGT_stdcall agt_raw_acquire(agt_self_t self, agt_agent_t recipient, size_t desiredMessageSize, agt_raw_send_info_t* pRawSendInfo, void** ppRawBuffer) AGT_noexcept {
   assert( self        != nullptr );
   assert( recipient   != nullptr );
   assert( ppRawBuffer != nullptr );
@@ -820,17 +787,17 @@ AGT_agent_api agt_status_t AGT_stdcall agt_raw_acquire(agt_self_t self, agt_agen
   return g_lib._pfn_raw_acquire();
 }
 
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_send(agt_self_t self, agt_agent_t recipient, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_raw_send(agt_self_t self, agt_agent_t recipient, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
 
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_send_as(agt_self_t self, agt_agent_t spoofSender, agt_agent_t recipient, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_raw_send_as(agt_self_t self, agt_agent_t spoofSender, agt_agent_t recipient, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
 
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_send_many(agt_self_t self, const agt_agent_t* recipients, agt_size_t agentCount, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_raw_send_many(agt_self_t self, const agt_agent_t* recipients, agt_size_t agentCount, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
 
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_send_many_as(agt_self_t self, agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_raw_send_many_as(agt_self_t self, agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
 
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_reply(agt_self_t self, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_raw_reply(agt_self_t self, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
 
-AGT_agent_api agt_status_t AGT_stdcall agt_raw_reply_as(agt_self_t self, agt_agent_t spoofSender, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_raw_reply_as(agt_self_t self, agt_agent_t spoofSender, const agt_raw_send_info_t* pRawSendInfo) AGT_noexcept;
 
 
 
@@ -839,7 +806,7 @@ AGT_agent_api agt_status_t AGT_stdcall agt_raw_reply_as(agt_self_t self, agt_age
 #define AGT_ASYNC_MEMORY_IS_OWNED 0x8000
 
 
-AGT_async_api agt_async_t  AGT_stdcall agt_new_async(agt_ctx_t ctx, agt_async_flags_t flags) AGT_noexcept {
+AGT_core_api agt_async_t  AGT_stdcall agt_new_async(agt_ctx_t ctx, agt_async_flags_t flags) AGT_noexcept {
   assert( ctx != nullptr );
 
 
@@ -851,12 +818,12 @@ AGT_async_api agt_async_t  AGT_stdcall agt_new_async(agt_ctx_t ctx, agt_async_fl
   asyncBase->flags       = flags | AGT_ASYNC_MEMORY_IS_OWNED;
   asyncBase->resultValue = 0;
   asyncBase->status      = AGT_ERROR_NOT_BOUND;
-  g_lib._pfn_init_async(asyncBase);
+  g_lib._pfn_initialize_async(asyncBase);
 
   return (agt_async_t)asyncBase;
 }
 
-AGT_async_api agt_async_t  AGT_stdcall agt_init_async(agt_inline_async_t* pInlineAsync, agt_async_flags_t flags) AGT_noexcept {
+AGT_core_api agt_async_t  AGT_stdcall agt_init_async(agt_inline_async_t* pInlineAsync, agt_async_flags_t flags) AGT_noexcept {
   assert( pInlineAsync != nullptr );
   // assert( pInlineAsync->ctx != nullptr );
 
@@ -869,12 +836,12 @@ AGT_async_api agt_async_t  AGT_stdcall agt_init_async(agt_inline_async_t* pInlin
   asyncBase->status      = AGT_ERROR_NOT_BOUND;
 
 
-  g_lib._pfn_init_async(asyncBase);
+  g_lib._pfn_initialize_async(asyncBase);
 
   return (agt_async_t)asyncBase;
 }
 
-AGT_async_api void         AGT_stdcall agt_copy_async(agt_async_t from_, agt_async_t to_) AGT_noexcept {
+AGT_core_api void         AGT_stdcall agt_copy_async(agt_async_t from_, agt_async_t to_) AGT_noexcept {
   assert( from_ != nullptr );
   assert( to_   != nullptr );
 
@@ -884,7 +851,7 @@ AGT_async_api void         AGT_stdcall agt_copy_async(agt_async_t from_, agt_asy
   g_lib._pfn_copy_async(from, to);
 }
 
-AGT_async_api void         AGT_stdcall agt_move_async(agt_async_t from_, agt_async_t to_) AGT_noexcept {
+AGT_core_api void         AGT_stdcall agt_move_async(agt_async_t from_, agt_async_t to_) AGT_noexcept {
   assert( from_ != nullptr );
   assert( to_   != nullptr );
 
@@ -899,11 +866,11 @@ AGT_async_api void         AGT_stdcall agt_move_async(agt_async_t from_, agt_asy
     // g_lib._pfn_free_async(from->ctx, (agt_async_t)from);
 }
 
-AGT_async_api void         AGT_stdcall agt_clear_async(agt_async_t async) AGT_noexcept {
+AGT_core_api void         AGT_stdcall agt_clear_async(agt_async_t async) AGT_noexcept {
 
 }
 
-AGT_async_api void         AGT_stdcall agt_destroy_async(agt_async_t async) AGT_noexcept {
+AGT_core_api void         AGT_stdcall agt_destroy_async(agt_async_t async) AGT_noexcept {
   if (async) {
     const auto asyncBase      = (async_base*)async;
     const auto ctx            = asyncBase->ctx;
@@ -915,32 +882,31 @@ AGT_async_api void         AGT_stdcall agt_destroy_async(agt_async_t async) AGT_
 }
 
 
+AGT_core_api agt_status_t AGT_stdcall agt_async_status(agt_async_t async_, agt_u64_t* pResult) AGT_noexcept {
+  assert( async_ != nullptr );
 
-AGT_async_api agt_status_t AGT_stdcall agt_async_status(agt_async_t async, agt_u64_t* pResult) AGT_noexcept {
-  assert( async != nullptr );
-
-  auto asyncBase = (async_base*)async;
+  auto async = (agt::async*)async_;
 
   agt_status_t status;
 
-  if ((asyncBase->flags & AGT_ASYNC_CACHE_STATUS) != 0) {
-    if (asyncBase->status == AGT_NOT_READY) {
-      if ((status = g_lib._pfn_async_get_status(asyncBase, pResult)) == AGT_SUCCESS && pResult != nullptr)
-        asyncBase->resultValue = *pResult;
-      asyncBase->status = status;
+  if (test(async->flags, async_flags::eCacheStatus)) {
+    if (async->status == AGT_NOT_READY) {
+      if ((status = g_lib._pfn_async_get_status(async, pResult)) == AGT_SUCCESS && pResult != nullptr)
+        async->resultValue = *pResult;
+      async->status = status;
     }
     else {
-      status = asyncBase->status;
+      status = async->status;
       if (pResult != nullptr)
-        *pResult = asyncBase->resultValue;
+        *pResult = async->resultValue;
     }
   }
   else
-    status = g_lib._pfn_async_get_status(asyncBase, pResult);
+    status = g_lib._pfn_async_get_status(async, pResult);
 
   return status;
 }
-AGT_async_api agt_status_t AGT_stdcall agt_async_status_all(const agt_async_t* pAsyncs, agt_size_t asyncCount, agt_status_t* pStatuses, agt_u64_t* pResults) AGT_noexcept {
+AGT_core_api agt_status_t AGT_stdcall agt_async_status_all(const agt_async_t* pAsyncs, agt_size_t asyncCount, agt_status_t* pStatuses, agt_u64_t* pResults) AGT_noexcept {
   assert( asyncCount == 0 || pAsyncs   != nullptr );
   assert( asyncCount == 0 || pStatuses != nullptr );
 
@@ -994,16 +960,36 @@ AGT_async_api agt_status_t AGT_stdcall agt_async_status_all(const agt_async_t* p
   return AGT_NOT_READY;
 }
 
-AGT_async_api agt_status_t AGT_stdcall agt_wait(agt_async_t async, agt_u64_t* pResult, agt_timeout_t timeout) AGT_noexcept;
-AGT_async_api agt_status_t AGT_stdcall agt_wait_all(const agt_async_t* pAsyncs, agt_size_t asyncCount, agt_timeout_t timeout) AGT_noexcept;
-AGT_async_api agt_status_t AGT_stdcall agt_wait_any(const agt_async_t* pAsyncs, agt_size_t asyncCount, agt_size_t* pIndex, agt_timeout_t timeout) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_wait(agt_async_t async, agt_u64_t* pResult, agt_timeout_t timeout) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_wait_all(const agt_async_t* pAsyncs, agt_size_t asyncCount, agt_timeout_t timeout) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_wait_any(const agt_async_t* pAsyncs, agt_size_t asyncCount, agt_size_t* pIndex, agt_timeout_t timeout) AGT_noexcept;
+
+
+/** ========================= [ Signal ] ========================= **/
+
+
+
+AGT_core_api void         AGT_stdcall agt_attach_signal(agt_signal_t signal, agt_async_t async) AGT_noexcept {
+
+}
+
+AGT_core_api void         AGT_stdcall agt_attach_many_signals(const agt_signal_t* pSignals, agt_size_t signalCount, agt_async_t async, size_t waitForN) AGT_noexcept {
+
+}
+
+
+AGT_core_api void         AGT_stdcall agt_raise_signal(agt_signal_t signal) AGT_noexcept {
+
+}
+
+
 
 
 
 
 /** ==== [ Fibers ] ==== **/
 
-AGT_exec_api agt_status_t AGT_stdcall agt_enter_fiber(agt_ctx_t ctx, const agt_fiber_desc_t* pFiberDesc) AGT_noexcept {
+AGT_exec_api agt_status_t AGT_stdcall agt_enter_fctx(agt_ctx_t ctx, const agt_fctx_desc_t* pFiberDesc) AGT_noexcept {
   /*if (!ctx)
     ctx = agt::get_ctx();*/
 
@@ -1093,6 +1079,7 @@ AGT_exec_api void         AGT_stdcall agt_exit_fiber(agt_ctx_t ctx, int exitCode
 
 
 
+/*
 AGT_exec_api agt_u64_t    AGT_stdcall agt_fiber_switch(agt_ctx_t ctx, agt_fiber_t fiber, agt_u64_t param, agt_fiber_save_flags_t flags) AGT_noexcept {
   AGT_assert( ctx != nullptr );
   AGT_assert( fiber != nullptr );
@@ -1121,7 +1108,9 @@ AGT_exec_api agt_u64_t    AGT_stdcall agt_fiber_switch(agt_ctx_t ctx, agt_fiber_
 
   x64::afiber_jump(fiber, param, agt::FIBER_JUMP_SWITCH_FIBER);
 }
+*/
 
+/*
 AGT_exec_api void         AGT_stdcall agt_fiber_jump(agt_ctx_t ctx, agt_fiber_t fiber, agt_u64_t param) AGT_noexcept {
   AGT_assert( ctx != nullptr );
   AGT_assert( fiber != nullptr );
@@ -1143,41 +1132,11 @@ AGT_exec_api void         AGT_stdcall agt_fiber_jump(agt_ctx_t ctx, agt_fiber_t 
     x64::afiber_jump(fiber, param, agt::FIBER_JUMP_SWITCH_FIBER);
   }
 }
-
-AGT_exec_api void         AGT_stdcall agt_push_fiber_section(agt_ctx_t ctx, const agt_fiber_section_info_t* pSectionInfo, agt_fiber_save_flags_t flags) AGT_noexcept {
-  AGT_assert( ctx != nullptr );
-  AGT_assert( pSectionInfo != nullptr );
-
-  namespace x64 = agt::impl::assembly;
-
-  fiber_data saveData;
-
-  auto currentFiber = ctx->boundFiber;
-
-  if (currentFiber == nullptr) {
-    g_lib._pfn_raise(ctx, AGT_ERROR_NO_FIBER_BOUND, nullptr);
-    return;
-  }
-
-  x64::afiber_push_section(currentFiber, pSectionInfo, flags, &saveData);
-}
-
-AGT_exec_api void         AGT_stdcall agt_pop_fiber_section(agt_ctx_t ctx) AGT_noexcept {
-  AGT_assert( ctx != nullptr );
-
-  auto boundFiber = ctx->boundFiber;
-
-  if (boundFiber == nullptr) {
-    g_lib._pfn_raise(ctx, AGT_ERROR_NO_FIBER_BOUND, nullptr);
-    return;
-  }
-
-  boundFiber->privateData = boundFiber->privateData->prevSection;
-}
+*/
 
 
 AGT_exec_api agt_fiber_transfer_t AGT_stdcall agt_fiber_switch(agt_fiber_t fiber, agt_fiber_param_t param, agt_fiber_flags_t flags) AGT_noexcept {
-
+  return g_lib._pfn_fiber_switch(fiber, param, flags);
 }
 
 AGT_exec_api AGT_noreturn void    AGT_stdcall agt_fiber_jump(agt_fiber_t fiber, agt_fiber_param_t param) AGT_noexcept {
@@ -1185,29 +1144,29 @@ AGT_exec_api AGT_noreturn void    AGT_stdcall agt_fiber_jump(agt_fiber_t fiber, 
 }
 
 AGT_exec_api agt_fiber_transfer_t AGT_stdcall agt_fiber_fork(agt_fiber_proc_t proc, agt_fiber_param_t param, agt_fiber_flags_t flags) AGT_noexcept {
-
+  return g_lib._pfn_fiber_fork(proc, param, flags);
 }
 
 AGT_exec_api agt_fiber_transfer_t AGT_stdcall agt_fiber_loop(agt_fiber_proc_t proc, agt_u64_t param, agt_fiber_flags_t flags) AGT_noexcept {
-
+  return g_lib._pfn_fiber_loop(proc, param, flags);
 }
 
 
 /*
 
 
-AGT_api agt_status_t     AGT_stdcall agtNewContext(agt_ctx_t* pContext) AGT_noexcept {
+agt_status_t     AGT_stdcall agtNewContext(agt_ctx_t* pContext) AGT_noexcept {
   if (!pContext)
     return AGT_ERROR_INVALID_ARGUMENT;
   return createCtx(*pContext);
 }
 
-AGT_api agt_status_t     AGT_stdcall agtDestroyContext(agt_ctx_t context) AGT_noexcept {
+agt_status_t     AGT_stdcall agtDestroyContext(agt_ctx_t context) AGT_noexcept {
   return AGT_ERROR_NOT_YET_IMPLEMENTED;
 }
 
 
-AGT_api agt_status_t     AGT_stdcall agtGetObjectInfo(agt_ctx_t context, agt_object_info_t* pObjectInfo) AGT_noexcept {
+agt_status_t     AGT_stdcall agtGetObjectInfo(agt_ctx_t context, agt_object_info_t* pObjectInfo) AGT_noexcept {
   if (!pObjectInfo) [[unlikely]] {
     return AGT_ERROR_INVALID_ARGUMENT;
   }
@@ -1257,7 +1216,7 @@ AGT_api agt_status_t     AGT_stdcall agtGetObjectInfo(agt_ctx_t context, agt_obj
 
 }
 
-AGT_api agt_status_t     AGT_stdcall agtDuplicateHandle(agt_handle_t inHandle, agt_handle_t* pOutHandle) AGT_noexcept {
+agt_status_t     AGT_stdcall agtDuplicateHandle(agt_handle_t inHandle, agt_handle_t* pOutHandle) AGT_noexcept {
   if (!pOutHandle) [[unlikely]]
     return AGT_ERROR_INVALID_ARGUMENT;
   if (inHandle == AGT_NULL_HANDLE) [[unlikely]] {
@@ -1267,26 +1226,26 @@ AGT_api agt_status_t     AGT_stdcall agtDuplicateHandle(agt_handle_t inHandle, a
   return static_cast<Handle*>(inHandle)->duplicate(reinterpret_cast<Handle*&>(*pOutHandle));
 }
 
-AGT_api void          AGT_stdcall agtCloseHandle(agt_handle_t handle) AGT_noexcept {
+void          AGT_stdcall agtCloseHandle(agt_handle_t handle) AGT_noexcept {
   if (handle) [[likely]]
     static_cast<Handle*>(handle)->close();
 }
 
 
 
-AGT_api agt_status_t     AGT_stdcall agtCreateChannel(agt_ctx_t context, const agt_channel_create_info_t* cpCreateInfo, agt_handle_t* pSender, agt_handle_t* pReceiver) AGT_noexcept;
-AGT_api agt_status_t     AGT_stdcall agtCreateAgent(agt_ctx_t context, const agt_agent_create_info_t* cpCreateInfo, agt_handle_t* pAgent) AGT_noexcept;
-AGT_api agt_status_t     AGT_stdcall agtCreateAgency(agt_ctx_t context, const agt_agency_create_info_t* cpCreateInfo, agt_handle_t* pAgency) AGT_noexcept;
-AGT_api agt_status_t     AGT_stdcall agtCreateThread(agt_ctx_t context, const agt_thread_create_info_t* cpCreateInfo, agt_handle_t* pThread) AGT_noexcept;
+agt_status_t     AGT_stdcall agtCreateChannel(agt_ctx_t context, const agt_channel_create_info_t* cpCreateInfo, agt_handle_t* pSender, agt_handle_t* pReceiver) AGT_noexcept;
+agt_status_t     AGT_stdcall agtCreateAgent(agt_ctx_t context, const agt_agent_create_info_t* cpCreateInfo, agt_handle_t* pAgent) AGT_noexcept;
+agt_status_t     AGT_stdcall agtCreateAgency(agt_ctx_t context, const agt_agency_create_info_t* cpCreateInfo, agt_handle_t* pAgency) AGT_noexcept;
+agt_status_t     AGT_stdcall agtCreateThread(agt_ctx_t context, const agt_thread_create_info_t* cpCreateInfo, agt_handle_t* pThread) AGT_noexcept;
 
-AGT_api agt_status_t     AGT_stdcall agtStage(agt_handle_t sender, agt_staged_message_t* pStagedMessage, agt_timeout_t timeout) AGT_noexcept {
+agt_status_t     AGT_stdcall agtStage(agt_handle_t sender, agt_staged_message_t* pStagedMessage, agt_timeout_t timeout) AGT_noexcept {
   if (sender == AGT_NULL_HANDLE) [[unlikely]]
     return AGT_ERROR_NULL_HANDLE;
   if (pStagedMessage == nullptr) [[unlikely]]
     return AGT_ERROR_INVALID_ARGUMENT;
   return static_cast<Handle*>(sender)->stage(*pStagedMessage, timeout);
 }
-AGT_api void          AGT_stdcall agtSend(const agt_staged_message_t* cpStagedMessage, agt_async_t asyncHandle, agt_send_flags_t flags) AGT_noexcept {
+void          AGT_stdcall agtSend(const agt_staged_message_t* cpStagedMessage, agt_async_t asyncHandle, agt_send_flags_t flags) AGT_noexcept {
   const auto& stagedMsg = reinterpret_cast<const StagedMessage&>(*cpStagedMessage);
   const auto message = stagedMsg.message;
   setMessageId(message, stagedMsg.id);
@@ -1294,7 +1253,7 @@ AGT_api void          AGT_stdcall agtSend(const agt_staged_message_t* cpStagedMe
   setMessageAsyncHandle(message, asyncHandle);
   stagedMsg.receiver->send(stagedMsg.message, flags);
 }
-AGT_api agt_status_t     AGT_stdcall agtReceive(agt_handle_t receiver, agt_message_info_t* pMessageInfo, agt_timeout_t timeout) AGT_noexcept {
+agt_status_t     AGT_stdcall agtReceive(agt_handle_t receiver, agt_message_info_t* pMessageInfo, agt_timeout_t timeout) AGT_noexcept {
   if (receiver == AGT_NULL_HANDLE) [[unlikely]]
     return AGT_ERROR_NULL_HANDLE;
   if (pMessageInfo == nullptr) [[unlikely]]
@@ -1305,21 +1264,21 @@ AGT_api agt_status_t     AGT_stdcall agtReceive(agt_handle_t receiver, agt_messa
 
 
 
-AGT_api void          AGT_stdcall agtReturn(agt_message_t message, agt_status_t status) AGT_noexcept {
+void          AGT_stdcall agtReturn(agt_message_t message, agt_status_t status) AGT_noexcept {
 
 }
 
 
-AGT_api void          AGT_stdcall agtYieldExecution() AGT_noexcept;
+void          AGT_stdcall agtYieldExecution() AGT_noexcept;
 
-AGT_api agt_status_t     AGT_stdcall agtDispatchMessage(const agt_actor_t* pActor, const agt_message_info_t* pMessageInfo) AGT_noexcept;
-// AGT_api agt_status_t     AGT_stdcall agtExecuteOnThread(agt_thread_t thread, ) AGT_noexcept;
-
-
+agt_status_t     AGT_stdcall agtDispatchMessage(const agt_actor_t* pActor, const agt_message_info_t* pMessageInfo) AGT_noexcept;
+// agt_status_t     AGT_stdcall agtExecuteOnThread(agt_thread_t thread, ) AGT_noexcept;
 
 
 
-AGT_api agt_status_t     AGT_stdcall agtGetSenderHandle(agt_message_t message, agt_handle_t* pSenderHandle) AGT_noexcept;
+
+
+agt_status_t     AGT_stdcall agtGetSenderHandle(agt_message_t message, agt_handle_t* pSenderHandle) AGT_noexcept;
 
 
 
@@ -1328,7 +1287,7 @@ AGT_api agt_status_t     AGT_stdcall agtGetSenderHandle(agt_message_t message, a
 /* ========================= [ Async ] ========================= *//*
 
 
-AGT_api agt_status_t     AGT_stdcall agtNewAsync(agt_ctx_t ctx, agt_async_t* pAsync) AGT_noexcept {
+agt_status_t     AGT_stdcall agtNewAsync(agt_ctx_t ctx, agt_async_t* pAsync) AGT_noexcept {
 
   if (!pAsync) [[unlikely]] {
     return AGT_ERROR_INVALID_ARGUMENT;
@@ -1341,23 +1300,23 @@ AGT_api agt_status_t     AGT_stdcall agtNewAsync(agt_ctx_t ctx, agt_async_t* pAs
   return AGT_SUCCESS;
 }
 
-AGT_api void          AGT_stdcall agtCopyAsync(agt_async_t from, agt_async_t to) AGT_noexcept {
+void          AGT_stdcall agtCopyAsync(agt_async_t from, agt_async_t to) AGT_noexcept {
   asyncCopyTo(from, to);
 }
 
-AGT_api void          AGT_stdcall agtClearAsync(agt_async_t async) AGT_noexcept {
+void          AGT_stdcall agtClearAsync(agt_async_t async) AGT_noexcept {
   asyncClear(async);
 }
 
-AGT_api void          AGT_stdcall agtDestroyAsync(agt_async_t async) AGT_noexcept {
+void          AGT_stdcall agtDestroyAsync(agt_async_t async) AGT_noexcept {
   asyncDestroy(async);
 }
 
-AGT_api agt_status_t     AGT_stdcall agtWait(agt_async_t async, agt_timeout_t timeout) AGT_noexcept {
+agt_status_t     AGT_stdcall agtWait(agt_async_t async, agt_timeout_t timeout) AGT_noexcept {
   return asyncWait(async, timeout);
 }
 
-AGT_api agt_status_t     AGT_stdcall agtWaitMany(const agt_async_t* pAsyncs, size_t asyncCount, agt_timeout_t timeout) AGT_noexcept {
+agt_status_t     AGT_stdcall agtWaitMany(const agt_async_t* pAsyncs, size_t asyncCount, agt_timeout_t timeout) AGT_noexcept {
   return AGT_ERROR_NOT_YET_IMPLEMENTED;
 }
 
@@ -1368,23 +1327,23 @@ AGT_api agt_status_t     AGT_stdcall agtWaitMany(const agt_async_t* pAsyncs, siz
 /* ========================= [ Signal ] ========================= *//*
 
 
-AGT_api agt_status_t     AGT_stdcall agtNewSignal(agt_ctx_t ctx, agt_signal_t* pSignal) AGT_noexcept {
+agt_status_t     AGT_stdcall agtNewSignal(agt_ctx_t ctx, agt_signal_t* pSignal) AGT_noexcept {
 
 }
 
-AGT_api void          AGT_stdcall agtAttachSignal(agt_signal_t signal, agt_async_t async) AGT_noexcept {
+void          AGT_stdcall agtAttachSignal(agt_signal_t signal, agt_async_t async) AGT_noexcept {
   signalAttach(signal, async);
 }
 
-AGT_api void          AGT_stdcall agtRaiseSignal(agt_signal_t signal) AGT_noexcept {
+void          AGT_stdcall agtRaiseSignal(agt_signal_t signal) AGT_noexcept {
   signalRaise(signal);
 }
 
-AGT_api void          AGT_stdcall agtRaiseManySignals(agt_signal_t signal) AGT_noexcept {
+void          AGT_stdcall agtRaiseManySignals(agt_signal_t signal) AGT_noexcept {
 
 }
 
-AGT_api void          AGT_stdcall agtDestroySignal(agt_signal_t signal) AGT_noexcept {
+void          AGT_stdcall agtDestroySignal(agt_signal_t signal) AGT_noexcept {
 
 }
 */

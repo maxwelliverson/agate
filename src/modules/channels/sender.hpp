@@ -6,9 +6,13 @@
 #define AGATE_SENDER_HPP
 
 #include "config.hpp"
-#include "modules/core/object.hpp"
+#include "core/object.hpp"
+#include "core/rc.hpp"
+
 
 namespace agt {
+
+  struct message;
 
   enum sender_kind_t : agt_u32_t {
     local_spsc_sender_kind,
@@ -28,7 +32,7 @@ namespace agt {
   };
 
 
-  AGT_object_type(sender) {
+  AGT_virtual_object_type(sender, ref_counted) {
 
   };
 
@@ -39,22 +43,22 @@ namespace agt {
 
 
 
-  agt_status_t sendLocalSPSCQueue(sender_t sender,  agt_message_t message) noexcept;
-  agt_status_t sendLocalMPSCQueue(sender_t sender,  agt_message_t message) noexcept;
-  agt_status_t sendLocalSPMCQueue(sender_t sender,  agt_message_t message) noexcept;
-  agt_status_t sendLocalMPMCQueue(sender_t sender,  agt_message_t message) noexcept;
-  agt_status_t sendSharedSPSCQueue(sender_t sender, agt_message_t message) noexcept;
-  agt_status_t sendSharedMPSCQueue(sender_t sender, agt_message_t message) noexcept;
-  agt_status_t sendSharedSPMCQueue(sender_t sender, agt_message_t message) noexcept;
-  agt_status_t sendSharedMPMCQueue(sender_t sender, agt_message_t message) noexcept;
-  agt_status_t sendPrivateQueue(sender_t sender,    agt_message_t message) noexcept;
-  agt_status_t sendLocalSpBQueue(sender_t sender,   agt_message_t message) noexcept;
-  agt_status_t sendLocalMpBQueue(sender_t sender,   agt_message_t message) noexcept;
-  agt_status_t sendSharedSpBQueue(sender_t sender,  agt_message_t message) noexcept;
-  agt_status_t sendSharedMpBQueue(sender_t sender,  agt_message_t message) noexcept;
+  agt_status_t sendLocalSPSCQueue(sender_t sender,  message* message) noexcept;
+  agt_status_t sendLocalMPSCQueue(sender_t sender,  message* message) noexcept;
+  agt_status_t sendLocalSPMCQueue(sender_t sender,  message* message) noexcept;
+  agt_status_t sendLocalMPMCQueue(sender_t sender,  message* message) noexcept;
+  agt_status_t sendSharedSPSCQueue(sender_t sender, message* message) noexcept;
+  agt_status_t sendSharedMPSCQueue(sender_t sender, message* message) noexcept;
+  agt_status_t sendSharedSPMCQueue(sender_t sender, message* message) noexcept;
+  agt_status_t sendSharedMPMCQueue(sender_t sender, message* message) noexcept;
+  agt_status_t sendPrivateQueue(sender_t sender,    message* message) noexcept;
+  agt_status_t sendLocalSpBQueue(sender_t sender,   message* message) noexcept;
+  agt_status_t sendLocalMpBQueue(sender_t sender,   message* message) noexcept;
+  agt_status_t sendSharedSpBQueue(sender_t sender,  message* message) noexcept;
+  agt_status_t sendSharedMpBQueue(sender_t sender,  message* message) noexcept;
 
-  inline agt_status_t send(sender_t s, agt_message_t message) noexcept {
-    using send_pfn = agt_status_t(*)(sender_t, agt_message_t);
+  inline agt_status_t send(sender_t s, message* message) noexcept {
+    using send_pfn = agt_status_t(*)(sender_t, agt::message*);
     constexpr static send_pfn jmp_table[] = {
         sendLocalSPSCQueue,
         sendLocalMPSCQueue,
