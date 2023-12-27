@@ -17,9 +17,14 @@ namespace agt {
 
   AGT_BITFLAG_ENUM(async_flags, agt_u32_t) {
     eUnbound       = 0x0,
-    eBound         = 0x100,
-    eReady         = 0x200,
-    eWaiting       = 0x400,
+    eEdgeTriggered = AGT_ASYNC_EDGE_TRIGGERED,
+    // eUninitialized = AGT_ASYNC_IS_UNINITIALIZED,
+    eMayReplace    = AGT_ASYNC_MAY_REPLACE,
+    eIsValid       = AGT_ASYNC_IS_VALID,
+    eCacheStatus   = AGT_ASYNC_CACHE_STATUS,
+    eBound         = 0x1000,
+    eReady         = 0x2000,
+    eWaiting       = 0x4000,
     eMemoryIsOwned = 0x8000,
 };
 
@@ -43,10 +48,14 @@ namespace agt {
 
 
   AGT_virtual_object_type(async_data) {
-    agt_u32_t epoch;           // key
-    agt_u64_t refCount;
-    agt_u64_t responseCounter;
-    agt_u64_t resultValue;
+    agt_u32_t    epoch;           // key
+    agt_u64_t    refCount;
+    agt_u64_t    responseCounter;
+    agt_u64_t    resultValue;
+    agt_u32_t    expectedResponses;
+    agt_u32_t    threadWaiterEstimate;
+    agt_bool_t   isComplete;
+    agt_status_t errorCode;
   };
 
   AGT_final_object_type(local_async_data, extends(async_data)) {
@@ -96,11 +105,44 @@ namespace agt {
 
 
 
-
+  template <bool SharedIsEnabled>
   async_key_t  async_data_attach(agt_ctx_t ctx, async_data_t asyncData) noexcept;
+  template <bool SharedIsEnabled>
   async_key_t  async_data_get_key(agt_ctx_t ctx, async_data_t asyncData) noexcept;
-  void         async_data_drop(agt_ctx_t ctx,   async_data_t asyncData, async_key_t key) noexcept;
-  void         async_data_arrive(agt_ctx_t ctx, async_data_t asyncData, async_key_t key) noexcept;
+
+  /**
+   * Note the following functions are asynchronous response functions:
+   *   async_drop
+   *   async_arrive
+   *   async_arrive_with_result
+   *
+   */
+
+  // An asynchronous response indicating that the prospective operation was dropped. Returns an optional error code that may give some indication as to why the operation was dropped.
+  // Returns true if this was the last expected result. Clients that do not need to track this information may ignore the result. (primarily intended for use by indirect messages, as signaling an asynchronous response is akin to dropping a non-waiter reference to the async_data_t object. Thus, to avoid the overhead of a parallel reference count, the return value of the async response functions may simply be checked.)
+  template <bool SharedIsEnabled>
+  bool         async_drop(agt_ctx_t ctx,   async_data_t asyncData, async_key_t key, agt_status_t status) noexcept;
+
+  // An asynchronous response indicating success.
+  // See async_data_drop_
+  template <bool SharedIsEnabled>
+  bool         async_arrive(agt_ctx_t ctx, async_data_t asyncData, async_key_t key) noexcept;
+  template <bool SharedIsEnabled>
+  bool         async_arrive_with_result(agt_ctx_t ctx, async_data_t asyncData, async_key_t key, agt_u64_t result) noexcept;
+
+
+  extern template async_key_t async_data_attach<true>(agt_ctx_t, async_data_t) noexcept;
+  extern template async_key_t async_data_attach<false>(agt_ctx_t, async_data_t) noexcept;
+  extern template async_key_t async_data_get_key<true>(agt_ctx_t, async_data_t) noexcept;
+  extern template async_key_t async_data_get_key<false>(agt_ctx_t, async_data_t) noexcept;
+  extern template bool        async_drop<true>(agt_ctx_t, async_data_t, async_key_t, agt_status_t) noexcept;
+  extern template bool        async_drop<false>(agt_ctx_t, async_data_t, async_key_t, agt_status_t) noexcept;
+  extern template bool        async_arrive<true>(agt_ctx_t, async_data_t, async_key_t) noexcept;
+  extern template bool        async_arrive<false>(agt_ctx_t, async_data_t, async_key_t) noexcept;
+  extern template bool        async_arrive_with_result<true>(agt_ctx_t, async_data_t, async_key_t, agt_u64_t) noexcept;
+  extern template bool        async_arrive_with_result<false>(agt_ctx_t, async_data_t, async_key_t, agt_u64_t) noexcept;
+
+
 
   void         async_copy_to(const async& fromAsync, async& toAsync) noexcept;
   void         async_clear(async& async) noexcept;
@@ -188,9 +230,9 @@ namespace agt {
 
 
 
-  std::pair<async_data_t, async_key_t> async_attach_shared(agt_async_t& async, agt_u32_t expectedCount, agt_u32_t attachedCount) noexcept;
+  std::pair<async_data_t, async_key_t> async_attach_shared(async& async, agt_u32_t expectedCount, agt_u32_t attachedCount) noexcept;
 
-  std::pair<async_data_t, async_key_t> async_attach_local(agt_async_t& async, agt_u32_t expectedCount, agt_u32_t attachedCount) noexcept;
+  std::pair<async_data_t, async_key_t> async_attach_local(async& async, agt_u32_t expectedCount, agt_u32_t attachedCount) noexcept;
 
   agt_status_t                         async_wait(agt_async_t& async, agt_timeout_t timeout) noexcept;
 

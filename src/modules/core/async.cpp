@@ -116,6 +116,9 @@ namespace {
   }
 
   agt_status_t     async_data_wait(agt_ctx_t ctx, agt::async_data* data, agt_u32_t expectedCount, agt_timeout_t timeout) noexcept {
+    if (expectedCount != 0) [[likely]] {
+
+    }
     /*if (expectedCount != 0) [[likely]] {
       if (!data->responseCount.waitFor(expectedCount, timeout))
         return false;
@@ -134,7 +137,7 @@ namespace {
 
   void             async_data_destroy(agt_ctx_t context, agt::async_data* data) noexcept {
 
-    AGT_assert(impl::atomicLoad(data->refCount) == 0);
+    AGT_assert(atomicLoad(data->refCount) == 0);
 
     ctxReleaseLocalAsyncData(context, data);
 
@@ -148,7 +151,7 @@ namespace {
 
   void             async_data_destroy(agt_ctx_t context, agt::shared_async_data* data, async_data_t handle) noexcept {
 
-    AGT_assert(impl::atomicLoad(data->refCount) == 0);
+    AGT_assert(atomicLoad(data->refCount) == 0);
 
     ctxReleaseSharedAsyncData(context, handle);
 
@@ -180,20 +183,68 @@ namespace {
   }
 
 
-  void      asyncDataSignalResponse(async_data_t data_, agt_ctx_t ctx, async_key_t key, agt_u64_t diff) noexcept {
-    if (auto data = localAsyncData(data_)) [[likely]] {
-      if (data->currentKey == key)
-        impl::atomicExchangeAdd(data->responseCounter, diff);
-      if (impl::atomicExchangeAdd(data->refCount, DecNonWaiterRef) == 0)
-        asyncDataDestroy(ctx, data);
+  // returns total responses
+  template <bool Dropped>
+  agt_u32_t async_respond(agt::async_data* asyncData) noexcept {
+    constexpr static auto Diff = Dropped ? DroppedResponse : ArrivedResponse;
+    return static_cast<agt_u32_t>(async_total_responses(atomicExchangeAdd(asyncData->responseCounter, Diff) + Diff));
+  }
+
+
+  // Returns true if the caller should destroy the async_data object.
+  template <bool Dropped, typename R>
+  bool      try_async_response(agt_ctx_t ctx, async_data* data, agt_u32_t key, R result, bool& isComplete) noexcept {
+    if (data->epoch == key) {
+      auto totalResponses = async_respond<Dropped>(data);
+      if (totalResponses == data->expectedResponses) [[likely]] {
+        isComplete = true;
+        data->isComplete = AGT_TRUE;
+        std::atomic_thread_fence(std::memory_order_release);
+        if constexpr (!std::same_as<R, int>) {
+          if constexpr (Dropped)
+            data->errorCode = result;
+          else
+            data->resultValue = result;
+        }
+
+        switch(data->threadWaiterEstimate) {
+          [[likely]] case 0:
+            break;
+          [[likely]] case 1:
+            atomicNotifyOneLocal(data->responseCounter);
+          break;
+          default:
+            atomicNotifyAllLocal(data->responseCounter);
+        }
+      }
     }
-    else {
-      auto sharedData = sharedAsyncData(ctx, data_);
-      if (sharedData->currentKey == key)
-        impl::atomicExchangeAdd(sharedData->responseCounter, diff);
-      if (impl::atomicExchangeAdd(sharedData->refCount, DecNonWaiterRef) == 0)
-        asyncDataDestroy(ctx, sharedData, data_);
+
+    return atomicExchangeAdd(data->refCount, DecNonWaiterRef) == 0x1;
+  }
+
+
+  template <bool SharedIsEnabled, bool Dropped, typename R = int>
+  bool      async_data_signal_response(agt_ctx_t ctx, async_data_t data_, async_key_t key_, R result = 0) noexcept {
+    local_async_data* localData;
+    const auto key = static_cast<agt_u32_t>(key_);
+    bool isComplete = false;
+
+
+    if constexpr (SharedIsEnabled) {
+      if (!(localData = handle_cast<local_async_data>(data_))) {
+        const auto sharedData = get_shared_async_data(ctx, data_);
+        if (try_async_response<Dropped>(ctx, sharedData, key, result, isComplete))
+          async_data_destroy(ctx, sharedData, data_);
+        return isComplete;
+      }
     }
+    else
+      localData = reinterpret_cast<local_async_data*>(data_);
+
+    if (try_async_response<Dropped>(ctx, localData, key, result, isComplete))
+      async_data_destroy(ctx, localData);
+
+    return isComplete;
   }
 }
 
@@ -202,34 +253,61 @@ namespace {
 
 
 
-async_key_t  agt::asyncDataAttach(async_data_t data_, agt_ctx_t ctx) noexcept {
-  if (auto data = localAsyncData(data_)) [[likely]] {
-    impl::atomicExchangeAdd(data->refCount, IncNonWaiterRef);
-    return data->currentKey;
+template <bool SharedIsEnabled>
+async_key_t agt::async_data_attach(agt_ctx_t ctx, async_data_t data) noexcept {
+  local_async_data* localData;
+
+  if constexpr (SharedIsEnabled) {
+    // if data is local, assign to localData and fallthrough
+    if (!(localData = handle_cast<local_async_data>(data))) {
+      auto sharedData = get_shared_async_data(ctx, data);
+      atomicExchangeAdd(sharedData->refCount, IncNonWaiterRef);
+      return static_cast<async_key_t>(sharedData->epoch);
+    }
   }
   else {
-    auto sharedData = sharedAsyncData(ctx, data_);
-    impl::atomicExchangeAdd(sharedData->refCount, IncNonWaiterRef);
-    return sharedData->currentKey;
+    localData = reinterpret_cast<local_async_data*>(data);
   }
+
+  atomicExchangeAdd(localData->refCount, IncNonWaiterRef);
+  return static_cast<async_key_t>(localData->epoch);
+}
+template <bool SharedIsEnabled>
+async_key_t agt::async_data_get_key(agt_ctx_t ctx, async_data_t data) noexcept {
+  async_data* dataBase;
+  if constexpr (SharedIsEnabled) {
+    if (!(dataBase = handle_cast<local_async_data>(data)))
+      dataBase = get_shared_async_data(ctx, data);
+  }
+  else {
+    dataBase = reinterpret_cast<local_async_data*>(data);
+  }
+
+  return static_cast<async_key_t>(dataBase->epoch);
+}
+template <bool SharedIsEnabled>
+bool        agt::async_drop(agt_ctx_t ctx, async_data_t data, async_key_t key, agt_status_t status) noexcept {
+  async_data_signal_response<SharedIsEnabled, true>(ctx, data, key, status);
+}
+template <bool SharedIsEnabled>
+bool        agt::async_arrive(agt_ctx_t ctx, async_data_t data, async_key_t key) noexcept {
+  async_data_signal_response<SharedIsEnabled, false>(ctx, data, key);
+}
+template <bool SharedIsEnabled>
+bool        agt::async_arrive_with_result(agt_ctx_t ctx, async_data_t data, async_key_t key, agt_u64_t result) noexcept {
+  async_data_signal_response<SharedIsEnabled, false>(ctx, data, key, result);
 }
 
-async_key_t  agt::asyncDataGetKey(async_data_t data_, agt_ctx_t ctx) noexcept {
-  if (auto data = localAsyncData(data_)) [[likely]]
-    return data->currentKey;
-  return sharedAsyncData(ctx, data_)->currentKey;
-}
-
-void         agt::asyncDataDrop(async_data_t data, agt_ctx_t ctx, async_key_t key) noexcept {
-  asyncDataSignalResponse(data, ctx, key, DroppedResponse);
-}
-
-void         agt::asyncDataArrive(async_data_t data, agt_ctx_t ctx, async_key_t key) noexcept {
-  asyncDataSignalResponse(data, ctx, key, DroppedResponse);
-}
-
-
-
+template async_key_t agt::async_data_attach<true>(agt_ctx_t, async_data_t) noexcept;
+template async_key_t agt::async_data_attach<false>(agt_ctx_t, async_data_t) noexcept;
+template async_key_t agt::async_data_get_key<true>(agt_ctx_t, async_data_t) noexcept;
+template async_key_t agt::async_data_get_key<false>(agt_ctx_t, async_data_t) noexcept;
+template bool        agt::async_drop<true>(agt_ctx_t, async_data_t, async_key_t, agt_status_t) noexcept;
+template bool        agt::async_drop<false>(agt_ctx_t, async_data_t, async_key_t, agt_status_t) noexcept;
+template bool        agt::async_arrive<true>(agt_ctx_t, async_data_t, async_key_t) noexcept;
+template bool        agt::async_arrive<false>(agt_ctx_t, async_data_t, async_key_t) noexcept;
+template bool        agt::async_arrive_with_result<true>(agt_ctx_t, async_data_t, async_key_t, agt_u64_t) noexcept;
+template bool        agt::async_arrive_with_result<false>(agt_ctx_t, async_data_t, async_key_t, agt_u64_t) noexcept;
 
 
 
@@ -452,107 +530,4 @@ void         agt::initAsync(agt_ctx_t context, agt_async_t& async_, agt_async_fl
   async.desiredResponseCount = 0;
 }
 
-
-
-#define AGT_return_type agt_status_t
-
-#undef AGT_exported_function_name
-#define AGT_exported_function_name new_async
-
-AGT_export_family {
-
-  AGT_function_entry(pa40)(agt_ctx_t ctx, agt_async_t* pAsync, agt_async_flags_t flags) {
-
-    AGT_assert(ctx != nullptr);
-
-    if (pAsync == nullptr) [[unlikely]]
-      return AGT_ERROR_INVALID_ARGUMENT;
-
-
-
-    auto&& async = (agt::async&)*pAsync;
-    auto data    = createAsyncData(context, IncNonWaiterRef);
-
-    async.context              = context;
-    async.asyncStructSize      = ctxGetBuiltin(context, builtin_value::asyncStructSize);
-    async.data                 = asHandle(data);
-    async.dataKey              = data->currentKey;
-    async.status               = AGT_ERROR_NOT_BOUND;
-    async.desiredResponseCount = 0;
-  }
-
-
-
-
-}
-
-
-#undef AGT_return_type
-#define AGT_return_type void
-
-#undef AGT_exported_function_name
-#define AGT_exported_function_name copy_async
-
-
-AGT_export_family {
-
-  AGT_function_entry(pa40)(const agt_async_t* pFrom, agt_async_t* pTo) {
-
-  }
-
-
-
-
-}
-
-
-
-#undef AGT_exported_function_name
-#define AGT_exported_function_name move_async
-
-
-AGT_export_family {
-
-  AGT_function_entry(pa40)(agt_async_t* pFrom, agt_async_t* pTo) {
-
-  }
-
-
-
-
-}
-
-
-
-#undef AGT_exported_function_name
-#define AGT_exported_function_name clear_async
-
-
-AGT_export_family {
-
-  AGT_function_entry(pa40)(agt_async_t* async) {
-
-  }
-
-
-
-
-}
-
-
-
-#undef AGT_exported_function_name
-#define AGT_exported_function_name destroy_async
-
-
-AGT_export_family {
-
-  AGT_function_entry(pa40)(agt_async_t* async) {
-
-  }
-
-
-
-
-}
 

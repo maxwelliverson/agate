@@ -18,7 +18,7 @@ AGT_begin_c_namespace
 
 typedef enum agt_async_flag_bits_t {
   AGT_ASYNC_EDGE_TRIGGERED = 0x1,    ///< Default is level-triggered.
-  AGT_ASYNC_UNINITIALIZED  = 0x2,
+  // AGT_ASYNC_UNINITIALIZED  = 0x2,
   AGT_ASYNC_MAY_REPLACE    = 0x4,
   // AGT_ASYNC_INIT_LAZY      = 0x80,   ///< Actual initialization does some minor allocation and such; If INIT_LAZY is specified, this work is postponed until first use; this is ideal if async may not even see use.
   AGT_ASYNC_IS_VALID       = 0x100,
@@ -116,11 +116,11 @@ AGT_async_api agt_status_t AGT_stdcall agt_wait_any(const agt_async_t* pAsyncs, 
 
 typedef struct agt_aset_st* agt_aset_t;
 
-/*AGT_api agt_status_t AGT_stdcall agt_new_aset(agt_ctx_t ctx, agt_aset_t* pAsyncSet) AGT_noexcept;
-AGT_api agt_status_t AGT_stdcall agt_aset_add(agt_aset_t aset, agt_async_t* const * pAsyncs, agt_size_t asyncCount) AGT_noexcept;
-AGT_api void         AGT_stdcall agt_aset_remove(agt_aset_t aset, agt_async_t* const * pAsyncs, agt_size_t asyncCount) AGT_noexcept;
+/*agt_status_t AGT_stdcall agt_new_aset(agt_ctx_t ctx, agt_aset_t* pAsyncSet) AGT_noexcept;
+agt_status_t AGT_stdcall agt_aset_add(agt_aset_t aset, agt_async_t* const * pAsyncs, agt_size_t asyncCount) AGT_noexcept;
+void         AGT_stdcall agt_aset_remove(agt_aset_t aset, agt_async_t* const * pAsyncs, agt_size_t asyncCount) AGT_noexcept;
 
-AGT_api agt_status_t AGT_stdcall agt_aset_poll(agt_aset_t aset, ) AGT_noexcept;*/
+agt_status_t AGT_stdcall agt_aset_poll(agt_aset_t aset, ) AGT_noexcept;*/
 
 
 
