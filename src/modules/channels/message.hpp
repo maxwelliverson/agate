@@ -227,6 +227,9 @@ namespace agt {
   public:
 
 
+    message() = default;
+    message(message_header* header) noexcept : pMsg(header) { }
+
     void init(msg_layout_t layout, agt_ecmd_t cmd, message_flags flags = {}) const noexcept {
       pMsg->layout = layout;
       pMsg->state  = AGT_MSG_STATE_INITIAL;

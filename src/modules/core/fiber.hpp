@@ -187,6 +187,7 @@ struct alignas(AGT_CACHE_LINE) agt_fiber_st {
   agt::fiber_pool*  pool;
   agt_async_t       blockingAsync;
   agt_timestamp_t   blockDeadline;
+  agt_eagent_t      blockedExecAgentTag;
   agt_fiber_t       root;
   agt::fiber_state  state;
   agt_fiber_flags_t flags;

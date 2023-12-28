@@ -93,6 +93,7 @@ inline constexpr static agt_fiber_param_t BlockFiber      = 1;
 inline constexpr static agt_fiber_param_t BlockFiberUntil = 2;
 inline constexpr static agt_fiber_param_t IdleFiber       = 3;
 inline constexpr static agt_fiber_param_t DestroyFiber    = 4;
+inline constexpr static agt_fiber_param_t YieldFiber      = 5;
 
 
 
@@ -134,6 +135,29 @@ void idle_fiber(agt::local_event_executor* exec, agt_fiber_t fiber) noexcept;
 void destroy_fiber(agt::local_event_executor* exec, agt_fiber_t fiber) noexcept;
 
 
+void handle_fiber_transfer(agt_fiber_t fromFiber, agt_fiber_param_t param, agt::local_event_executor* exec) noexcept {
+  switch (param) {
+    case ProcInitial:
+      init_fibers(exec);
+    break;
+    case BlockFiber:
+      block_fiber(exec, fromFiber);
+    break;
+    case BlockFiberUntil:
+      block_fiber_until(exec, fromFiber);
+    break;
+    case IdleFiber:
+      idle_fiber(exec, fromFiber);
+    break;
+    case DestroyFiber:
+      destroy_fiber(exec, fromFiber);
+    break;
+    default:
+      hasError = true;
+    shouldClose = true;
+  }
+}
+
 agt_fiber_param_t local_fiber_proc(agt_fiber_t fromFiber, agt_fiber_param_t param, void* userData) {
   auto exec = (agt::local_event_executor*)userData;
 
@@ -141,26 +165,7 @@ agt_fiber_param_t local_fiber_proc(agt_fiber_t fromFiber, agt_fiber_param_t para
   bool shouldClose = false;
   bool shouldCleanup = true;
 
-  switch (param) {
-    case ProcInitial:
-      init_fibers(exec);
-      break;
-    case BlockFiber:
-      block_fiber(exec, fromFiber);
-      break;
-    case BlockFiberUntil:
-      block_fiber_until(exec, fromFiber);
-      break;
-    case IdleFiber:
-      idle_fiber(exec, fromFiber);
-      break;
-    case DestroyFiber:
-      destroy_fiber(exec, fromFiber);
-      break;
-    default:
-      hasError = true;
-      shouldClose = true;
-  }
+  handle_fiber_transfer(fromFiber, param, exec);
 
   while (!shouldClose) {
     agt::message* msg;
@@ -221,6 +226,30 @@ using namespace agt;
 namespace {
 
 
+  local_event_eagent* get_ready_agent(local_event_executor* exec) noexcept {
+    // TODO: Implement some shit to check whether a blocked agent is ready
+    if (exec->readyAgents.empty())
+      return nullptr;
+    auto result = exec->readyAgents.front();
+    exec->readyAgents.pop_front();
+    return result;
+  }
+
+  agt_fiber_t get_free_fiber(local_event_executor* exec) noexcept {
+    if (!exec->freeFibers.empty())
+      return exec->freeFibers.pop_back_val();
+    agt_fiber_t fiber;
+    auto status = AGT_ctx_api(new_fiber, exec->ctx)(exec->ctx, &fiber, local_fiber_proc, exec);
+    assert( status == AGT_SUCCESS );
+    return fiber;
+  }
+
+  agt_fiber_t get_next_fiber(local_event_executor* exec) noexcept {
+    if (auto readyAgent = get_ready_agent(exec))
+      return readyAgent->boundFiber;
+    return get_free_fiber(exec);
+  }
+
 
   void local_event_executor_proc(local_event_executor* exec) noexcept {
     auto ctx = get_ctx();
@@ -257,8 +286,11 @@ namespace {
         local_event_executor_proc(exec);
       }
       else {
+        return AGT_ERROR_NOT_YET_IMPLEMENTED;
         // TODO: Implement starting a local_event_executor on a new thread
       }
+
+      return AGT_SUCCESS;
     },
     .attachAgentDirect = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {
       const auto exec = static_cast<local_event_executor*>(exec_);
@@ -294,7 +326,8 @@ namespace {
       agent->executor = nullptr;
       agent->execAgentTag = nullptr;
       advance_agent_epoch(agent);
-      agent->
+      release(eagent);
+      return AGT_SUCCESS;
     },
     .blockAgent = [](basic_executor* exec_, agent_self* agent, async& async) -> agt_status_t {
       assert( exec_ != nullptr );
@@ -302,12 +335,37 @@ namespace {
       assert( agent->execAgentTag != nullptr );
       auto exec = static_cast<local_event_executor*>(exec_);
       auto eagent = static_cast<local_event_eagent*>(agent->execAgentTag);
+      exec->currentFiber->blockingAsync = (agt_async_t)&async;
+      exec->currentFiber->blockedExecAgentTag = eagent;
+      eagent->boundFiber = exec->currentFiber;
+      agt_fiber_t       targetFiber = get_next_fiber(exec);
+      auto transfer = AGT_ctx_api(fiber_switch, exec->ctx)(targetFiber, BlockFiber, 0);
+      handle_fiber_transfer(transfer.parent, transfer.param, exec);
+      return AGT_SUCCESS;
+    },
+    .blockAgentUntil = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {
+      return AGT_ERROR_NOT_YET_IMPLEMENTED;
+    },
+    .yield = [](basic_executor* exec_, agent_self* agent) {
+      assert( exec_ != nullptr );
+      assert( agent != nullptr );
+      assert( agent->execAgentTag != nullptr );
+      auto exec = static_cast<local_event_executor*>(exec_);
+
+      if (auto readyAgent = get_ready_agent(exec)) {
+        auto transfer = AGT_ctx_api(fiber_switch, exec->ctx)(readyAgent->boundFiber, YieldFiber, AGT_FIBER_SAVE_EXTENDED_STATE);
+        handle_fiber_transfer(transfer.parent, transfer.param, exec);
+      }
+    },
+    .acquireMessage = [](basic_executor* exec_, const acquire_message_info& msgInfo, message& msg) -> agt_status_t {
+      assert( exec_ != nullptr );
+      auto exec = static_cast<local_event_executor*>(exec_);
+      msg = acquire_message(exec->ctx, &exec->defaultPool, get_min_message_size(msgInfo));
+      return AGT_SUCCESS;
+    },
+    .releaseMessage = [](basic_executor* exec, message msg) {
 
     },
-    .blockAgentUntil = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {},
-    .yield = [](basic_executor* exec_, agent_self* agent) {},
-    .acquireMessage = [](basic_executor* exec, const acquire_message_info& msgInfo, message& msg) -> agt_status_t {},
-    .releaseMessage = [](basic_executor* exec, message msg) {},
     .commitMessage = [](basic_executor* exec, message msg) -> agt_status_t {}
   };
   inline constexpr agt::executor_vtable local_busy_executor_vtable {

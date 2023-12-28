@@ -71,9 +71,9 @@ struct supervisor {
   int          left;
 
   supervisor(agt_ctx_t ctx, agt_async_t& async, int numRings, int repetitions) {
-    agt_new_async(ctx, &async, 0);
+    async = agt_new_async(ctx, 0);
     agt_new_signal(ctx, &signal, AGT_ANONYMOUS, 0);
-    agt_attach_signal(signal, &async);
+    agt_attach_signal(signal, async);
     left = numRings + (numRings * repetitions);
     startTime = std::chrono::high_resolution_clock::now();
   }
@@ -107,6 +107,7 @@ struct supervisor {
 
     if (--left == 0) {
       auto endTime = std::chrono::high_resolution_clock::now();
+      auto result = std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(endTime - startTime);
       std::cout << std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(endTime - startTime) << std::endl;
       agt_raise_signal(signal);
 
@@ -153,27 +154,28 @@ struct chain_master {
 
     agt_send_as(self, supervisor, factorizer, &msg);
 
-    createInfo.flags            = 0;
-    createInfo.name             = AGT_INVALID_NAME_TOKEN;
-    createInfo.fixedMessageSize = sizeof(uint64_t);
+    agt_executor_t exec;
+
+    agt_get_executor(self, nullptr, &exec);
+
+    createInfo.flags            = AGT_AGENT_CREATE_TRIVIAL;
+    createInfo.name             = AGT_ANONYMOUS;
+    createInfo.executor         = exec;
     createInfo.initFn           = nullptr;
     createInfo.procFn           = [](agt_self_t self, void* state, const void* msg, size_t msgSize){
       assert( msgSize == sizeof(uint64_t) );
       (void)msg;
       agt_delegate(self, (agt_agent_t)state);
     };
-    createInfo.dtorFn           = nullptr;
-    createInfo.owner            = nullptr;
+    createInfo.dtorFn           = (void(*)(agt_self_t, void*))agt_get_proc_address("agt_release"); // Shortcut
 
-    agt_agent_t prev = nullptr;
     agt_agent_t nextAgt;
 
     agt_retain_self(self, &nextAgt);
 
     for (int i = 1; i < ring_size; ++i) {
       createInfo.state = nextAgt;
-      agt_transfer_owner(context, prev, nextAgt); // While this will attempt to transfer ownership of self to the agent at the end of the chain, this will fail, given that self is detatched.
-      prev = nextAgt;
+      // agt_transfer_owner(context, prev, nextAgt); // While this will attempt to transfer ownership of self to the agent at the end of the chain, this will fail, given that self is detatched.
       auto result = agt_create_agent(context, &createInfo, &nextAgt);
       assert(result == AGT_SUCCESS);
     }
@@ -187,8 +189,6 @@ struct chain_master {
 
   void init(agt_self_t self) noexcept {
     auto result = agt_retain(&supervisor, supervisor);
-    assert(result == AGT_SUCCESS);
-    result = agt_take_ownership(self, factorizer);
     assert(result == AGT_SUCCESS);
     new_ring(self);
   }
@@ -206,8 +206,6 @@ struct chain_master {
         new_ring(self);
       }
       else {
-        /*agt_release(cm->factorizer);
-            agt_release(cm->supervisor);*/
         agt_exit(self, 0);
       }
     }
@@ -277,10 +275,10 @@ int main(int argc, char** argv) {
     assert( result == AGT_SUCCESS );
   }
 
-  result = agt_wait(&async, nullptr, AGT_WAIT);
+  result = agt_wait(async, nullptr, AGT_WAIT);
 
   assert(result == AGT_SUCCESS);
 
-  agt_destroy_async(&async);
+  agt_destroy_async(async);
   agt_finalize(ctx);
 }

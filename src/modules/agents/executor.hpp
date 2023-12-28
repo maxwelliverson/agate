@@ -41,6 +41,9 @@ namespace agt {
     agent_self*      sender;
   };
 
+
+  size_t get_min_message_size(const acquire_message_info& msgInfo) noexcept;
+
   struct executor_vtable {
     agt_status_t (* AGT_stdcall start)(basic_executor* exec, bool startOnCurrentThread);
     agt_status_t (* AGT_stdcall attachAgentDirect)(basic_executor* exec, agent_self* agent);
