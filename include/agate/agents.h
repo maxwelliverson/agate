@@ -13,8 +13,6 @@ AGT_begin_c_namespace
 /* =================[ Types ]================= */
 
 
-
-
 typedef struct agt_self_st*       agt_self_t;
 typedef struct agt_agent_st*      agt_agent_t;
 typedef agt_u64_t                 agt_agent_handle_t; // For sending shared handles across shared channels
@@ -54,7 +52,8 @@ typedef enum agt_agent_create_flag_bits_t {
   AGT_AGENT_CREATE_BUSY               = 0x04,
   AGT_AGENT_CREATE_WITH_NEW_EXECUTOR  = 0x08,
   AGT_AGENT_CREATE_ONLY_EXCLUSIVE     = 0x10, ///< The execution mode of the created agent cannot be set to AGT_EXEC_CONCURRENT.
-  AGT_AGENT_CREATE_DEFAULT_CONCURRENT = 0x20
+  AGT_AGENT_CREATE_DEFAULT_CONCURRENT = 0x20,
+  AGT_AGENT_CREATE_TRIVIAL            = 0x80, ///< The created agent must NOT have any possibility of blocking
 } agt_agent_create_flag_bits_t;
 typedef agt_flags32_t agt_agent_create_flags_t;
 
@@ -163,8 +162,6 @@ typedef struct agt_agent_type_info_t {
 typedef struct agt_agent_create_info_t {
   agt_agent_create_flags_t flags;
   agt_name_t               name;             ///< [optional] Agent name; token must have previously been acquired from a call to agt_reserve_name. If set to AGT_ANONYMOUS, agent will remain anonymous.
-  size_t                   fixedMessageSize; ///< [optional] If not 0, all messages sent to this agent must be equal to or less than fixedMessageSize. If 0, messages of any size may be sent.
-  agt_agent_t              owner;            ///< [optional] The agent who owns the returned reference. If null and within an agent execution context, the owner defaults to agt_self(). If null and NOT within such a context, the agent has no defined owner.
   agt_executor_t           executor;         ///< [optional] The executor responsible for executing agent actions. If null and within an agent execution context, will try to use the current executor. If that fails for some reason, or if this field is null and not within an agent execution context, a default executor will be created as per context settings.
   agt_agent_init_t         initFn;           ///< [optional] Initial callback executed in the agent's context before it starts receiving messages.
   agt_agent_proc_t         procFn;           ///< Main callback executed in the agent's context
@@ -204,13 +201,6 @@ AGT_noreturn AGT_core_api void AGT_stdcall agt_create_busy_agent_on_current_thre
 
 AGT_core_api agt_status_t AGT_stdcall agt_create_executor(agt_ctx_t ctx, const agt_executor_create_info_t* cpCreateInfo, agt_executor_t* pExecutor) AGT_noexcept;
 
-
-// If agentHandle is null, this is a noop.
-// If agentHandle is detached (ie. does not, and cannot have an owner), this fails with AGT_ERROR_AGENT_IS_DETACHED
-AGT_core_api       agt_status_t AGT_stdcall agt_transfer_owner(agt_ctx_t ctx, agt_agent_t agentHandle, agt_agent_t newOwner) AGT_noexcept;
-
-// If agent
-AGT_core_api agt_status_t AGT_stdcall agt_take_ownership(agt_self_t self, agt_agent_t agent) AGT_noexcept;
 
 /* =============[ Queries ]============= */
 

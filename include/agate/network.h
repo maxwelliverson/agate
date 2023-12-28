@@ -11,7 +11,12 @@
 AGT_begin_c_namespace
 
 
+
+typedef struct agt_ipaddr_st* agt_ipaddr_t;
 typedef struct agt_socket_st* agt_socket_t;
+
+
+
 
 
 
