@@ -7,6 +7,8 @@
 
 #include "agate.h"
 
+#include "dllexport.hpp"
+
 
 #include "allocator.hpp"
 
@@ -37,13 +39,13 @@ namespace agt {
 
 
     template <typename SizeType>
-    struct vector_base {
+    struct AGT_dllexport vector_base {
 
       using size_type = SizeType;
 
       static agt_u64_t get_new_capacity(agt_u64_t minimum_size, agt_u64_t old_capacity) noexcept;
 
-    protected:
+      protected:
       void*     begin_;
       size_type size_ = 0;
       size_type capacity_;
@@ -63,7 +65,7 @@ namespace agt {
 
 
 
-    public:
+      public:
       vector_base() = delete;
 
       AGT_nodiscard size_type size() const noexcept { return size_; }
@@ -222,9 +224,9 @@ namespace agt {
         agt_u64_t Index = -1;
         if constexpr ( !U::takes_param_by_value ) {
           if (This->is_reference_to_storage(&element)) [[unlikely]] {
-              references_storage = true;
-              Index = &element - This->begin();
-            }
+            references_storage = true;
+            Index = &element - This->begin();
+          }
         }
         This->grow(NewSize);
         return references_storage ? This->begin() + Index : &element;
@@ -320,7 +322,7 @@ namespace agt {
 
       explicit small_array_template_base(agt_u64_t size)
           : small_array_template_common<T>(size){}
-      
+
 
       void destroy_range(T* start, T* end) noexcept {
         if constexpr ( !std::is_trivially_destructible_v<std::remove_cv_t<T>> ) {
@@ -336,7 +338,7 @@ namespace agt {
       template<typename It1, typename It2>
       void uninitialized_move(It1 I, It1 E, It2 Dest) noexcept {
         std::uninitialized_move(I, E, Dest);
-        notify_init_range(std::addressof(*Dest), std::ranges::distance(I, E));
+        // notify_init_range(std::addressof(*Dest), std::ranges::distance(I, E));
       }
 
       /// Copy the range [I, E) onto the uninitialized memory starting with "Dest",
@@ -355,9 +357,9 @@ namespace agt {
       /// in \p new_capacity. This is the first section of \a grow().
       T* malloc_for_grow(agt_u64_t minimum_size, agt_u64_t& new_capacity) {
         return static_cast<T *>(vector_base<small_array_size_type<T>>::malloc_for_grow(
-          minimum_size, 
-          sizeof(T), 
-          new_capacity, 
+          minimum_size,
+          sizeof(T),
+          new_capacity,
           alignof(T)));
       }
 
@@ -388,19 +390,19 @@ namespace agt {
         agt_u64_t new_capacity;
         T *new_elements = malloc_for_grow(num_elements, new_capacity);
         std::uninitialized_fill_n(new_elements, num_elements, element);
-        notify_init_range(new_elements, num_elements);
+        // notify_init_range(new_elements, num_elements);
         this->destroy_range(this->begin(), this->end());
         take_allocation_for_grow(new_elements, new_capacity);
         this->set_size(num_elements);
       }
 
-      template <typename... ArgTypes> 
+      template <typename... ArgTypes>
       T& grow_and_emplace_back(ArgTypes &&... Args) {
         // Grow manually in case one of Args is an internal reference.
         agt_u64_t new_capacity;
         T *new_elements = malloc_for_grow(0, new_capacity);
         ::new ((void *)(new_elements + this->size())) T(std::forward<ArgTypes>(Args)...);
-        notify_init_object(new_elements + this->size());
+        // notify_init_object(new_elements + this->size());
         move_elements_for_grow(new_elements);
         take_allocation_for_grow(new_elements, new_capacity);
         this->set_size(this->size() + 1);
@@ -472,7 +474,7 @@ namespace agt {
 
       explicit small_array_template_base(agt_u64_t Size)
           : small_array_template_common<T>(Size){}
-      
+
 
       // No need to do a destroy loop for POD's.
       static void destroy_range(T *, T *) { }
@@ -572,13 +574,13 @@ namespace agt {
       static constexpr size_t value = num_elements_that_fit == 0 ? 1 : num_elements_that_fit;
     };
   }
-  
+
   template <typename T>
   class any_vector : public impl::small_array_template_base<T>{
   public:
 
     using supertype = impl::small_array_template_base<T>;
-    
+
     using iterator = typename supertype::iterator;
     using const_iterator = typename supertype::const_iterator;
     using reference = typename supertype::reference;
@@ -613,7 +615,7 @@ namespace agt {
     }
 
   private:
-    template <bool ForOverwrite> 
+    template <bool ForOverwrite>
     void resize_impl(size_type N) {
       if (N < this->size()) {
         this->pop_back_n(this->size() - N);
@@ -624,7 +626,7 @@ namespace agt {
             new (std::addressof(*I)) T;
           else
             new (std::addressof(*I)) T();
-        this->notify_init_range(this->end(), N - this->size());
+        // this->notify_init_range(this->end(), N - this->size());
         this->set_size(N);
       }
     }
@@ -674,7 +676,7 @@ namespace agt {
       size_type NumInputs = std::distance(in_start, in_end);
       this->reserve(this->size() + NumInputs);
       this->uninitialized_copy(in_start, in_end, this->end());
-      this->notify_init_range(this->end(), NumInputs);
+      // this->notify_init_range(this->end(), NumInputs);
       this->set_size(this->size() + NumInputs);
     }
 
@@ -682,7 +684,7 @@ namespace agt {
     void append(size_type NumInputs, value_param_t Elt) {
       const T *EltPtr = this->reserve_for_param_and_get_address(Elt, NumInputs);
       std::uninitialized_fill_n(this->end(), NumInputs, *EltPtr);
-      this->notify_init_range(this->end(), NumInputs);
+      // this->notify_init_range(this->end(), NumInputs);
       this->set_size(this->size() + NumInputs);
     }
 
@@ -703,7 +705,7 @@ namespace agt {
       std::fill_n(this->begin(), std::min(NumElts, this->size()), Elt);
       if (NumElts > this->size()) {
         std::uninitialized_fill_n(this->end(), NumElts - this->size(), Elt);
-        this->notify_init_range(this->end(), NumElts - this->size());
+        // this->notify_init_range(this->end(), NumElts - this->size());
       }
       else if (NumElts < this->size())
         this->destroy_range(this->begin() + NumElts, this->end());
@@ -758,7 +760,7 @@ namespace agt {
     }
 
   private:
-    template <typename ArgType> 
+    template <typename ArgType>
     iterator insert_one_impl(iterator I, ArgType &&Elt) {
       // Callers ensure that ArgType is derived from T.
       static_assert(
@@ -792,7 +794,7 @@ namespace agt {
         if (this->is_reference_to_range(EltPtr, I, this->end()))
           ++EltPtr;
       }
-      
+
       *I = ::std::forward<ArgType>(*EltPtr);
       return I;
     }
@@ -842,7 +844,7 @@ namespace agt {
           if (I <= EltPtr && EltPtr < this->end())
             EltPtr += NumToInsert;
         }
-        
+
 
         std::fill_n(I, NumToInsert, *EltPtr);
         return I;
@@ -863,13 +865,13 @@ namespace agt {
         if (I <= EltPtr && EltPtr < this->end())
           EltPtr += NumToInsert;
       }
-      
+
       // Replace the overwritten part.
       std::fill_n(I, NumOverwritten, *EltPtr);
 
       // Insert the non-overwritten middle part.
       std::uninitialized_fill_n(OldEnd, NumToInsert - NumOverwritten, *EltPtr);
-      
+
       return I;
     }
 
@@ -940,8 +942,8 @@ namespace agt {
       if (this->size() >= this->capacity()) [[unlikely]]
                                             return this->grow_and_emplace_back(std::forward<ArgTypes>(Args)...);
 
-      ::new ((void *)this->end()) T(std::forward<ArgTypes>(Args)...);
-      this->notify_init_object(this->end());
+      ::new ((void *)this->end()) T { std::forward<ArgTypes>(Args)... };
+      // this->notify_init_object(this->end());
       this->set_size(this->size() + 1);
       return this->back();
     }
@@ -964,7 +966,7 @@ namespace agt {
 
   template <typename T>
   void any_vector<T>::swap(any_vector& RHS) {
-    if (this == &RHS) 
+    if (this == &RHS)
       return;
 
     // We can only avoid copying elements if neither vector is small.
@@ -1119,7 +1121,7 @@ namespace agt {
   //        appropriately moved around during assignment and such
   template <typename T, size_t N = impl::small_array_default_inline_elements<T>::value>
   class AGT_empty_bases vector : public any_vector<T>, impl::small_array_inline_storage<T, N>{
-  public:
+    public:
     vector() : any_vector<T>(N) {}
 
     ~vector() {
@@ -1182,9 +1184,10 @@ namespace agt {
   };
 
 
-
+#if !defined(agate_support_EXPORTS)
   extern template class impl::vector_base<agt_u32_t>;
   extern template class impl::vector_base<agt_u64_t>;
+#endif
 }
 
 #endif//JEMSYS_INTERNAL_VECTOR_HPP

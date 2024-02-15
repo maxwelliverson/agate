@@ -12,6 +12,8 @@
 #include "iterator.hpp"
 #include "allocator.hpp"
 
+#include "dllexport.hpp"
+
 #include <string_view>
 #include <memory>
 #include <bit>
@@ -34,7 +36,6 @@ namespace agt {
     template <typename T>
     inline constexpr static agt_size_t ptr_free_low_bits = std::countr_zero(alignof(T));
 
-    inline constexpr static size_t OptimalStringAlign = 16;
     
     class dictionary_entry_base {
       agt_u64_t m_keyLength;
@@ -106,7 +107,7 @@ namespace agt {
 
 
 
-    class dictionary {
+    class AGT_dllexport dictionary {
 
       
     protected:
@@ -139,7 +140,7 @@ namespace agt {
       void init(agt_u32_t Size) noexcept;
       void explicit_init(agt_u32_t size) noexcept;
 
-      agt_u32_t  rehash_table(agt_u32_t BucketNo) noexcept;
+      agt_u32_t  rehash_table(agt_u32_t BucketNo = 0) noexcept;
 
       /// lookup_bucket_for - Look up the bucket that the specified string should end
       /// up in.  If it already exists as a key in the map, the Item pointer for the

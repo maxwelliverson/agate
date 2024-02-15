@@ -7,13 +7,15 @@
 
 #include "config.hpp"
 
+#include "dllexport.hpp"
+
 #include <span>
 
 namespace agt {
 
   // TODO: Need to continue filling out with attribute getters
 
-  class cpu {
+  class AGT_dllexport cpu {
   public:
 
     enum class cache_kind : uint8_t {
@@ -115,7 +117,7 @@ namespace agt {
     static std::span<const cache_info> getCacheInfos() noexcept;
   };
 
-  class processor {
+  class AGT_dllexport processor {
     class impl;
   public:
     processor() = delete;

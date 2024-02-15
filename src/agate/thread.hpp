@@ -12,13 +12,14 @@
 
 #include "config.hpp"
 #include "thread_id.hpp"
+#include "dllexport.hpp"
 
 #include <tuple>
 #include <atomic>
 
 namespace agt {
 
-  class thread {
+  class AGT_dllexport thread {
 
 #if AGT_system_windows
   public:

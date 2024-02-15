@@ -7,6 +7,8 @@
 
 #include "agate.h"
 
+#include "dllexport.hpp"
+
 #include "align.hpp"
 #include "iterator.hpp"
 #include "allocator.hpp"
@@ -21,7 +23,6 @@
 
 namespace agt {
   namespace impl {
-    inline constexpr static size_t OptimalStringAlign = 16;
 
     class codex;
 
@@ -78,7 +79,7 @@ namespace agt {
       }
     };
 
-    class codex {
+    class AGT_dllexport codex {
 
       inline bool _key_matches_entry(const void* keyData, size_t keyLength, codex_entry_base* entry) const noexcept;
 

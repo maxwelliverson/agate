@@ -16,7 +16,7 @@ namespace {
   
   inline constexpr agt_u32_t hash_offset32_v = 5381;
   
-  template <typename T> requires (std::has_unique_object_representations_v<T>)
+  template <typename T> requires (!std::is_aggregate_v<T> || std::has_unique_object_representations_v<T>)
   inline constexpr agt_u32_t hash_append_bytes32(const T* address, size_t length, agt_u32_t val = hash_offset32_v) noexcept {
     for (const T* const end = address + length; address != end; ++address) {
       if constexpr ( sizeof(T) != 1 ) {
@@ -41,7 +41,10 @@ namespace {
   }
 
   impl::dictionary_entry_base** alloc_table(agt_u32_t count) noexcept {
-    return static_cast<impl::dictionary_entry_base**>(_aligned_malloc((sizeof(void*) + sizeof(agt_u32_t)) * (count + 1), alignof(void*)));
+    size_t tableSize = (sizeof(void*) + sizeof(agt_u32_t)) * (count + 1);
+    auto result = static_cast<impl::dictionary_entry_base**>(_aligned_malloc(tableSize, alignof(void*)));
+    std::memset(result, 0, tableSize);
+    return result;
   }
 }
 
@@ -144,35 +147,35 @@ agt_u32_t impl::dictionary::lookup_bucket_for(std::string_view Key) noexcept {
     impl::dictionary_entry_base *BucketItem = TheTable[BucketNo];
     // If we found an empty bucket, this key isn't in the table yet, return it.
     if (!BucketItem) [[likely]] {
-        // If we found a tombstone, we want to reuse the tombstone instead of an
-        // empty bucket.  This reduces probing.
-        if (FirstTombstone != -1) {
-          HashTable[FirstTombstone] = FullHashValue;
-          return FirstTombstone;
-        }
-
-        HashTable[BucketNo] = FullHashValue;
-        return BucketNo;
+      // If we found a tombstone, we want to reuse the tombstone instead of an
+      // empty bucket.  This reduces probing.
+      if (FirstTombstone != -1) {
+        HashTable[FirstTombstone] = FullHashValue;
+        return FirstTombstone;
       }
+
+      HashTable[BucketNo] = FullHashValue;
+      return BucketNo;
+    }
 
     if (BucketItem == get_tombstone_val()) {
       // Skip over tombstones.  However, remember the first one we see.
       if (FirstTombstone == -1)
         FirstTombstone = BucketNo;
     } else if (HashTable[BucketNo] == FullHashValue) [[likely]] {
-        // If the full hash value matches, check deeply for a match.  The common
-        // case here is that we are only looking at the buckets (for item info
-        // being non-null and for the full hash value) not at the items.  This
-        // is important for cache locality.
+      // If the full hash value matches, check deeply for a match.  The common
+      // case here is that we are only looking at the buckets (for item info
+      // being non-null and for the full hash value) not at the items.  This
+      // is important for cache locality.
 
-        // Do the comparison like this because Name isn't necessarily
-        // null-terminated!
-        auto *ItemStr = (char*)BucketItem + ItemSize;
-        if (Key == std::string_view(ItemStr, BucketItem->get_key_length())) {
-          // We found a match!
-          return BucketNo;
-        }
+      // Do the comparison like this because Name isn't necessarily
+      // null-terminated!
+      auto *ItemStr = (char*)BucketItem + ItemSize;
+      if (Key == std::string_view(ItemStr, BucketItem->get_key_length())) {
+        // We found a match!
+        return BucketNo;
       }
+    }
 
     // Okay, we didn't find the item.  Probe to the next bucket.
     BucketNo = (BucketNo + ProbeAmt) & (HTSize - 1);

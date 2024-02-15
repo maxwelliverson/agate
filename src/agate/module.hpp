@@ -6,6 +6,7 @@
 #define AGATE_INTERNAL_MODULE_HPP
 
 #include "config.hpp"
+#include "dllexport.hpp"
 
 #include "sys_string.hpp"
 #include "version.hpp"
@@ -38,7 +39,7 @@ namespace agt {
   inline constexpr size_t MaxModuleCount = std::countr_zero(AGT_MODULE_MAX_ENUM_PLUS_ONE - 1) + 2;
 
   inline constexpr size_t module_index(module_id id) noexcept {
-    if !consteval {
+    AGT_if_not_consteval {
       AGT_assert( std::has_single_bit(static_cast<std::underlying_type_t<module_id>>(id)) && id < AGT_MODULE_MAX_ENUM_PLUS_ONE );
     }
     if (id == AGT_CORE_MODULE)
