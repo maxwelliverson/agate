@@ -344,3 +344,70 @@ target_include_directories(DUMMY PRIVATE include src)
 
 add_library(DUMMY_MODULE src/dummy_module.cpp)
 target_include_directories(DUMMY_MODULE PRIVATE include src)
+
+
+
+
+
+target_sources(agate PUBLIC FILE_SET HEADERS BASE_DIRS include
+        FILES
+        include/agate.h
+        include/agate_module.h
+        include/agate/agents.h
+        include/agate/async.h
+        include/agate/channels.h
+        include/agate/core.h
+        include/agate/exec.h
+        include/agate/fiber.h
+        include/agate/init.h
+        include/agate/log.h
+        include/agate/naming.h
+        include/agate/network.h
+        include/agate/pool.h
+        include/agate/shmem.h
+        include/agate/signal.h
+        include/agate/task.h
+        include/agate/thread.h
+        include/agate/timer.h
+)
+
+
+
+include(GNUInstallDirs)
+
+set(INCLUDE_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR}
+        CACHE PATH "Location of header files" )
+set(SYSCONFIG_INSTALL_DIR ${CMAKE_INSTALL_SYSCONFDIR}/agate
+        CACHE PATH "Location of configuration files" )
+set(LIB_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}
+        CACHE PATH "Location of library files")
+set(BIN_INSTALL_DIR ${CMAKE_INSTALL_BINDIR}
+        CACHE PATH "Location of binary files")
+
+
+install(TARGETS agate agate-support
+        EXPORT agateTargets
+        FILE_SET HEADERS
+        LIBRARY DESTINATION $CACHE{BIN_INSTALL_DIR}       # agate modules
+        ARCHIVE DESTINATION $CACHE{LIB_INSTALL_DIR}       # agate.lib (the loader)
+        INCLUDES DESTINATION $CACHE{INCLUDE_INSTALL_DIR}) # header files
+
+install(TARGETS ${AGATE_MODULES}
+        RUNTIME DESTINATION $CACHE{BIN_INSTALL_DIR}
+        LIBRARY DESTINATION $CACHE{LIB_INSTALL_DIR}
+)
+
+install(EXPORT agateTargets
+        FILE agateTargets.cmake
+        NAMESPACE agate::
+        DESTINATION $CACHE{LIB_INSTALL_DIR}/cmake/agate)
+
+include(CMakePackageConfigHelpers)
+configure_package_config_file(agateConfig.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/agateConfig.cmake
+        INSTALL_DESTINATION $CACHE{LIB_INSTALL_DIR}/cmake/agate
+        PATH_VARS INCLUDE_INSTALL_DIR SYSCONFIG_INSTALL_DIR)
+write_basic_package_version_file("agateConfigVersion.cmake" COMPATIBILITY SameMajorVersion)
+
+# install(DIRECTORY include/dt TYPE INCLUDE)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/agateConfig.cmake" "${CMAKE_CURRENT_BINARY_DIR}/agateConfigVersion.cmake" DESTINATION $CACHE{LIB_INSTALL_DIR}/cmake/agate)
