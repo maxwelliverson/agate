@@ -93,7 +93,7 @@ namespace agt {
 
 
 
-  [[nodiscard]] size_t         sys_strlen(sys_cstring str) noexcept {
+  [[nodiscard]] inline size_t         sys_strlen(sys_cstring str) noexcept {
 #if AGT_system_windows
     return ::wcslen(str);
 #else
@@ -101,7 +101,7 @@ namespace agt {
 #endif
   }
 
-  [[nodiscard]] size_t         sys_strnlen(sys_cstring str, size_t maxLength) noexcept {
+  [[nodiscard]] inline size_t         sys_strnlen(sys_cstring str, size_t maxLength) noexcept {
 #if AGT_system_windows
     return ::wcsnlen_s(str, maxLength);
 #else
@@ -113,7 +113,7 @@ namespace agt {
 
 
 
-  [[nodiscard]] sys_cstring    copy_sys_string(sys_char* buf, size_t bufSize, sys_char** dynPtr, const char* cstr, size_t length = static_cast<size_t>(-1)) noexcept {
+  [[nodiscard]] inline sys_cstring    copy_sys_string(sys_char* buf, size_t bufSize, sys_char** dynPtr, const char* cstr, size_t length = static_cast<size_t>(-1)) noexcept {
 #if AGT_system_windows
     if (length == static_cast<size_t>(-1))
       length = ::strlen(cstr);
@@ -139,7 +139,7 @@ namespace agt {
 #endif
   }
 
-  [[nodiscard]] sys_cstring    copy_sys_string(sys_char* buf, size_t bufSize, sys_char** dynPtr, const wchar_t* wstr, size_t length = static_cast<size_t>(-1)) noexcept {
+  [[nodiscard]] inline sys_cstring    copy_sys_string(sys_char* buf, size_t bufSize, sys_char** dynPtr, const wchar_t* wstr, size_t length = static_cast<size_t>(-1)) noexcept {
 #if AGT_system_windows
     if (length == static_cast<size_t>(-1))
       length = ::wcslen(wstr);
@@ -175,7 +175,7 @@ namespace agt {
   }
 
 
-  [[nodiscard]] unique_sys_str make_unique_string(const char* cstr, size_t length = static_cast<size_t>(-1)) noexcept {
+  [[nodiscard]] inline unique_sys_str make_unique_string(const char* cstr, size_t length = static_cast<size_t>(-1)) noexcept {
 #if AGT_system_windows
     if (length == static_cast<size_t>(-1))
       length = ::strlen(cstr);
@@ -183,12 +183,13 @@ namespace agt {
     for (size_t i = 0; i < length; ++i)
       buf[i] = static_cast<wchar_t>(cstr[i]);
     buf[length] = L'\0';
+    return unique_sys_str(buf);
 #else
     return unique_sys_str(::strdup(cstr));
 #endif
   }
 
-  [[nodiscard]] unique_sys_str make_unique_string(const wchar_t* wstr, size_t length = static_cast<size_t>(-1)) noexcept {
+  [[nodiscard]] inline unique_sys_str make_unique_string(const wchar_t* wstr, size_t length = static_cast<size_t>(-1)) noexcept {
 #if AGT_system_windows
     if (length == static_cast<size_t>(-1))
       return unique_sys_str(_wcsdup(wstr));
@@ -202,7 +203,7 @@ namespace agt {
 #endif
   }
 
-  [[nodiscard]] unique_sys_str make_unique_string(unique_cstr&& str) noexcept {
+  [[nodiscard]] inline unique_sys_str make_unique_string(unique_cstr&& str) noexcept {
 #if AGT_system_windows
     // TODO: Maybe write utf8 to wide string conversion routine??
     /*size_t length = ::strlen(str.get());
@@ -221,7 +222,7 @@ namespace agt {
 #endif
   }
 
-  [[nodiscard]] unique_sys_str make_unique_string(unique_wstr&& str) noexcept {
+  [[nodiscard]] inline unique_sys_str make_unique_string(unique_wstr&& str) noexcept {
 #if AGT_system_windows
     return std::move(str);
 #else

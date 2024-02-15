@@ -130,23 +130,23 @@ namespace agt {
     agt_u64_t timestamp;
   };
 
-  void spin_sleep_until(deadline deadline) noexcept {
+  inline void spin_sleep_until(deadline deadline) noexcept {
     agt_u32_t backoff = 0;
     while ( deadline.hasNotPassed() ) {
       DUFFS_MACHINE(backoff);
     }
   }
 
-  void sleep(agt_u64_t ms) noexcept {
+  inline void sleep(agt_u64_t ms) noexcept {
     if ( ms > 20 )
       Sleep((DWORD)ms);
     else
       spin_sleep_until(deadline::fromTimeout(AGT_TIMEOUT_MS(ms)));
   }
-  void usleep(agt_u64_t us) noexcept {
+  inline void usleep(agt_u64_t us) noexcept {
     spin_sleep_until(deadline::fromTimeout(AGT_TIMEOUT_US(us)));
   }
-  void nanosleep(agt_u64_t ns) noexcept {
+  inline void nanosleep(agt_u64_t ns) noexcept {
     spin_sleep_until(deadline::fromTimeout(AGT_TIMEOUT_NS(ns)));
   }
 
@@ -1163,7 +1163,7 @@ namespace agt {
     agt_u32_t m_lock = UnlockedValue;
   };
 
-  class futex {
+  /*class futex {
 
     inline constexpr static agt_u16_t MaxIndex  = 16;
     inline constexpr static agt_u16_t IndexMask = MaxIndex - 1;
@@ -1302,7 +1302,7 @@ namespace agt {
     }
 
     lock_type m_lock;
-  };
+  };*/
 
 
 
@@ -2147,7 +2147,7 @@ namespace agt {
 
     union owner_info {
       struct {
-        agt_u32_t
+        agt_u32_t ayo;
       };
       agt_u64_t bits;
     };
@@ -2404,6 +2404,6 @@ namespace agt {
 
 }
 
-
+#include "atomic.cpp"
 
 #endif//JEMSYS_AGATE2_ATOMIC_HPP

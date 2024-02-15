@@ -14,6 +14,10 @@
 
 namespace agt {
 
+  namespace impl {
+    inline constexpr static size_t OptimalStringAlign = 16;
+  }
+
   template <size_t Align>
   AGT_forceinline static bool is_aligned(const void* ptr) noexcept {
     return (reinterpret_cast<uintptr_t>(ptr) & (Align - 1)) == 0;

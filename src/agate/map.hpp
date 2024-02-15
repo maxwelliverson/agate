@@ -12,6 +12,7 @@
 
 #include <bit>
 #include <concepts>
+#include <utility>
 
 namespace agt {
 
@@ -101,6 +102,45 @@ namespace agt {
       value_type&       value()       noexcept { return *this; }
       const value_type& value() const noexcept { return *this; }
     };
+
+    template <typename Val, size_t I>
+    concept is_valid_bucket_index = (I == 0) || (!std::same_as<Val, no_value> && (I == 1));
+
+    template <size_t I, typename Key, typename Val> requires is_valid_bucket_index<Val, I>
+    inline static decltype(auto) get(bucket<Key, Val>& b) noexcept {
+      if constexpr (I == 0)
+        return b.key();
+      else if constexpr (I == 1)
+        return b.value();
+      // no need to cover other possibilities; the 'is_valid_bucket_index' constraint ensures only valid indices will be used.
+    }
+
+    template <size_t I, typename Key, typename Val> requires is_valid_bucket_index<Val, I>
+    inline static decltype(auto) get(const bucket<Key, Val>& b) noexcept {
+      if constexpr (I == 0)
+        return b.key();
+      else if constexpr (I == 1)
+        return b.value();
+      // no need to cover other possibilities; the 'is_valid_bucket_index' constraint ensures only valid indices will be used.
+    }
+
+    template <size_t I, typename Key, typename Val> requires is_valid_bucket_index<Val, I>
+    inline static decltype(auto) get(bucket<Key, Val>&& b) noexcept {
+      if constexpr (I == 0)
+        return std::move(b.key());
+      else if constexpr (I == 1)
+        return std::move(b.value());
+      // no need to cover other possibilities; the 'is_valid_bucket_index' constraint ensures only valid indices will be used.
+    }
+
+    template <size_t I, typename Key, typename Val> requires is_valid_bucket_index<Val, I>
+    inline static decltype(auto) get(const bucket<Key, Val>&& b) noexcept {
+      if constexpr (I == 0)
+        return std::move(b.key());
+      else if constexpr (I == 1)
+        return std::move(b.value());
+      // no need to cover other possibilities; the 'is_valid_bucket_index' constraint ensures only valid indices will be used.
+    }
 
     template <typename B>
     concept is_bucket_type = requires(B& b, const B& cb) {
@@ -638,7 +678,8 @@ namespace agt {
       template <typename KeyArg, typename... ValueArgs>
       bucket_type* _insert_into_bucket(bucket_type* bucket, KeyArg&& key, ValueArgs&& ...values) noexcept {
 
-        assert( bucket != nullptr ); // A bucket should already have been found by lookup;
+        // bucket should have been found by lookup, unless the map hasn't yet been initialized....
+        // assert( bucket != nullptr ); // A bucket should already have been found by lookup;
 
         bucket = this->_insert_into_bucket_impl(/*key, */key, bucket);
 
@@ -791,8 +832,8 @@ namespace agt {
     }
 
     map(const map &other) : base_type() {
-      init(0);
-      copyFrom(other);
+      init(other.size());
+      copy_from(other);
     }
 
     map(map&& other) noexcept : base_type() {
@@ -1075,5 +1116,22 @@ namespace agt {
   };
 
 }
+
+
+
+
+
+template <typename Key, typename Value>
+struct std::tuple_element<0, agt::impl::bucket<Key, Value>> : std::type_identity<Key> {};
+template <typename Key, typename Value>
+struct std::tuple_element<1, agt::impl::bucket<Key, Value>> : std::type_identity<Value> {};
+
+template <typename Key, typename Value>
+struct std::tuple_size<agt::impl::bucket<Key, Value>> : std::integral_constant<size_t, 2> {};
+template <typename Key>
+struct std::tuple_size<agt::impl::bucket<Key, agt::impl::no_value>> : std::integral_constant<size_t, 1> {};
+
+
+
 
 #endif//AGATE_SUPPORT_MAP_HPP

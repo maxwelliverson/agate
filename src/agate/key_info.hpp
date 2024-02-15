@@ -18,6 +18,41 @@ namespace agt {
   //static unsigned get_hash_value(const T &Val);
   //static bool     is_equal(const T &LHS, const T &RHS);
 
+  template <>
+  struct key_info<int> {
+    static inline int get_empty_key() {
+      return INT32_MIN;
+    }
+    static inline int get_tombstone_key() {
+      return INT32_MIN + 1;
+    }
+    static unsigned get_hash_value(int val) noexcept {
+      return val * 37;
+    }
+    static bool     is_equal(int a, int b) noexcept {
+      return a == b;
+    }
+  };
+
+  template <typename E> requires std::is_enum_v<E>
+  struct key_info<E> {
+
+    using int_key_info = key_info<std::underlying_type_t<E>>;
+
+    static inline E get_empty_key() {
+      return static_cast<E>(int_key_info::get_empty_key());
+    }
+    static inline E get_tombstone_key() {
+      return static_cast<E>(int_key_info::get_tombstone_key());
+    }
+    static unsigned get_hash_value(E val) noexcept {
+      return int_key_info::get_hash_value(std::to_underlying(val));
+    }
+    static bool     is_equal(E a, E b) noexcept {
+      return a == b;
+    }
+  };
+
   template <typename T>
   struct key_info<T*> {
 

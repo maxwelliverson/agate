@@ -296,13 +296,18 @@ namespace agt {
   static constexpr std::optional<I> parse_decimal_integer(std::basic_string_view<Char, CharTraits> sv) noexcept {
 
 
-    if !consteval {
+    AGT_if_not_consteval {
 
       I val;
 
 #if AGT_system_windows
+#if defined(__cpp_if_consteval)
       constexpr static size_t MaxDigits = 23;
       constexpr static agt_u16_t AsciiMaxValue = 127;
+#else
+      const size_t MaxDigits = 23;
+      const agt_u16_t AsciiMaxValue = 127;
+#endif
       char digitBuffer[MaxDigits + 1];
 
       if (sv.size() > MaxDigits)
@@ -325,7 +330,7 @@ namespace agt {
       return val;
     }
 
-    if consteval {
+    AGT_if_consteval {
       using namespace detail;
 
       using C = parse_char_constants<CharTraits>;
@@ -366,6 +371,9 @@ namespace agt {
 
       return realValue;
     }
+
+
+    return 0;
   }
 
   template <std::integral I,
