@@ -219,7 +219,7 @@ namespace agt {
 
       do {
         next.epoch      = old.epoch;
-        mayRecycleObject = next.refCount == releaseCount;
+        mayRecycleObject = old.refCount == releaseCount;
         if (mayRecycleObject) {
           next.refCount = initialRefCount;
           next.epoch   += 1;

@@ -86,6 +86,15 @@ using agt_char_t = char;
 #define AGT_api(func) ((::agt::get_ctx())->exports->_pfn_##func)
 
 
+#if defined(__cpp_if_consteval)
+# define AGT_if_consteval if consteval
+# define AGT_if_not_consteval if not consteval
+#else
+# define AGT_if_consteval if (std::is_constant_evaluated())
+# define AGT_if_not_consteval if (!std::is_constant_evaluated())
+#endif
+
+
 
 #if defined(AGT_BUILD_SHARED) && defined(AGT_BUILDING_MODULE)
 #include "module_fwd.hpp"

@@ -12,7 +12,7 @@ namespace agt {
   struct shared_ctx;
 
 
-  struct shared_cb;
+  // struct shared_cb;
   struct shared_cache;
 
   struct tmem_cb; // Transient memory control block; is a normal shared allocation
@@ -71,7 +71,7 @@ namespace agt {
 
   agt_status_t claim_shared_name(shared_ctx& sharedCtx, const char* pName, size_t nameLength, name_token& token) noexcept;
   void         release_shared_name(shared_ctx& sharedCtx, name_token nameToken) noexcept;
-  void         bind_shared_name(shared_ctx& sharedCtx, name_token nameToken, HandleHeader* handle) noexcept;
+  void         bind_shared_name(shared_ctx& sharedCtx, name_token nameToken, shared_handle handle) noexcept;
 
 
 

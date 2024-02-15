@@ -137,13 +137,22 @@ namespace agt {
 
 
     template <typename PoolType>
-    AGT_noinline    inline static void _push_new_chunk_to_stack(PoolType& pool, agt_instance_t inst) noexcept;
+    AGT_noinline    inline static void _push_new_chunk_to_stack(PoolType& pool, agt_instance_t inst) noexcept {
+      assert( false && "Not yet implemented");
+      std::unreachable();
+    }
 
     template <typename PoolType>
-    AGT_forceinline inline static void _adjust_stack_post_free(PoolType& pool, pool_chunk_t chunk) noexcept;
+    AGT_forceinline inline static void _adjust_stack_post_free(PoolType& pool, pool_chunk_t chunk) noexcept {
+      assert( false && "Not yet implemented");
+      std::unreachable();
+    }
 
     template <typename PoolType>
-    AGT_forceinline inline static void _adjust_stack_post_alloc(PoolType& pool, pool_chunk_t allocChunk, agt_u16_t remainingCount) noexcept;
+    AGT_forceinline inline static void _adjust_stack_post_alloc(PoolType& pool, pool_chunk_t allocChunk, agt_u16_t remainingCount) noexcept {
+      assert( false && "Not yet implemented");
+      std::unreachable();
+    }
 
     AGT_noinline    inline static void _destroy_pool(ctx_pool& pool) noexcept {
       for (auto pChunk = pool.stackHead - 1; pool.stackBase <= pChunk; --pChunk)

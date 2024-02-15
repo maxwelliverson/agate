@@ -41,10 +41,11 @@ typedef void (* AGT_stdcall agt_async_callback_t)(agt_ctx_t ctx, agt_status_t re
 // Once initialized, these public fields should be left untouched.
 typedef struct AGT_alignas(AGT_ASYNC_STRUCT_ALIGNMENT) agt_inline_async_t {
   agt_ctx_t         ctx;
-  agt_u8_t          reserved[AGT_ASYNC_STRUCT_SIZE - sizeof(agt_ctx_t)];
+  agt_u32_t         structSize;
+  agt_u8_t          reserved[AGT_ASYNC_STRUCT_SIZE - sizeof(agt_ctx_t) - sizeof(agt_u32_t)];
 } agt_inline_async_t;
 
-#define AGT_INIT_INLINE_ASYNC(ctx) { (ctx), { } }
+#define AGT_INIT_INLINE_ASYNC(ctx) { ctx, (agt_u32_t)(sizeof(agt_inline_async_t)), { } }
 
 
 

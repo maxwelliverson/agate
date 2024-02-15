@@ -16,6 +16,30 @@ namespace agt {
   struct async;
 
 
+  agt_instance_t       AGT_stdcall create_instance_private(agt_config_t config, init::init_manager& manager);
+  agt_instance_t       AGT_stdcall create_instance_shared(agt_config_t config, init::init_manager& manager);
+
+  void                 AGT_stdcall destroy_instance_private(agt_instance_t instance, bool invokedOnThreadExit);
+  void                 AGT_stdcall destroy_instance_shared(agt_instance_t instance, bool invokedOnThreadExit);
+
+  agt_ctx_t            AGT_stdcall create_ctx_private(agt_instance_t instance, const agt_allocator_params_t* pAllocParams);
+  agt_ctx_t            AGT_stdcall create_ctx_shared(agt_instance_t instance, const agt_allocator_params_t* pAllocParams);
+
+  bool                 AGT_stdcall release_ctx_private(agt_ctx_t ctx);
+  bool                 AGT_stdcall release_ctx_shared(agt_ctx_t ctx);
+
+  // agt_status_t         AGT_stdcall finalize_ctx_private(agt_ctx_t ctx);
+  // agt_status_t         AGT_stdcall finalize_ctx_shared(agt_ctx_t ctx);
+
+
+  agt_status_t AGT_stdcall enter_fctx(agt_ctx_t ctx, const agt_fctx_desc_t* pFCtxDesc, int* pExitCode) AGT_noexcept;
+  void         AGT_stdcall exit_fctx(agt_ctx_t ctx, int exitCode) AGT_noexcept;
+
+  agt_status_t AGT_stdcall new_fiber(agt_fiber_t* pFiber, agt_fiber_proc_t proc, void* userData) AGT_noexcept;
+  agt_status_t AGT_stdcall destroy_fiber(agt_fiber_t fiber) AGT_noexcept;
+  void*        AGT_stdcall set_fiber_data(agt_fiber_t fiber, void* userData) AGT_noexcept;
+  void*        AGT_stdcall get_fiber_data(agt_fiber_t fiber) AGT_noexcept;
+
   void                 AGT_stdcall fiber_init_noexcept(agt_fiber_t fiber, agt_fiber_proc_t proc, bool isConvertingThread);
   void                 AGT_stdcall fiber_init_except(agt_fiber_t fiber, agt_fiber_proc_t proc, bool isConvertingThread);
 

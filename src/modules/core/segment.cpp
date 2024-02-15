@@ -268,22 +268,22 @@ static agt::seg_descriptor*  newSegDescriptor(agt::seg_manager* sm) noexcept {
 
 
 
-void         agt::segManagerInit(seg_manager* sm, size_t tableBuckets, rng_seeder* seeder) noexcept {
+void         agt::seg_manager_init(seg_manager* sm, size_t tableBuckets, rng_seeder* seeder) noexcept {
   segTableInit(&sm->table, tableBuckets);
   initRng(&sm->idGenerator, seeder);
   // TODO: Initialize the rest :)
 
 }
 
-agt_status_t agt::segManagerLookup(seg_manager* sm, agt_u32_t id, seg_descriptor** pDescriptor) noexcept {
-
+agt_status_t agt::seg_manager_lookup(seg_manager* sm, agt_u32_t id, seg_descriptor** pDescriptor) noexcept {
+  return AGT_ERROR_NOT_YET_IMPLEMENTED;
 }
 
-agt_status_t agt::segManagerAlloc(seg_manager* sm, seg_type type, size_t size, seg_descriptor** pDescriptor) noexcept {
-
+agt_status_t agt::seg_manager_alloc(seg_manager* sm, seg_type type, size_t size, seg_descriptor** pDescriptor) noexcept {
+  return AGT_ERROR_NOT_YET_IMPLEMENTED;
 }
 
-void         agt::segManagerDestroy(seg_manager *sm) noexcept {
+void         agt::seg_manager_destroy(seg_manager *sm) noexcept {
   segTableDestroy(sm);
 }
 

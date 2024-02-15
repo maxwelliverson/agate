@@ -77,6 +77,8 @@ namespace agt {
 
   void raise(agt_status_t status, void* errorData, agt_ctx_t context = nullptr) noexcept;
 
+  void raise(agt_instance_t instance, agt_status_t status, void* errorData) noexcept;
+
   template <typename T>
   void raise(err::internal<T>& info, agt_ctx_t context = nullptr) noexcept {
     raise(AGT_ERROR_UNKNOWN, &info, context);

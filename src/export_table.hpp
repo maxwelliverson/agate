@@ -59,6 +59,16 @@ namespace agt {
   class proc_set;
 
 
+  namespace init {
+    class attributes;
+    class init_manager;
+  }
+
+  namespace impl {
+    struct fiber_stack_info;
+  }
+
+
   inline constexpr static size_t MaxAPINameLength = AGT_CACHE_LINE - sizeof(agt_proc_t);
 
   struct AGT_cache_aligned proc_entry {
@@ -85,13 +95,35 @@ namespace agt {
     const agt_value_type_t* attrTypes;               ///< agt_attr_type_t values indexed by agt_attr_id_t. length: attrCount
     agt_u32_t               attrCount;               ///< Size of attribute table
 
+    agt_internal_log_handler_t logHandler;           ///< Local log handler
+    void*                      logHandlerData;       ///< Log handler user data.
+
+    agt_u32_t               tableSize;
+    agt_u32_t               maxValidOffset;
 
 
 
     // Version 0.01
 
     AGT_cache_aligned
-    agt_status_t (* AGT_stdcall _pfn_finalize)(agt_ctx_t ctx);
+
+    agt_instance_t (* AGT_stdcall _pfn_create_instance)(agt_config_t config, init::init_manager& manager);
+    agt_ctx_t      (* AGT_stdcall _pfn_create_ctx)(agt_instance_t instance, const agt_allocator_params_t* pAllocParams); // Do not call this directly except in a few select cases. Usually, you want to use acquire_ctx, which, if a ctx has already been created for the current thread, returns that, and only creates a new ctx if one doesn't already exist.
+
+    // invokedOnThreadExit is true if the instance is being automatically cleaned up.
+    void           (* AGT_stdcall _pfn_destroy_instance)(agt_instance_t instance, bool invokedOnThreadExit);  // Only used by init routines to rollback upon failure!! Never directly destroy an instance object.
+    // returns true if the instance should be destroyed
+    bool           (* AGT_stdcall _pfn_release_ctx)(agt_ctx_t ctx);                 // Only used by init routines to rollback upon failure!! Use ctx finalize to destroy a context object.
+
+    // void           (* AGT_stdcall _pfn_free_modules)(module_table* table);
+
+    void           (* AGT_stdcall _pfn_free_modules_on_thread_exit)(module_table* table);
+
+    agt_ctx_t      (* AGT_stdcall _pfn_ctx)();
+
+    agt_ctx_t      (* AGT_stdcall _pfn_do_acquire_ctx)(agt_instance_t instance, const agt_allocator_params_t* pAllocParams);
+
+
 
     agt_status_t (* AGT_stdcall _pfn_reserve_name)(agt_ctx_t ctx, const agt_name_desc_t* pNameDesc, agt_name_t* pResult);
     void         (* AGT_stdcall _pfn_release_name)(agt_ctx_t ctx, agt_name_t name);
@@ -188,17 +220,20 @@ namespace agt {
     agt_status_t         (* AGT_stdcall _pfn_enter_fctx)(agt_ctx_t ctx, const agt_fctx_desc_t* pFCtxDesc, int* pExitCode);
     void                 (* AGT_stdcall _pfn_exit_fctx)(agt_ctx_t ctx, int exitCode);
 
-    agt_status_t         (* AGT_stdcall _pfn_new_fiber)(agt_ctx_t ctx, agt_fiber_t* pFiber, agt_fiber_proc_t proc, void* userData);
+    agt_status_t         (* AGT_stdcall _pfn_new_fiber)(agt_fiber_t* pFiber, agt_fiber_proc_t proc, void* userData);
+    agt_status_t         (* AGT_stdcall _pfn_destroy_fiber)(agt_fiber_t fiber);
 
-    void                 (* AGT_stdcall _pfn_destroy_fiber)(agt_ctx_t ctx, agt_fiber_t fiber);
-
-    void                 (* AGT_stdcall _pfn_fiber_init)(agt_fiber_t fiber, agt_fiber_proc_t proc, bool isConvertingThread);
+    void                 (* AGT_stdcall _pfn_fiber_init)(agt_fiber_t fiber, agt_fiber_proc_t proc, const impl::fiber_stack_info& stackInfo);
     agt_fiber_transfer_t (* AGT_stdcall _pfn_fiber_switch)(agt_fiber_t fiber, agt_fiber_param_t param, agt_fiber_flags_t flags);
     void                 (* AGT_stdcall _pfn_fiber_jump)(agt_fiber_t fiber, agt_fiber_param_t param);
     agt_fiber_transfer_t (* AGT_stdcall _pfn_fiber_fork)(agt_fiber_proc_t proc, agt_fiber_param_t param, agt_fiber_flags_t flags);
-    agt_fiber_transfer_t (* AGT_stdcall _pfn_fiber_loop)(agt_fiber_proc_t proc, agt_u64_t param, agt_fiber_flags_t flags);
+    agt_fiber_param_t    (* AGT_stdcall _pfn_fiber_loop)(agt_fiber_proc_t proc, agt_u64_t param, agt_fiber_flags_t flags);
 
 
+
+    /** ====================[ agate-log ]======================= **/
+
+    AGT_log_api void     (* AGT_stdcall _pfn_log)(agt_self_t self, agt_u32_t category, const void* msg, size_t msgLength);
   };
 }
 

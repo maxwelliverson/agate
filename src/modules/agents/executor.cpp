@@ -256,7 +256,7 @@ namespace {
 
     agt_fctx_desc_t fctxDesc;
     fctxDesc.flags         = 0;
-    fctxDesc.stackSize     = attr::default_fiber_stack_size();
+    fctxDesc.stackSize     = attr::default_fiber_stack_size(ctx->instance);
     fctxDesc.maxFiberCount = exec->maxAgentCount;
     fctxDesc.parent        = nullptr;
     fctxDesc.proc          = local_fiber_proc;
@@ -340,7 +340,7 @@ namespace {
       eagent->boundFiber = exec->currentFiber;
       agt_fiber_t       targetFiber = get_next_fiber(exec);
       auto transfer = AGT_ctx_api(fiber_switch, exec->ctx)(targetFiber, BlockFiber, 0);
-      handle_fiber_transfer(transfer.parent, transfer.param, exec);
+      handle_fiber_transfer(transfer.source, transfer.param, exec);
       return AGT_SUCCESS;
     },
     .blockAgentUntil = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {
@@ -354,7 +354,7 @@ namespace {
 
       if (auto readyAgent = get_ready_agent(exec)) {
         auto transfer = AGT_ctx_api(fiber_switch, exec->ctx)(readyAgent->boundFiber, YieldFiber, AGT_FIBER_SAVE_EXTENDED_STATE);
-        handle_fiber_transfer(transfer.parent, transfer.param, exec);
+        handle_fiber_transfer(transfer.source, transfer.param, exec);
       }
     },
     .acquireMessage = [](basic_executor* exec_, const acquire_message_info& msgInfo, message& msg) -> agt_status_t {

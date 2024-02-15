@@ -261,7 +261,7 @@ namespace agt {
 #endif
 #else
 
-    struct ctx_allocator {
+    struct ctx_allocator   {
       agt_flags32_t   flags;
       impl::ctx_pool* pPools;
       agt_u32_t       poolCount;
@@ -375,7 +375,7 @@ namespace agt {
       return AGT_SUCCESS;
     }
 
-    AGT_forceinline inline static size_t _calculate_lut_required_size(const agt_allocator_params_t& params) noexcept {
+    AGT_forceinline static size_t _calculate_lut_required_size(const agt_allocator_params_t& params) noexcept {
       size_t maxSize = std::ranges::max(std::span{ params.blockSizes, params.blockSizeCount });
       return ((maxSize / impl::PoolBasicUnitSize) + 1) * sizeof(void*);
     }
@@ -385,13 +385,13 @@ namespace agt {
       std::free(allocator.pPools);
     }
 
-    AGT_forceinline inline static impl::ctx_pool* get_ctx_pool_unchecked(ctx_allocator& alloc, size_t size) noexcept {
+    AGT_forceinline static impl::ctx_pool* get_ctx_pool_unchecked(ctx_allocator& alloc, size_t size) noexcept {
       return alloc.poolLookupTable[ size / CtxAllocatorGranularity ];
     }
 
-    AGT_forceinline inline static size_t get_max_alloc_size(const ctx_allocator& allocator) noexcept { return allocator.maxAllocSize; }
+    AGT_forceinline static size_t get_max_alloc_size(const ctx_allocator& allocator) noexcept { return allocator.maxAllocSize; }
 
-    AGT_forceinline inline static size_t get_max_chunk_size(const ctx_allocator& allocator) noexcept { return allocator.maxChunkSize; }
+    AGT_forceinline static size_t get_max_chunk_size(const ctx_allocator& allocator) noexcept { return allocator.maxChunkSize; }
 
 
 #if defined(AGT_COMPILE_SINGLE_THREADED)
@@ -400,7 +400,7 @@ namespace agt {
 
     using get_default_allocator_params_return_type = instance_default_allocator_params;
 
-    AGT_forceinline inline static get_default_allocator_params_return_type get_default_allocator_params(agt_instance_t instance) noexcept;
+    AGT_forceinline static get_default_allocator_params_return_type get_default_allocator_params(agt_instance_t instance) noexcept;
 
     AGT_noinline inline static agt_status_t init_default_allocator_params(instance_default_allocator_params& alloc, const agt_allocator_params_t* pParams) noexcept {
       agt_allocator_params_t defaultParamStruct;
@@ -488,7 +488,7 @@ namespace agt {
       return AGT_SUCCESS;
     }
 
-    AGT_forceinline inline static void _init_default_ctx_allocator(ctx_allocator& allocator, instance_default_allocator_params params) noexcept {
+    AGT_forceinline static void _init_default_ctx_allocator(ctx_allocator& allocator, instance_default_allocator_params params) noexcept {
       const size_t totalSize = sizeof(ctx_allocator) + (params->poolLookupTableSize * sizeof(void*));
       std::memcpy(&allocator, params, totalSize);
       allocator.pPools = nullptr; // Does not own the pools, and as such may not free the table. Pools can still be accessed via index table
@@ -520,7 +520,7 @@ namespace agt {
 
     using get_default_allocator_params_return_type = const instance_default_allocator_params&;
 
-    AGT_forceinline inline static get_default_allocator_params_return_type get_default_allocator_params(agt_instance_t instance) noexcept;
+    AGT_forceinline static get_default_allocator_params_return_type get_default_allocator_params(agt_instance_t instance) noexcept;
 
     inline static void _init_default_ctx_allocator(ctx_allocator& allocator, const instance_default_allocator_params& params) noexcept {
       const auto poolTable = (impl::ctx_pool*)std::calloc(params.paramCount, sizeof(impl::ctx_pool));
@@ -639,19 +639,19 @@ namespace agt {
 
 
     template <typename T> requires (!std::is_pointer_v<T>)
-    AGT_forceinline inline static T& _deref(T& ref) noexcept {
+    AGT_forceinline static T& _deref(T& ref) noexcept {
       return ref;
     }
     template <typename T> requires (!std::is_pointer_v<T>)
-    AGT_forceinline inline static const T& _deref(const T& ref) noexcept {
+    AGT_forceinline static const T& _deref(const T& ref) noexcept {
       return ref;
     }
     template <typename T>
-    AGT_forceinline inline static T& _deref(T* ptr) noexcept {
+    AGT_forceinline static T& _deref(T* ptr) noexcept {
       return *ptr;
     }
     template <typename T>
-    AGT_forceinline inline static const T& _deref(const T* ptr) noexcept {
+    AGT_forceinline static const T& _deref(const T* ptr) noexcept {
       return *ptr;
     }
 
@@ -674,7 +674,7 @@ namespace agt {
       return status;
     }
 
-    AGT_forceinline inline static size_t    ctx_allocator_lut_required_size(agt_instance_t instance, const agt_allocator_params_t* params) noexcept {
+    AGT_forceinline static size_t    ctx_allocator_lut_required_size(agt_instance_t instance, const agt_allocator_params_t* params) noexcept {
       if (params)
         return _calculate_lut_required_size(*params);
       return _deref(get_default_allocator_params(instance)).poolLookupTableSize * sizeof(void*);

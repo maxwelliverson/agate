@@ -14,6 +14,8 @@
 #include "agate/set.hpp"
 #include "agate/string_pool.hpp"
 
+#include <algorithm>
+#include <functional>
 #include <span>
 #include <variant>
 #include <optional>
@@ -88,6 +90,8 @@ namespace agt::init {
     template <>
     struct attr_type_to<int32_t> { inline constexpr static agt_value_type_t value = AGT_TYPE_INT32; };
     template <>
+    struct attr_type_to<version> { inline constexpr static agt_value_type_t value = AGT_TYPE_INT32; };
+    template <>
     struct attr_type_to<uint64_t> { inline constexpr static agt_value_type_t value = AGT_TYPE_UINT64; };
     template <>
     struct attr_type_to<int64_t> { inline constexpr static agt_value_type_t value = AGT_TYPE_INT64; };
@@ -111,21 +115,39 @@ namespace agt::init {
       else
         return *reinterpret_cast<const T*>(&value);
     }
+
+    template <typename T>
+    inline static agt_value_t value_cast(T val) noexcept {
+      aligned_type<T> aligned{ val };
+      return std::bit_cast<agt_value_t>(aligned);
+    }
   }
 
+  class library_configuration;
+  class init_manager;
 
-  class attribute_setter {
-  public:
-
-  };
+  struct config_options;
 
   class attributes {
-    size_t                  m_attrCount;
-    const agt_value_type_t* m_attrType;
-    const uintptr_t*        m_attrValue;
-    bool                    m_usingNativeUnit;
+
+    friend struct config_options;
+
+    size_t                  m_attrCount = 0;
+    const agt_value_type_t* m_attrType = nullptr;
+    const uintptr_t*        m_attrValue = nullptr;
+    bool                    m_usingNativeUnit = false;
+    void                 (* m_destroyArrays)(const agt_value_type_t* pTypes, const uintptr_t* pAttrs);
 
   public:
+
+    attributes() = default;
+
+    ~attributes() {
+      freeAll();
+    }
+
+
+    void initialize(const library_configuration& libConfig, init_manager& initManager) noexcept;
 
     template <attribute_visitor V>
     auto visit(agt_attr_id_t attrId, V&& v) const noexcept {
@@ -172,18 +194,28 @@ namespace agt::init {
       return m_attrCount;
     }
 
+    [[nodiscard]] std::tuple<uint32_t, const agt_value_type_t*, const uintptr_t*> copy() const noexcept {
+      auto pValues = new uintptr_t[m_attrCount];
+      auto pTypes = new agt_value_type_t[m_attrCount];
+      std::uninitialized_copy_n(m_attrValue, m_attrCount, pValues);
+      std::uninitialized_copy_n(m_attrType, m_attrCount, pTypes);
+      return { static_cast<uint32_t>(m_attrCount), pTypes, pValues };
+    }
+
+    void freeAll() noexcept;
+
 
     [[nodiscard]] bool using_native_unit() const noexcept {
       return m_usingNativeUnit;
     }
   };
 
-  inline constexpr static uint32_t eExportIsPublic   = 0x1;
-  inline constexpr static uint32_t eExportIsExternal = 0x2;
+  inline constexpr static uint32_t eExportIsPublic   = 0x1; // Export has a slot in the proc lookup table (can be found by agt_get_proc_address)
+  inline constexpr static uint32_t eExportHasTableSlot = 0x2; // Export has a slot in the export table
 
 
-  inline constexpr static uint32_t ePublicExport = eExportIsPublic | eExportIsExternal;
-  inline constexpr static uint32_t ePrivateExport = eExportIsExternal;
+  inline constexpr static uint32_t ePublicExport  = eExportIsPublic | eExportHasTableSlot;
+  inline constexpr static uint32_t ePrivateExport = eExportHasTableSlot;
   inline constexpr static uint32_t eVirtualExport = eExportIsPublic;
 
   struct export_info {
@@ -197,7 +229,8 @@ namespace agt::init {
   class environment {
     string_pool               m_envVarValuePool;
     dictionary<pooled_string> m_envVarCache;
-    bool                      m_hasPrefetched;
+    bool                      m_hasPrefetched = false;
+
 
 
     using cookie_t = void*;
@@ -208,7 +241,12 @@ namespace agt::init {
       SYSENV_INSUFFICIENT_BUFFER
     };
 
+
     [[nodiscard]] static sysenv_result _sysenv_lookup(std::string_view key, char* buffer, size_t& length) noexcept;
+
+    sysenv_result (* m_lookup)(std::string_view key, char* buffer, size_t& length) noexcept = _sysenv_lookup;
+
+
 
     [[nodiscard]] pooled_string _lookup_value(std::string_view key) noexcept {
       constexpr static size_t StaticBufferSize = 256;
@@ -219,7 +257,7 @@ namespace agt::init {
 
 
       do {
-        switch (_sysenv_lookup(key, data, length)) {
+        switch (m_lookup(key, data, length)) {
           case SYSENV_UNDEFINED_VARIABLE:
             return {};
           case SYSENV_SUCCESS:
@@ -232,9 +270,9 @@ namespace agt::init {
     }
 
 
-    [[nodiscard]] cookie_t _read_all_environment_variables(any_vector<std::pair<std::string_view, std::string_view>>& keyValuePairs) noexcept;
+    [[nodiscard]] static cookie_t _read_all_environment_variables(any_vector<std::pair<std::string_view, std::string_view>>& keyValuePairs) noexcept;
 
-    void _release_cookie(cookie_t cookie) noexcept;
+    static void _release_cookie(cookie_t cookie) noexcept;
 
   public:
     void prefetch_all() noexcept {
@@ -267,7 +305,14 @@ namespace agt::init {
   };
 
 
+
+
+
+
   class library_configuration {
+
+    friend class attributes;
+
     struct var_t {
       agt_value_type_t type;
       agt_value_t      value;
@@ -277,8 +322,19 @@ namespace agt::init {
     const agt_allocator_params_t* m_allocParams = nullptr;
     agt_attr_id_t                 m_maxKnownId = { };
     vector<agt_u32_t, 0>          m_unknownAttributes;
-    environment                   m_env;
+    mutable environment           m_env;
+
+    config_options*               m_options = nullptr;
+    void                       (* m_optionsDtor)(config_options*) = nullptr;
+    void                       (* m_pfnCompileOptions)(config_options*, attributes& attr, environment& env, init_manager& initManager) = nullptr;
   public:
+
+    ~library_configuration() {
+      if (m_optionsDtor && m_options)
+        m_optionsDtor(m_options);
+    }
+
+    void init_options(init_manager& initManager) noexcept;
 
     void set_max_known_attribute(agt_attr_id_t attrId) noexcept {
       m_maxKnownId = attrId;
@@ -344,6 +400,17 @@ namespace agt::init {
         m_maxKnownId = attrId;
     }
 
+
+    [[nodiscard]] environment& env() const noexcept {
+      return m_env;
+    }
+
+    [[nodiscard]] config_options& options() const noexcept {
+      assert( m_options != nullptr );
+      return *m_options;
+    }
+
+
     [[nodiscard]] bool attribute_is_set(agt_attr_id_t attrId) const noexcept {
       return m_attributes.count(attrId);
     }
@@ -351,25 +418,20 @@ namespace agt::init {
 
 
   class module_exports {
-    vector<export_info> m_exports;
-    void (*m_pfnDtor)(vector<export_info>& exports); // Passing a destructor pointer ensures that we don't run into any weird issues where the dll and the process are using difference allocation functions. This shouldn't be the case 99% of the time, but it can happen.
 
-    inline constexpr static size_t DefaultInitialCapacity = 8;
+    agt::vector<export_info> m_exports;
 
   public:
 
-    module_exports() noexcept : module_exports(DefaultInitialCapacity) { }
-    explicit module_exports(size_t initialCapacity) noexcept {
-      m_exports.reserve(initialCapacity);
-    }
+    using iterator = export_info*;
+    using const_iterator = const export_info*;
+
+
+
+    module_exports() noexcept = default;
 
     module_exports(const module_exports&) = delete;
     module_exports(module_exports&&) noexcept = delete;
-
-    ~module_exports() {
-      assert( m_pfnDtor );
-      m_pfnDtor(m_exports);
-    }
 
 
     template <typename Ret, typename ...Args>
@@ -381,8 +443,36 @@ namespace agt::init {
       info.flags       = kind;
     }
 
+    template <typename Ret, typename ...Args>
+    void add_virtual_export(const char* name, Ret(* procAddress)(Args...)) noexcept {
+      auto& info       = m_exports.emplace_back();
+      info.procName    = name;
+      info.address     = (agt_proc_t)procAddress;
+      info.tableOffset = 0; // ignore
+      info.flags       = eVirtualExport;
+    }
+
+
+    [[nodiscard]] std::span<export_info> exports() noexcept {
+      return m_exports;
+    }
+
     [[nodiscard]] std::span<const export_info> exports() const noexcept {
       return m_exports;
+    }
+
+    [[nodiscard]] iterator begin() noexcept {
+      return m_exports.data();
+    }
+    [[nodiscard]] iterator end()   noexcept {
+      return begin() + m_exports.size();
+    }
+
+    [[nodiscard]] const_iterator begin() const noexcept {
+      return m_exports.data();
+    }
+    [[nodiscard]] const_iterator end() const noexcept {
+      return begin() + m_exports.size();
     }
 
     void clear() noexcept {
@@ -390,24 +480,291 @@ namespace agt::init {
     }
   };
 
-  class module {
-    const char*         m_name;
-    void*               m_handle;
-    const attributes*   m_attributes;
-    module_exports      m_exports;
-    bool                m_hasRetrievedExports;
 
-    [[nodiscard]] agt_proc_t get_raw_proc(const char* procName) noexcept;
-  public:
+  class module;
 
-    module(const char* name, const attributes& attr, bool usingCustomSearchPath) noexcept;
+  enum class undo_cookie_t : uintptr_t;
 
-    [[nodiscard]] std::span<const export_info> exports() noexcept;
+  inline constexpr static agt_config_flag_bits_t AGT_OPTION_IS_INTERNAL_CONSTRAINT = static_cast<agt_config_flag_bits_t>(0x200000); // This flag is only used internally, so is not exposed to clients
+  inline constexpr static agt_config_flag_bits_t AGT_OPTION_IS_ENVVAR_OVERRIDE = static_cast<agt_config_flag_bits_t>(0x100000); // This flag is only used internally, so is not exposed to clients
+
+  class init_manager {
+
+    struct callback_header {
+      callback_header* next;
+      callback_header* prev;
+    };
+
+    struct cleanup_callback : callback_header {
+      void (* cleanup)(void* userData);
+      void (* dtor)(cleanup_callback* cb);
+      void* userData;
+    };
+
+
+    callback_header m_callbackList = { &m_callbackList, &m_callbackList };
+    agt_status_t m_status = AGT_SUCCESS;
+    bool m_isComplete = false;
+
+
+    static cleanup_callback* newBasicCallback(void(* callback)(void*), void* userData) noexcept {
+      auto cbNode = new cleanup_callback;
+      cbNode->cleanup = callback;
+      cbNode->userData = userData;
+      cbNode->dtor = [](cleanup_callback* cb) {
+        delete cb;
+      };
+      return cbNode;
+    }
 
     template <typename Fn>
-    [[nodiscard]] Fn* get_proc(const char* procName) noexcept {
-      return (Fn*)this->get_raw_proc(procName);
+    static cleanup_callback* newCallback(Fn&& fn) noexcept {
+      using func_t = std::remove_cvref_t<Fn>;
+
+      auto func = new func_t{std::forward<Fn>(fn)};
+      auto callback = new cleanup_callback{
+        .cleanup = [](void* ud) {
+          std::invoke(*static_cast<func_t*>(ud));
+        },
+        .dtor = [](cleanup_callback* self) {
+          delete static_cast<func_t*>(self->userData);
+          delete self;
+        },
+        .userData = func
+      };
+
+      return callback;
     }
+
+    static void insertCallbackAfter(callback_header* position, callback_header* callback) noexcept {
+      callback->next = position->next;
+      callback->prev = position;
+      position->next->prev = callback;
+      position->next = callback;
+    }
+
+    static void removeAndDestroyCallback(cleanup_callback* callback) noexcept {
+      callback->prev->next = callback->next;
+      callback->next->prev = callback->prev;
+      callback->dtor(callback);
+    }
+
+    static undo_cookie_t     toCookie(cleanup_callback* cb) noexcept {
+      return static_cast<undo_cookie_t>(reinterpret_cast<uintptr_t>(cb));
+    }
+
+    static cleanup_callback* fromCookie(undo_cookie_t cookie) noexcept {
+      return reinterpret_cast<cleanup_callback*>(static_cast<uintptr_t>(cookie));
+    }
+
+    undo_cookie_t pushCallback(cleanup_callback* cb) noexcept {
+      insertCallbackAfter(&m_callbackList, cb);
+      return toCookie(cb);
+    }
+
+  public:
+
+    ~init_manager() {
+      const auto end = &m_callbackList;
+      auto begin = m_callbackList.next;
+
+      while (begin != end) {
+        auto cb = static_cast<cleanup_callback*>(begin);
+        auto next = begin->next;
+        cb->cleanup(cb->userData);
+        cb->dtor(cb);
+        begin = next;
+      }
+    }
+
+
+    void reportFatalError(std::string_view message) noexcept;
+    void reportError(std::string_view message) noexcept;
+    void reportWarning(std::string_view message) noexcept;
+
+    void reportErrno(errno_t errorCode, std::string_view descriptionOfCause) noexcept;
+    void raiseWin32Error(std::string_view descriptionOfCause) noexcept;
+    void reportModuleMissingGetExportsFunc(const char* moduleName) noexcept;
+
+    void reportCoreModuleMissingConfigLibraryFunc() noexcept;
+
+    void reportModuleNameTooLong(const char* moduleName, size_t maxLength, errno_t errorCode) noexcept;
+
+    void reportModuleNotFound(const char* moduleName, agt_init_necessity_t necessity, const void* customSearchPath = nullptr) noexcept;
+
+    void reportExportTooLong(const char* name, size_t maxSize) noexcept;
+
+    void reportInvalidFunctionIndex(const export_info& exportInfo) noexcept;
+
+    void reportBadUtf8Encoding(const char* string, agt_init_necessity_t necessity) noexcept;
+
+    void reportOptionBadType(const agt_config_option_t& option, std::initializer_list<agt_value_type_t> expectedTypes) noexcept;
+
+    void reportInvalidPathWin32(const void* path, agt_init_necessity_t necessity, unsigned long errorCode) noexcept;
+
+    void reportPathIsNotADirectory(const void* path, agt_init_necessity_t necessity) noexcept;
+
+    void reportBadNegativeValue(const agt_config_option_t& option) noexcept;
+
+    // given value is out of range for the actual option type.
+    void reportOptionTypeOutOfRange(const agt_config_option_t& option, agt_value_type_t optionType) noexcept;
+
+    // When a specified option is ignored; generally because it is overriden by a different option with a greater necessity.
+    void reportOptionIgnored(const agt_config_option_t& option) noexcept;
+
+    void reportBadEnvVarValue(std::string_view name, std::string_view value, agt_value_type_t targetType) noexcept;
+
+    void reportBadVersionString(std::string_view value) noexcept;
+
+    void reportEnvVarOverride(std::string_view envVar) noexcept;
+
+
+    void reportFatalOptionConflict(const agt_config_option_t& firstOpt, const agt_config_option_t& secondOpt) noexcept;
+
+
+    [[nodiscard]] bool isFatal() const noexcept;
+
+
+
+    undo_cookie_t registerCleanup(void(* callback)(void*), void* userData) noexcept {
+      return pushCallback(newBasicCallback(callback, userData));
+    }
+
+    undo_cookie_t registerCleanupAndDtor(void(* callback)(void*), void(* dtor)(void*), void* userData) noexcept {
+      struct callback_info {
+        void(* pCallback)(void*);
+        void(* pDtor)(void*);
+        void*  pUserData;
+      };
+
+      auto cbInfo = new callback_info{
+        .pCallback = callback,
+        .pDtor     = dtor,
+        .pUserData = userData
+      };
+
+      auto cleanup = new cleanup_callback{
+        .cleanup = [](void* ud) {
+          auto info = static_cast<callback_info*>(ud);
+          info->pCallback(info->pUserData);
+        },
+        .dtor = [](cleanup_callback* self) {
+          auto info = static_cast<callback_info*>(self->userData);
+          info->pDtor(info->pUserData);
+          delete info;
+          delete self;
+        },
+        .userData = cbInfo
+      };
+
+      return pushCallback(cleanup);
+    }
+
+    template <typename T> requires((std::integral<T> || std::is_enum_v<T>) && sizeof(T) <= sizeof(void*))
+    undo_cookie_t registerCleanup(void(* callback)(T), T userData) noexcept {
+      return pushCallback(newBasicCallback(reinterpret_cast<void(*)(void*)>(callback), reinterpret_cast<void*>(static_cast<uintptr_t>(userData))));
+    }
+
+    template <typename T> requires(!std::same_as<void, T>)
+    undo_cookie_t registerCleanup(void(* callback)(T*), T* userData) noexcept {
+      return pushCallback(newBasicCallback(reinterpret_cast<void(*)(void*)>(callback), (void*)userData));
+    }
+
+    template <typename Fn> requires std::invocable<Fn>
+    undo_cookie_t registerCleanup(Fn&& fn) noexcept {
+      return pushCallback(newCallback(std::forward<Fn>(fn)));
+    }
+
+
+
+    static void unregister(undo_cookie_t cookie) noexcept {
+      removeAndDestroyCallback(fromCookie(cookie));
+    }
+
+
+
+    // Indicates that the initialization has completed; this means that cleanup functions will only execute if a fatal error was encountered.
+    void complete() noexcept {
+      m_isComplete = true;
+    }
+
+
+    // 1. Dumps status messages
+    // 2. If incomplete (or fatal), call the cleanup callbacks in the order they were registered
+    // 3. Determine appropriate status value to return
+    // 4. Return status
+    [[nodiscard]] agt_status_t finish() noexcept {
+      // dump...
+
+      const auto end = &m_callbackList;
+      auto begin = m_callbackList.next;
+
+      const bool shouldCleanup = !m_isComplete || isFatal();
+
+      while (begin != end) {
+        auto cb = static_cast<cleanup_callback*>(begin);
+        auto next = begin->next;
+        if (shouldCleanup)
+          cb->cleanup(cb->userData);
+        cb->dtor(cb);
+        begin = next;
+      }
+
+      m_callbackList.next = &m_callbackList;
+      m_callbackList.prev = &m_callbackList;
+
+      return m_status;
+    }
+  };
+
+
+
+  class module {
+    const char*          m_name;
+    void*                m_handle;
+    init_manager*        m_errList;
+    agt_init_necessity_t m_necessity;
+    bool                 m_ownsHandle = true;
+  public:
+
+    module(dictionary_entry<agt_init_necessity_t>* name, init_manager& initManager, bool usingCustomSearchPaths) noexcept;
+
+    module(const module&) = delete;
+    module(module&& mod) noexcept
+      : m_name(mod.m_name),
+        m_handle(std::exchange(mod.m_handle, nullptr)),
+        m_errList(mod.m_errList),
+        m_necessity(mod.m_necessity)
+    { }
+
+    ~module();
+
+
+    void loadExports(module_exports& exp, const attributes& attr) const noexcept;
+
+    void configLibrary(library_configuration& out, agt_config_t config) const noexcept;
+
+    void postInit(agt_ctx_t ctx) const noexcept;
+
+    [[nodiscard]] bool  isValid() const noexcept {
+      return m_handle != nullptr;
+    }
+
+    [[nodiscard]] void* releaseHandle() noexcept {
+      m_ownsHandle = false;
+      return m_handle;
+    }
+
+    [[nodiscard]] const char* name() const noexcept {
+      return m_name;
+    }
+
+    [[nodiscard]] agt_init_necessity_t necessity() const noexcept {
+      return m_necessity;
+    }
+
+
+    void freeHandle();
   };
 
   class user_module {
@@ -415,24 +772,28 @@ namespace agt::init {
 
   };
 
-  class error_list {
-  public:
-  };
-
   struct loader_shared {
-    agt_config_t baseLoader = nullptr;
-    agt::map<void*, agt_config_t>          loaderMap;
-    agt::dictionary<agt_init_necessity_t>  requestedModules;
-    agt_allocator_params_t                 allocatorParams = {};
-    agt::vector<agt_user_module_info_t, 0> userModules;
-    bool                                   hasCustomAllocatorParams = false;
-    agt_internal_log_handler_t             logHandler;
-    void*                                  logHandlerUserData;
+    agt_config_t                      baseLoader = nullptr;
+    map<void*, agt_config_t>          loaderMap;
+    dictionary<agt_init_necessity_t>  requestedModules;
+    agt_allocator_params_t            allocatorParams = {};
+    vector<agt_user_module_info_t, 0> userModules;
+    bool                              hasCustomAllocatorParams = false;
+    agt_internal_log_handler_t        logHandler;
+    void*                             logHandlerUserData;
   };
 
+
+
+  // Required to be implemented by every module. Simply declares and defines the functions exported by the module.
   using get_exports_proc_t    = void(*)(module_exports& exports, const attributes& attrs);
 
-  using config_library_proc_t = bool(*)(library_configuration& out, agt_config_t config, error_list& errList);
+  // Required to be implemented by the core module; other modules may optionally implement
+  using config_library_proc_t = void(*)(library_configuration& out, agt_config_t config, init_manager& manager);
+
+  // Completely optional; is called following the creation of the instance, contexts, and export tables. If the module needs to do some local initialization, it should do it by exporting this function.
+  using post_init_proc_t = void(*)(agt_ctx_t ctx, init_manager& manager);
+
 
 
   export_table* get_local_export_table() noexcept;
@@ -447,14 +808,110 @@ struct agt_config_st {
   int                          headerVersion;
   int                          loaderVersion;
   agt::export_table*           pExportTable;
+  size_t                       exportTableSize; // shouldn't ever really grow but ya kno, just in case
   void*                        moduleHandle;
   agt::init::loader_shared*    shared;
+  agt::vector<agt_config_option_t, 0> options;
   agt::vector<agt_config_t, 0> childLoaders;
   agt_internal_log_handler_t   logHandler;
   void*                        logHandlerUserData;
+  agt_init_callback_t          initCallback;
+  void*                        callbackUserData;
+  agt_ctx_t*                   pCtxResult;
+
 };
 
 }
+
+
+
+inline void agt::init::attributes::initialize(const library_configuration &libConfig, init_manager &initManager) noexcept {
+  assert( libConfig.m_pfnCompileOptions != nullptr );
+
+  libConfig.m_pfnCompileOptions(libConfig.m_options, *this, libConfig.m_env, initManager);
+}
+
+
+
+AGT_noinline inline void agt::init::init_manager::reportFatalError(std::string_view message) noexcept {
+}
+AGT_noinline inline void agt::init::init_manager::reportError(std::string_view message) noexcept {
+}
+AGT_noinline inline void agt::init::init_manager::reportWarning(std::string_view message) noexcept {
+}
+AGT_noinline inline void agt::init::init_manager::reportBadNegativeValue(const agt_config_option_t &option) noexcept {
+}
+AGT_noinline inline void agt::init::init_manager::reportOptionTypeOutOfRange(const agt_config_option_t &option, agt_value_type_t optionType) noexcept {
+}
+AGT_noinline inline void agt::init::init_manager::reportOptionIgnored(const agt_config_option_t &option) noexcept {
+}
+AGT_noinline inline void agt::init::init_manager::reportBadEnvVarValue(std::string_view name, std::string_view value, agt_value_type_t targetType) noexcept {
+}
+AGT_noinline inline void agt::init::init_manager::reportBadVersionString(std::string_view value) noexcept {
+}
+AGT_noinline inline void agt::init::init_manager::reportEnvVarOverride(std::string_view envVar) noexcept {
+}
+AGT_noinline inline void agt::init::init_manager::reportFatalOptionConflict(const agt_config_option_t &firstOpt, const agt_config_option_t &secondOpt) noexcept {
+}
+AGT_noinline inline void agt::init::init_manager::reportErrno(errno_t errorCode, std::string_view descriptionOfCause) noexcept {
+  assert(false);
+}
+
+AGT_noinline inline void agt::init::init_manager::raiseWin32Error(std::string_view descriptionOfCause) noexcept {
+  assert(false);
+}
+AGT_noinline inline void agt::init::init_manager::reportModuleMissingGetExportsFunc(const char* moduleName) noexcept {
+  assert(false);
+}
+
+AGT_noinline inline void agt::init::init_manager::reportCoreModuleMissingConfigLibraryFunc() noexcept {
+  assert(false);
+}
+
+AGT_noinline inline void agt::init::init_manager::reportModuleNameTooLong(const char* moduleName, size_t maxLength, errno_t errorCode) noexcept {
+  assert(false);
+}
+
+AGT_noinline inline void agt::init::init_manager::reportModuleNotFound(const char* moduleName, agt_init_necessity_t necessity, const void* customSearchPath) noexcept {
+
+  if (necessity == AGT_INIT_REQUIRED) {
+    m_status = AGT_ERROR_MODULE_NOT_FOUND;
+    //TODO: add error logging??
+  }
+  //assert(necessity != AGT_INIT_REQUIRED);
+}
+
+AGT_noinline inline void agt::init::init_manager::reportExportTooLong(const char* name, size_t maxSize) noexcept {
+  assert(false);
+}
+
+AGT_noinline inline void agt::init::init_manager::reportInvalidFunctionIndex(const export_info& exportInfo) noexcept {
+  assert(false);
+}
+
+AGT_noinline inline void agt::init::init_manager::reportBadUtf8Encoding(const char* string, agt_init_necessity_t necessity) noexcept {
+  assert(necessity != AGT_INIT_REQUIRED);
+}
+
+AGT_noinline inline void agt::init::init_manager::reportOptionBadType(const agt_config_option_t& option, std::initializer_list<agt_value_type_t> expectedTypes) noexcept {
+  assert(option.necessity != AGT_INIT_REQUIRED);
+}
+
+AGT_noinline inline void agt::init::init_manager::reportInvalidPathWin32(const void* path, agt_init_necessity_t necessity, unsigned long errorCode) noexcept {
+  assert(necessity != AGT_INIT_REQUIRED);
+}
+
+AGT_noinline inline void agt::init::init_manager::reportPathIsNotADirectory(const void* path, agt_init_necessity_t necessity) noexcept {
+  assert(necessity != AGT_INIT_REQUIRED);
+}
+
+[[nodiscard]] inline bool agt::init::init_manager::isFatal() const noexcept {
+  return m_status != AGT_SUCCESS;
+}
+
+
+
+
 
 
 

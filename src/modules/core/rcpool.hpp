@@ -5,9 +5,13 @@
 #ifndef AGATE_CORE_TRANSIENT_POOL_HPP
 #define AGATE_CORE_TRANSIENT_POOL_HPP
 
-#include "modules/core/impl/pool.hpp"
+#include "ctx.hpp"
+#include "impl/pool.hpp"
+#include "instance.hpp"
 #include "object.hpp"
 #include "rc.hpp"
+
+#include "agate/thread_id.hpp"
 
 #include <immintrin.h>
 
@@ -81,6 +85,7 @@ namespace agt {
       slot_list         freeSlotList;
       agt_u32_t         flags;
       agt_u32_t         chunkWeakRefCount;
+      agt_u32_t         totalSlotCount;
       agt::rcpool*      ownerPool;
       rcpool_chunk_t*   stackPos;
       agt_instance_t    instance;
@@ -102,7 +107,9 @@ namespace agt {
     inline constexpr size_t MaxRCPoolChunkSize  = RCPoolBasicUnitSize * (0x1 << 16); // Basic slots are indexed with a 16 bit unsigned integer, so there can be at most 2^16 basic units, so the maximum chunk size is 2^16 times the basic unit size
 
     AGT_forceinline rcpool_chunk_t _get_chunk(rc_object& obj) noexcept {
-      return reinterpret_cast<agt::impl::rcpool_chunk_t>(reinterpret_cast<char*>(&obj) - (obj.thisSlot * RCPoolBasicUnitSize));
+
+
+      return reinterpret_cast<agt::impl::rcpool_chunk_t>(reinterpret_cast<char*>(&obj) - (obj.poolChunkOffset * RCPoolBasicUnitSize));
     }
 
     AGT_forceinline rc_object&     _get_slot(rcpool_chunk_t chunk, agt_u16_t slot) noexcept {
@@ -143,6 +150,7 @@ namespace agt {
     // A few helper query functions
 
     AGT_forceinline static bool           _chunk_is_empty(rcpool_chunk_t chunk) noexcept {
+      // Does this work????
       return chunk->freeSlotList.length == chunk->totalSlotCount;
     }
 
@@ -177,7 +185,7 @@ namespace agt {
 
 
 
-    AGT_noinline void _resize_stack(rcpool& pool, size_t newCapacity) noexcept {
+    AGT_noinline inline void _resize_stack(rcpool& pool, size_t newCapacity) noexcept {
       const auto oldBase = pool.stackBase;
       auto newBase = (rcpool_chunk_t*)std::realloc(oldBase, newCapacity * sizeof(void*));
 
@@ -210,7 +218,7 @@ namespace agt {
 
     // Allocate a new chunk and then push it to the top of the stack
 
-    AGT_noinline void _push_new_chunk_to_stack(rcpool& pool) noexcept {
+    AGT_noinline inline void _push_new_chunk_to_stack(rcpool& pool) noexcept {
 
       // Determine chunk size
 
@@ -222,7 +230,10 @@ namespace agt {
 
       // Allocate chunk
 
-      auto mem = ctxAllocPages(pool.context, chunkSize);
+      const auto instance = pool.context->instance;
+
+      auto mem = instance_alloc_pages(instance, chunkSize);
+      // auto mem = ctxAllocPages(pool.context, chunkSize);
       auto chunk = new(mem) rcpool_chunk;
 
       // Initialize chunk slots
@@ -239,14 +250,14 @@ namespace agt {
       for (agt_u16_t i = initialSlot; i < maxSlotIndex; slot += slotStride) {
         auto currentSlot = reinterpret_cast<rc_object*>(slot);
         currentSlot->epoch = 0;
-        currentSlot->thisSlot = i;
+        currentSlot->poolChunkOffset = i;
         i += indexStride;
-        currentSlot->nextFreeSlot = i;
+        reinterpret_cast<agt_u16_t&>(currentSlot->type) = i;
       }
 
       // Initialize chunk fields
 
-      chunk->ctx                   = pool.context;
+      chunk->instance              = instance;
       chunk->freeSlotList.nextSlot = initialSlot;
       chunk->freeSlotList.length   = totalSlotCount;
       chunk->totalSlotCount        = totalSlotCount;
@@ -256,7 +267,7 @@ namespace agt {
       chunk->ownerPool             = &pool;
       chunk->chunkSize             = chunkSize;
       if ((chunk->flags & PoolIsUnsafe) == 0)
-        chunk->threadId            = _thread_id();
+        chunk->threadId            = get_thread_id();
 
 
       // Reserve stack capacity
@@ -317,7 +328,7 @@ namespace agt {
 
 
     template <bool AtomicOp>
-    AGT_noinline    void _pop_chunk_from_stack(rcpool& pool) noexcept {
+    AGT_noinline inline void _pop_chunk_from_stack(rcpool& pool) noexcept {
       if constexpr (AtomicOp) {
         // TODO:
       }
@@ -345,7 +356,7 @@ namespace agt {
       if ((list.bits = atomicExchange(chunk->delayedFreeList.bits, 0))) {
         // There are delayed free operations that have to be processed
 
-        _get_slot(chunk, list.head).nextFreeSlot = chunk->freeSlotList.nextSlot;
+        reinterpret_cast<agt_u16_t&>(_get_slot(chunk, list.head).type) = chunk->freeSlotList.nextSlot;
         chunk->freeSlotList.nextSlot = list.next;
         chunk->freeSlotList.length += list.length;
 
@@ -369,7 +380,7 @@ namespace agt {
       return false;
     }
 
-    AGT_noinline    bool _resolve_all_delayed_frees(rcpool& pool) noexcept {
+    AGT_noinline inline bool _resolve_all_delayed_frees(rcpool& pool) noexcept {
       bool            freed         = false;
       rcpool_chunk_t* stackBase     = pool.stackBase;
       rcpool_chunk_t* oldFullHead   = pool.stackFullHead;
@@ -441,7 +452,7 @@ namespace agt {
                                oldLength = old.length;
                                allocObj = &_get_slot(chunk, old.nextSlot);
                                return slot_list{
-                                   .nextSlot = allocObj->nextFreeSlot,
+                                   .nextSlot = reinterpret_cast<agt_u16_t&>(allocObj->type),
                                    .length   = static_cast<agt_u16_t>(old.length - 1)
                                };
                              });
@@ -450,7 +461,7 @@ namespace agt {
       else {
         AGT_invariant( !_chunk_is_full(chunk) );
         auto& obj = _get_slot(chunk, chunk->freeSlotList.nextSlot);
-        chunk->freeSlotList.nextSlot = obj.nextFreeSlot;
+        chunk->freeSlotList.nextSlot = reinterpret_cast<agt_u16_t&>(obj.type);
         return { &obj, chunk->freeSlotList.length-- };
       }
     }
@@ -464,7 +475,7 @@ namespace agt {
 
 
     template <thread_safety SafetyModel>
-    AGT_forceinline void _adjust_stack_post_free(rcpool& pool, rcpool_chunk_t chunk, agt_u16_t oldAllocCount) noexcept {
+    AGT_forceinline bool _adjust_stack_post_free(rcpool& pool, rcpool_chunk_t chunk, agt_u16_t oldAllocCount) noexcept {
       bool shrunkStack = false;
 
       if (oldAllocCount == 1) {
@@ -474,12 +485,12 @@ namespace agt {
         auto emptyChunkPos = --pool.stackEmptyTail;
         _swap(chunk, *emptyChunkPos);
 
-        auto emptyChunk = _first_empty_chunk();
+        auto emptyChunk = _first_empty_chunk(pool);
         auto topChunk = _top_of_stack(pool);
 
         if (chunk != topChunk) {
           if (_chunk_is_empty(topChunk)) {
-            _pop_chunk_from_stack(pool);
+            _pop_chunk_from_stack<test(SafetyModel, thread_producer_safe)>(pool);
             shrunkStack = true;
           }
           _swap(chunk, _top_of_stack(pool));
@@ -505,6 +516,7 @@ namespace agt {
     auto allocChunk      = _get_alloc_chunk<SafetyModel>(pool);
     auto [obj, oldLength] = _alloc_from_chunk<test(SafetyModel, thread_owner_safe)>(allocChunk);
     _adjust_stack_post_alloc<SafetyModel>(pool, allocChunk, oldLength);
+    return obj;
   }
 
   template <thread_safety SafetyModel>
@@ -513,29 +525,31 @@ namespace agt {
     agt_u16_t oldAllocCount;
     if constexpr (!test(SafetyModel, thread_owner_safe)) {
       if constexpr (test(SafetyModel, thread_user_safe)) {
-        if (chunk->threadId != _thread_id()) {
-          _delayed_free(chunk->delayedFreeList, obj);
+        if (chunk->threadId != get_thread_id()) {
+          // _deferred_push_to_chunk();
+          _deferred_push_to_chunk((pool_chunk_t)chunk, (pool_slot&)obj);
+          // _delayed_free(chunk->delayedFreeList, obj);
           return;
         }
       }
-      obj.nextFreeSlot = chunk->freeSlotList.nextSlot;
-      chunk->freeSlotList.nextSlot = obj.thisSlot;
+      reinterpret_cast<agt_u16_t&>(obj.type) = chunk->freeSlotList.nextSlot;
+      chunk->freeSlotList.nextSlot = obj.poolChunkOffset;
       oldAllocCount = chunk->freeSlotList.length++;
     }
     else {
       slotListAtomicUpdate(chunk->freeSlotList,
                            [&](slot_list old) mutable {
-                             obj.nextFreeSlot = old.nextSlot;
+                             reinterpret_cast<agt_u16_t&>(obj.type) = old.nextSlot;
                              oldAllocCount = old.length;
                              return slot_list {
-                                 .nextSlot = obj.thisSlot,
+                                 .nextSlot = obj.poolChunkOffset,
                                  .length = ++old.length
                              };
                            });
     }
 
 
-    _adjust_stack_post_free<SafetyModel>(chunk->ownerPool, chunk);
+    impl::_adjust_stack_post_free<SafetyModel>(*chunk->ownerPool, chunk, oldAllocCount);
   }
 
 
@@ -558,7 +572,7 @@ namespace agt {
     }
 
     if (shouldFreeChunk)
-      ctxFreePages(chunk->ctx, chunk, chunk->chunkSize);
+      instance_free_pages(chunk->instance, chunk, chunk->chunkSize);
   }
 
 }

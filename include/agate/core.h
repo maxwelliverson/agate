@@ -482,6 +482,7 @@ namespace agtxx {
 
 #define AGT_INVALID_INSTANCE ((agt_instance_t)AGT_NULL_HANDLE)
 #define AGT_INVALID_CTX ((agt_ctx_t)AGT_NULL_HANDLE)
+#define AGT_DEFAULT_CTX ((agt_ctx_t)AGT_NULL_HANDLE)
 
 
 #define AGT_NO_EXECUTOR      ((agt_executor_t)AGT_NULL_HANDLE)
@@ -560,6 +561,7 @@ typedef agt_u64_t                agt_handle_t;
 
 typedef agt_u64_t                agt_send_token_t;
 
+typedef agt_u64_t                agt_instance_id_t;
 
 typedef struct agt_instance_st*  agt_instance_t;
 typedef struct agt_ctx_st*       agt_ctx_t;
@@ -595,6 +597,8 @@ typedef enum agt_status_t {
   AGT_TIMED_OUT /** < A wait operation exceeded the specified timeout duration */,
   AGT_INCOMPLETE_MESSAGE,
   AGT_ERROR_UNKNOWN,
+  AGT_ERROR_ALREADY_EXISTS,
+  AGT_ERROR_CTX_NOT_ACQUIRED,
   AGT_ERROR_UNKNOWN_FOREIGN_OBJECT,
   AGT_ERROR_INVALID_OBJECT_ID,
   AGT_ERROR_EXPIRED_OBJECT_ID,
@@ -639,6 +643,7 @@ typedef enum agt_status_t {
   AGT_ERROR_INTERNAL_OVERFLOW,            ///< Indicates an internal overflow error that was caught and corrected but that caused the requested operation to fail.
   AGT_ERROR_OBJECT_IS_BUSY,               ///< Indicates that the requested operation failed because the receiving object is doing something else at the moment.
 
+  AGT_ERROR_ALREADY_COMPLETED,
 
   AGT_ERROR_UNKNOWN_ATTRIBUTE,
   AGT_ERROR_INVALID_ATTRIBUTE_VALUE,
@@ -648,7 +653,7 @@ typedef enum agt_status_t {
   AGT_ERROR_CORRUPT_MODULE,
   AGT_ERROR_BAD_MODULE_VERSION,
 
-  AGT_ERROR_NO_FIBER_BOUND,       ///< Returned by a procedure that must only be called from within a fiber if it is called from outside of a fiber.
+  AGT_ERROR_NO_FCTX,              ///< Returned by a procedure that must only be called from within a fiber if it is called from outside of a fiber.
   AGT_ERROR_ALREADY_FIBER,        ///< Returned by agt_enter_efiber if the calling context is already executing in a fiber.
   AGT_ERROR_IN_AGENT_CONTEXT,     ///< Returned by procedures that can only be called outside of an Agent Execution Context are called by an agent.
   AGT_ERROR_FCTX_EXCEPTION,       ///< Returned by agt_enter_fctx when the fctx undergoes abnormal termination (most frequently by a call to agt_exit_fctx with an exit code other than 0)
@@ -739,6 +744,7 @@ typedef void (* AGT_stdcall agt_proc_t)(void);
 /// Attribute Types
 
 typedef enum agt_value_type_t {
+  AGT_TYPE_UNKNOWN,
   AGT_TYPE_BOOLEAN,
   AGT_TYPE_ADDRESS,
   AGT_TYPE_STRING,
@@ -749,7 +755,7 @@ typedef enum agt_value_type_t {
   AGT_TYPE_INT64,
   AGT_TYPE_FLOAT32,
   AGT_TYPE_FLOAT64,
-  AGT_TYPE_UNKNOWN = 0x7FFFFFFF
+  AGT_VALUE_TYPE_COUNT        ///< The number of type enums
 } agt_value_type_t;
 
 typedef union agt_value_t {
@@ -783,6 +789,7 @@ typedef enum agt_attr_id_t {
   AGT_ATTR_DEFAULT_THREAD_STACK_SIZE,      ///< type: UINT64
   AGT_ATTR_DEFAULT_FIBER_STACK_SIZE,       ///< type: UINT64
   AGT_ATTR_FULL_STATE_SAVE_MASK,           ///< type: UINT64
+  AGT_ATTR_MAX_STATE_SAVE_SIZE,            ///< type: UINT32
 } agt_attr_id_t;
 
 typedef struct agt_attr_t {
@@ -819,6 +826,20 @@ typedef enum agt_weak_ref_flag_bits_t {
   AGT_WEAK_REF_RETAIN_IF_ACQUIRED = 0x1
 } agt_weak_ref_flag_bits_t;
 typedef agt_flags32_t agt_weak_ref_flags_t;
+
+
+
+typedef struct agt_allocator_params_t {
+  size_t               structSize;              ///< equals: sizeof(agt_allocator_params_t)
+  const agt_size_t*    blockSizes;              ///< length: blockSizeCount
+  const agt_size_t*    blocksPerChunk;          ///< length: blockSizeCount
+  size_t               blockSizeCount;
+  const agt_size_t (*  partneredBlockSizes)[2]; ///< length: partneredBlockSizeCount
+  size_t               partneredBlockSizeCount;
+  const agt_size_t*    soloBlockSizes;          ///< length: soloBlockSizeCount
+  size_t               soloBlockSizeCount;
+  size_t               maxChunkSize;
+} agt_allocator_params_t;
 
 
 
@@ -860,22 +881,12 @@ AGT_static_api agt_instance_t      AGT_stdcall agt_get_instance(agt_ctx_t contex
 
 
 /**
- * Returns the thread local agate context, or if a context has not
- * yet been initialized on the current thread, returns AGT_INVALID_CTX.
- * */
-AGT_static_api agt_ctx_t           AGT_stdcall agt_ctx() AGT_noexcept;
+ * Returns an integer value that uniquely identifies the library instance (essentially, the library loaded by the current process; this is effectively a portable process identifier)
+ */
+AGT_static_api agt_instance_id_t   AGT_stdcall agt_get_instance_id() AGT_noexcept;
 
 
-/**
- * Returns a local library context given the passed instance handle.
- * If an instance is not provided, the instance bound to the current module
- * is used instead. NOTE: If called from a DLL, an instance must previously have
- * been bound to the DLL module *specifically*. It is not sufficient to have an
- * instance bound to a module to which the DLL in question is linked.
- *
- * @param [optional] instance May be AGT_INVALID_INSTANCE.
- * */
-AGT_static_api agt_ctx_t           AGT_stdcall agt_acquire_ctx(agt_instance_t instance) AGT_noexcept;
+
 
 
 
@@ -886,6 +897,7 @@ AGT_static_api int                 AGT_stdcall agt_get_instance_version(agt_inst
 
 
 AGT_static_api int                 AGT_stdcall agt_get_static_version() AGT_noexcept;
+
 
 AGT_static_api agt_error_handler_t AGT_stdcall agt_get_error_handler(agt_instance_t instance) AGT_noexcept;
 
@@ -900,6 +912,38 @@ AGT_static_api agt_status_t        AGT_stdcall agt_query_instance_attributes(agt
 
 
 /** ===============[ Core API Functions ]=================== **/
+
+
+/**
+ * Returns the thread local agate context.
+ *
+ * @result A handle to the thread local library context.
+ * If the calling thread has not already acquired a context, this returns null.
+ *
+ * This is the preferred method of retrieving the context object when it is known that
+ * one already exists in the current thread, as it avoids the overhead of having to do any checks.
+ *
+ * This function may be used to query whether or not the current thread has initialized a context already,
+ *
+ * */
+AGT_core_api agt_ctx_t AGT_stdcall agt_ctx() AGT_noexcept;
+
+/**
+ * Attempts to create a new context in the local thread with
+ * optional parameters for initializing the context allocator.
+ *
+ * If the current thread has already acquired a context, it is returned instead.
+ * Otherwise, a new context is created and attached to the current thread.
+ *
+ * If a new context is created, and pAllocParams is not null, the parameters
+ * it points to will be used to initialize the context allocator. This is primarily
+ * intended as an optimization feature, whereby application authors may profile the allocation behaviour of
+ * certain contexts, and provide allocator parameters based on the expected behaviour of the context.
+ *
+ */
+AGT_core_api agt_ctx_t AGT_stdcall agt_acquire_ctx(const agt_allocator_params_t* pAllocParams) AGT_noexcept;
+
+
 
 
 /**
@@ -962,6 +1006,19 @@ AGT_core_api agt_timestamp_t AGT_stdcall agt_now(agt_ctx_t ctx) AGT_noexcept;
  * */
 AGT_core_api void            AGT_stdcall agt_get_timespec(agt_ctx_t ctx, agt_timestamp_t timestamp, struct timespec* ts) AGT_noexcept;
 
+
+
+/**
+ * Closes the provided context. Behaviour of this function depends on how the library was configured
+ *
+ * TODO: Decide whether to provide another API call with differing behaviour depending on whether or not
+ *       one wishes to wait for processing to finish.
+ * */
+AGT_core_api agt_status_t        AGT_stdcall agt_finalize(agt_ctx_t context) AGT_noexcept;
+
+
+
+AGT_static_api agt_proc_t   AGT_stdcall agt_get_proc_address(const char* symbol) AGT_noexcept;
 
 
 AGT_end_c_namespace

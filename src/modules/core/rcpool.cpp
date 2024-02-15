@@ -14,11 +14,11 @@
 AGT_export_family {
 
   AGT_function_entry(st)(agt_ctx_t ctx, agt_rcpool_t* pPool, agt_size_t fixedSize, agt_pool_flags_t flags) {
-
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
   }
 
   AGT_function_entry(mt)(agt_ctx_t ctx, agt_rcpool_t* pPool, agt_size_t fixedSize, agt_pool_flags_t flags) {
-
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
   }
 
 }

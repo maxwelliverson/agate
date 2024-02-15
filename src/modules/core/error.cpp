@@ -4,20 +4,15 @@
 
 #include "error.hpp"
 
+#include "ctx.hpp"
 #include "instance.hpp"
-#include "modules/agents/state.hpp"
 
 
 #include <cstdlib>
 
 
-void agt::raiseError(agt_status_t status, void *errorData, agt_ctx_t context) noexcept {
-  if (!context)
-    context = tl_state.context;
-  if (!context)
-    abort();
-
-  auto errorHandler = agt_get_error_handler(context);
+void agt::raise(agt_instance_t instance, agt_status_t status, void* errorData) noexcept {
+  auto errorHandler = instance->errorHandler;
   if (!errorHandler)
     abort();
 
@@ -27,10 +22,22 @@ void agt::raiseError(agt_status_t status, void *errorData, agt_ctx_t context) no
     case AGT_ERROR_HANDLED:
       break;
     case AGT_ERROR_IGNORED:
-      if (ctxMayIgnoreErrors(context))
+      if (instance_may_ignore_errors(instance))
         break;
-      [[fallthrough]];
+    [[fallthrough]];
     case AGT_ERROR_NOT_HANDLED:
       abort();
   }
 }
+
+void agt::raise(agt_status_t status, void *errorData, agt_ctx_t context) noexcept {
+  if (!context)
+    context = get_ctx();
+  if (!context)
+    abort();
+
+  const auto instance = context->instance;
+
+  raise(instance, status, errorData);
+}
+

@@ -117,8 +117,12 @@ namespace agt {
     user_allocation,
     user_rc_allocation,
 
-    unsafe_fiber,
-    safe_fiber,
+
+    // unsafe_fiber,
+    fiber,
+    fctx,
+    pooled_fctx,
+    // safe_fiber,
 
     unsafe_fiber_pool,
     safe_fiber_pool,
@@ -156,8 +160,8 @@ namespace agt {
     shared_ring_queue_receiver_begin = shared_sp_ring_queue_receiver,
     shared_ring_queue_receiver_end = shared_mp_ring_queue_receiver,
 
-    fiber_begin = unsafe_fiber,
-    fiber_end   = safe_fiber,
+    // fiber_begin = unsafe_fiber,
+    // fiber_end   = safe_fiber,
 
     fiber_pool_begin = unsafe_fiber_pool,
     fiber_pool_end   = safe_fiber_pool,
@@ -175,7 +179,7 @@ namespace agt {
   // Returns nullptr if ctx has not been initialized
   [[nodiscard]] agt_ctx_t get_ctx() noexcept;
 
-  [[nodiscard]] agt_ctx_t acquire_ctx(agt_instance_t instance) noexcept;
+  [[nodiscard]] agt_ctx_t acquire_ctx(agt_instance_t instance, const agt_allocator_params_t* pAllocParams) noexcept;
 
   template <typename ObjectType>
   [[nodiscard]] AGT_forceinline ObjectType* alloc(agt_ctx_t ctx = get_ctx()) noexcept;

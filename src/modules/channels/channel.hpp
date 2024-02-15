@@ -16,6 +16,7 @@
 namespace agt {
 
 
+  /*
   enum channel_kind_t {
     local_spsc_channel_kind,
     local_mpsc_channel_kind,
@@ -409,7 +410,7 @@ namespace agt {
   
   AGT_declare_vtable(shared_mpmc_channel_handle);
   AGT_declare_vtable(shared_mpmc_channel_sender);
-  AGT_declare_vtable(shared_mpmc_channel_receiver);
+  AGT_declare_vtable(shared_mpmc_channel_receiver);*/
 }
 
 #endif//JEMSYS_AGATE2_CHANNEL_HPP

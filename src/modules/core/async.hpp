@@ -43,7 +43,8 @@ namespace agt {
     async_flags  flags;
     agt_u64_t    resultValue;
     agt_status_t status;
-    agt_u8_t     reserved[AGT_ASYNC_STRUCT_SIZE - 28];
+    async_key_t  dataKey;
+    async_data_t data;
   };
 
 
@@ -94,8 +95,8 @@ namespace agt {
 
 
 
-  imported_async_data* get_imported_async_data() noexcept {
-
+  inline imported_async_data* get_imported_async_data() noexcept {
+    return nullptr;// TODO: Implement
   }
 
 
@@ -155,7 +156,7 @@ namespace agt {
   }
 
 
-  template <bool AgentsEnabled, bool SharedContext, size_t AsyncSize>
+  /*template <bool AgentsEnabled, bool SharedContext, size_t AsyncSize>
   inline agt_status_t async_wait(agt_async_t& async, agt_timeout_t timeout) noexcept {
     const auto desiredResponses = async.desiredResponseCount;
 
@@ -210,9 +211,9 @@ namespace agt {
     //       As is, a wait timing out will return AGT_NOT_READY rather than AGT_TIMED_OUT. Is this what we want?
     //       Is there a meaningful difference between the two statuses that should be made clear?
     return status;
-  }
+  }*/
 
-  template <bool AgentsEnabled, bool SharedContext, size_t AsyncSize>
+  /*template <bool AgentsEnabled, bool SharedContext, size_t AsyncSize>
   inline agt_status_t async_wait_all(std::span<agt_async_t* const> asyncs, agt_timeout_t timeout) noexcept {
     switch (timeout) {
       case AGT_WAIT:
@@ -222,7 +223,7 @@ namespace agt {
 
       }
     }
-  }
+  }*/
 
 
 

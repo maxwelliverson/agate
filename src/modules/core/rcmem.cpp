@@ -14,7 +14,7 @@ template <agt::thread_safety SafetyModel>
 AGT_forceinline static void* rc_user_alloc(agt_rcpool_t pool, agt_u32_t initialRefCount) noexcept {
   AGT_invariant(initialRefCount > 0);
   AGT_invariant(pool != nullptr);
-  return agt::impl::_cast_user_address_from_rc(agt::alloc_rc_object<SafetyModel>((agt::rcpool*)pool, initialRefCount));
+  return agt::impl::_cast_user_address_from_rc(agt::alloc_rc_object<SafetyModel>(*(agt::rcpool*)pool, initialRefCount));
 }
 
 AGT_export_family {

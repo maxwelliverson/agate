@@ -223,6 +223,11 @@ namespace agt {
     };
 
 
+    [[nodiscard]] AGT_forceinline size_t _get_max_entry_index(const registry_cache_entry& entry) noexcept {
+      return std::size(entry.buckets) - 1;
+    }
+
+
 
     [[nodiscard]] agt_u32_t _hash_string(const agt_char_t* string, size_t length) noexcept;
 
@@ -233,7 +238,7 @@ namespace agt {
 
 
     // Lock must be held for reading
-    [[nodiscard]] registry_entry* _lookup_instance_entry(registry& reg, const agt_char_t* string, size_t length, agt_u32_t hash) noexcept {
+    [[nodiscard]] inline registry_entry* _lookup_instance_entry(registry& reg, const agt_char_t* string, size_t length, agt_u32_t hash) noexcept {
       const agt_u32_t indexMask = reg.indexMask;
       const agt_u32_t initialIndex = hash & indexMask;
       agt_u32_t probeDistance = 1;
@@ -249,7 +254,7 @@ namespace agt {
     }
 
 
-    [[nodiscard]] std::pair<registry_entry*, bool> _try_create_instance_entry(agt_ctx_t ctx, registry& reg, read_lock* readLock, const agt_char_t* string, size_t length, agt_u32_t hash) noexcept {
+    [[nodiscard]] inline std::pair<registry_entry*, bool> _try_create_instance_entry(agt_ctx_t ctx, registry& reg, read_lock* readLock, const agt_char_t* string, size_t length, agt_u32_t hash) noexcept {
       write_lock lock;
       if (readLock)
         lock = write_lock(*readLock);
@@ -257,35 +262,38 @@ namespace agt {
         lock = write_lock(reg.mutex);
 
 
-
+      return {nullptr, false};// TODO: Implement
     }
 
 
 
 
-    void _set_most_recently_used(registry_cache_entry& entry, agt_u32_t entryIndex) noexcept {
-      if (entryIndex < entry.maxBucketIndex)
-        std::swap(entry.buckets[entryIndex], entry.buckets[entry.maxBucketIndex]);
+    inline void _set_most_recently_used(registry_cache_entry& entry, agt_u32_t entryIndex) noexcept {
+
+      if (entryIndex < _get_max_entry_index(entry))
+        std::swap(entry.buckets[entryIndex], entry.buckets[_get_max_entry_index(entry)]);
     }
 
-    void _rotate_cache_entries(registry_cache_entry& cacheEntry) noexcept {
+    inline void _rotate_cache_entries(registry_cache_entry& cacheEntry) noexcept {
       __m256i cacheRegister = _mm256_load_si256((const __m256i*)&cacheEntry.buckets);
-      _mm256_permute4x64_epi64();
+      // _mm256_permute4x64_epi64();
     }
 
-    bool _add_to_full_cache(registry_cache_entry& cacheEntry, registry_entry* entry) noexcept {
+    inline bool _add_to_full_cache(registry_cache_entry& cacheEntry, registry_entry* entry) noexcept {
       if (_retain_entry(entry)) {
         _release_entry(cacheEntry.buckets[0]);
         cacheEntry.buckets[0] = entry;
 
-        if (cacheEntry.maxBucketIndex != 0) {
+        if (_get_max_entry_index(cacheEntry) != 0) {
 
         }
       }
+
+      return false;// TODO: Implement
     }
 
     // Uses LRU ejection policy. Maybe worth changing depending on profiling results
-    bool _add_to_cache(registry_cache_entry& cacheEntry, registry_entry* entry, agt_i32_t cacheIndex) noexcept {
+    inline bool _add_to_cache(registry_cache_entry& cacheEntry, registry_entry* entry, agt_i32_t cacheIndex) noexcept {
       if (_retain_entry(entry)) {
         cacheEntry.buckets[cacheIndex] = entry;
         _set_most_recently_used(cacheEntry, cacheIndex);
@@ -294,7 +302,7 @@ namespace agt {
       return false;
     }
 
-    [[nodiscard]] registry_entry* _lookup_entry(registry_cache& reg, const agt_char_t* string, size_t length) noexcept {
+    [[nodiscard]] inline registry_entry* _lookup_entry(registry_cache& reg, const agt_char_t* string, size_t length) noexcept {
       const auto hash = _hash_string(string, length);
 
       const auto slotIndex = hash & reg.indexMask;
@@ -364,8 +372,17 @@ namespace agt {
       return instanceEntry;
     }
 
-    [[nodiscard]] registry_entry& _lookup_or_create_entry(agt_ctx_t ctx, registry_cache& reg, const agt_char_t* string, size_t length) noexcept {
+    [[nodiscard]] inline registry_entry& _lookup_or_create_entry(agt_ctx_t ctx, registry_cache& reg, const agt_char_t* string, size_t length) noexcept {
+      if (auto entry = _lookup_entry(reg, string, length))
+        return *entry;
 
+      const auto hash = _hash_string(string, length);
+
+      /// TODO: This is a placeholder implementation.
+      ///       Write an actual implementation more in line with _lookup_entry.
+
+      auto [entry, isNew] = _try_create_instance_entry(ctx, *reg.instanceRegistry, nullptr, string, length, hash);
+      return *entry;
     }
 
 

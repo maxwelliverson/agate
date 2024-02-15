@@ -8,39 +8,43 @@
 #include "config.hpp"
 
 #include "agate/flags.hpp"
+#include "agate/integer_division.hpp"
 #include "agate/version.hpp"
 #include "export_table.hpp"
 #include "impl/allocator.hpp"
 #include "impl/registry.hpp"
 
+
+
 extern "C" {
 
 struct agt_instance_st {
-  agt_u32_t                flags;
-  agt_u32_t                id;
-  agt::version             version;
-  agt_u32_t                refCount; // How many times has agate been loaded with this instance; only relevant when linking to external libraries that also use agate
-  const agt::export_table* exports;
-  agt_u32_t                asyncStructSize;
-  const agt_attr_t*        attributes;
-  size_t                   attributeCount;
-  agt_error_handler_t      errorHandler;
-  void*                    errorHandlerUserData;
+  agt_u32_t                  flags;
+  agt_u32_t                  id;
+  agt::version               version;
+  agt_u32_t                  refCount; // How many times has agate been loaded with this instance; only relevant when linking to external libraries that also use agate
+  agt::export_table*         exports;
+  agt_u32_t                  asyncStructSize;
+  const agt_value_type_t*    attrTypes;
+  const agt_value_t*         attrValues;
+  size_t                     attrCount;
+  agt_error_handler_t        errorHandler;
+  void*                      errorHandlerUserData;
   agt_internal_log_handler_t logCallback;
-  void*                    logCallbackUserData;
-  agt_u32_t                contextCount;
+  void*                      logCallbackUserData;
+  agt_u32_t                  contextCount;
 
-  agt_size_t               defaultMaxObjectSize;
+  agt_size_t                 defaultMaxObjectSize;
 
-  agt_u64_t                timeoutConstantMultiplier;
-  agt_u32_t                timeoutShiftValue;
 
-  agt_u32_t                instanceNameOffset;
-  agt_u32_t                instanceNameLength;
-  agt_u32_t                defaultCtxAllocatorParamsOffset;
-  agt_u32_t                localNameRegistryOffset;
-  agt_u32_t                pageAllocatorOffset;
-  agt_u32_t                threadDescriptorsOffset;
+  integer_divisor            timeoutDivisor;
+
+  agt_u32_t                  instanceNameOffset;
+  agt_u32_t                  instanceNameLength;
+  agt_u32_t                  defaultCtxAllocatorParamsOffset;
+  agt_u32_t                  localNameRegistryOffset;
+  agt_u32_t                  pageAllocatorOffset;
+  agt_u32_t                  threadDescriptorsOffset;
 
 
 
@@ -201,8 +205,8 @@ namespace agt {
 
 
 
-  agt_status_t ctxOpenHandleById(agt_instance_t inst, agt_object_id_t id, HandleHeader*& handle) noexcept;
-  agt_status_t ctxOpenHandleByName(agt_instance_t inst, const char* name, HandleHeader*& handle) noexcept;
+  // agt_status_t ctxOpenHandleById(agt_instance_t inst, agt_object_id_t id, HandleHeader*& handle) noexcept;
+  // agt_status_t ctxOpenHandleByName(agt_instance_t inst, const char* name, HandleHeader*& handle) noexcept;
 
 
 
@@ -218,9 +222,6 @@ namespace agt {
   agt_status_t inst_enumerate_named_objects(agt_instance_t inst, size_t& count, const char** pNames) noexcept;
   agt_status_t inst_enumerate_shared_objects(agt_instance_t inst, size_t& count, const char** pNames) noexcept;
 
-
-
-  agt_instance_t inst_get() noexcept;
 
   void         inst_set_thread_ctx(agt_instance_t inst, agt_ctx_t ctx) noexcept;
   agt_ctx_t    inst_get_thread_ctx(agt_instance_t inst) noexcept;

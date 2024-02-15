@@ -284,11 +284,11 @@ namespace agt {
       }
     }
 
-    AGT_forceinline inline static size_t _get_pool_slot_size(const basic_pool& pool) noexcept {
+    AGT_forceinline static size_t _get_pool_slot_size(const basic_pool& pool) noexcept {
       return pool.slotSize;
     }
 
-    AGT_forceinline inline static void   _push_chunk_to_stack(basic_pool& pool, pool_chunk_t chunk) noexcept {
+    AGT_forceinline static void   _push_chunk_to_stack(basic_pool& pool, pool_chunk_t chunk) noexcept {
       if (pool.stackHead == pool.stackTop) [[unlikely]]
         _resize_stack(pool, (pool.stackTop - pool.stackBase) * 2);
 

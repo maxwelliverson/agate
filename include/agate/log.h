@@ -60,11 +60,6 @@ AGT_log_api void                       AGT_stdcall agt_log(agt_self_t self, agt_
 
 
 
-AGT_log_api agt_internal_log_handler_t AGT_stdcall agt_set_internal_log_handler(agt_ctx_t ctx, agt_internal_log_handler_t callback, void* userData) AGT_noexcept;
-
-AGT_log_api agt_internal_log_handler_t AGT_stdcall agt_get_internal_log_handler(agt_ctx_t ctx, void** pUserData) AGT_noexcept;
-
-
 AGT_end_c_namespace
 
 #endif//AGATE_LOG_H

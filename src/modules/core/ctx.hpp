@@ -25,22 +25,16 @@
 
 namespace agt {
 
-  struct ctx_vtable {
-    agt_status_t (* create)(agt_ctx_t* pResult, agt_instance_t instance, agt_executor_t executor, const agt_allocator_params_t* allocParams);
-    void         (* destroy)(agt_ctx_t ctx);
-  };
+  struct fctx;
 
 
-  [[nodiscard]] agt_ctx_t    acquire_ctx(agt_instance_t instance = nullptr) noexcept;
+  // If a context was already initialized on the current thread, return it. Otherwise, create a new one with the given params (may be null), initialize, and return it.
+  [[nodiscard]] agt_ctx_t    acquire_ctx(agt_instance_t instance, const agt_allocator_params_t* pAllocParams) noexcept;
 
   // Returns nullptr if ctx has not been initialized
   // Should only really be called if it is already known that the local context has been initialized within the calling module
   // Note that this is specific to the calling module
   [[nodiscard]] agt_ctx_t    get_ctx() noexcept;
-
-  [[nodiscard]] agt_status_t new_ctx(agt_ctx_t& ctx, agt_instance_t instance, agt_executor_t executor, const agt_allocator_params_t* allocatorParams) noexcept;
-
-  void                       destroy_ctx(agt_ctx_t ctx) noexcept;
 
 
 
@@ -48,8 +42,6 @@ namespace agt {
   [[nodiscard]] inline agt_instance_t get_instance(agt_ctx_t ctx) noexcept;
 
   [[nodiscard]] inline bool           is_agent_execution_context(agt_ctx_t ctx) noexcept;
-
-  inline agt_ctx_t                    set_ctx(agt_ctx_t ctx) noexcept;
 
   [[nodiscard]] inline agt_executor_t get_executor(agt_ctx_t ctx) noexcept;
 
@@ -62,14 +54,15 @@ namespace agt {
 extern "C" {
 
 struct agt_ctx_st {
+  agt_u32_t                      refCount;
   agt_flags32_t                  flags;
-  agt_u32_t                      threadId;
   agt_executor_t                 executor;
   agt_agent_t                    boundAgent;
   agt_message_t                  currentMessage;
-  agt_fiber_t                    boundFiber;
+  agt::fctx*                     fctx; // null if this thread isn't using fibers
   agt_instance_t                 instance;
-  uintptr_t                      fastThreadId;
+  uintptr_t                      threadId;
+  agt_ctx_t*                     pLocalCtxAddress;
   const agt::export_table*       exports;
   agt::integer_divisor           timestampFrequencyRatio; //
   agt::reg_impl::registry_cache  registryCache;

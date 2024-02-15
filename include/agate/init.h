@@ -23,17 +23,7 @@
 AGT_begin_c_namespace
 
 
-typedef struct agt_allocator_params_t {
-  size_t               structSize;              ///< equals: sizeof(agt_allocator_params_t)
-  const agt_size_t*    blockSizes;              ///< length: blockSizeCount
-  const agt_size_t*    blocksPerChunk;          ///< length: blockSizeCount
-  size_t               blockSizeCount;
-  const agt_size_t (*  partneredBlockSizes)[2]; ///< length: partneredBlockSizeCount
-  size_t               partneredBlockSizeCount;
-  const agt_size_t*    soloBlockSizes;          ///< length: soloBlockSizeCount
-  size_t               soloBlockSizeCount;
-  size_t               maxChunkSize;
-} agt_allocator_params_t;
+
 
 
 typedef agt_flags64_t agt_init_flag_bits_t;
@@ -89,13 +79,14 @@ typedef enum agt_config_id_t {
 } agt_config_id_t;
 
 typedef enum agt_config_flag_bits_t {
-  AGT_ALLOW_ENVIRONMENT_OVERRIDE = 0x1,
-  AGT_ALLOW_SUBMODULE_OVERRIDE   = 0x2,
-  AGT_VALUE_GREATER_THAN = 0x1000,
-  AGT_VALUE_LESS_THAN    = 0x2000,
-  AGT_VALUE_GREATER_THAN_OR_EQUALS = 0x4000,
-  AGT_VALUE_LESS_THAN_OR_EQUALS = 0x8000,
-  AGT_VALUE_NOT_EQUALS = 0x10000
+  AGT_VALUE_EQUALS                 = 0x0001, ///< This is the default if no other relational flags are specified.
+  AGT_VALUE_LESS_THAN              = 0x0002,
+  AGT_VALUE_LESS_THAN_OR_EQUALS    = 0x0003,
+  AGT_VALUE_GREATER_THAN           = 0x0004,
+  AGT_VALUE_GREATER_THAN_OR_EQUALS = 0x0005,
+  AGT_VALUE_NOT_EQUALS             = 0x0006,
+  AGT_ALLOW_ENVIRONMENT_OVERRIDE   = 0x10,
+  AGT_ALLOW_SUBMODULE_OVERRIDE     = 0x20,
 } agt_config_flag_bits_t;
 typedef agt_flags32_t agt_config_flags_t;
 
@@ -134,26 +125,79 @@ typedef struct agt_user_module_info_t {
 typedef struct agt_config_st* agt_config_t;
 
 
+
+typedef void (* agt_init_callback_t)(agt_ctx_t ctx, void* pUserData);
+
+
 /* =================[ Config ]================= */
 
 
 
-AGT_static_api agt_config_t AGT_stdcall agt_get_config(agt_config_t config, int headerVersion) AGT_noexcept;
+
+/**
+ * Returns the API version of the static loader.
+ *
+ * \note See \ref AGT_MAKE_VERSION for the version format
+ */
+AGT_static_api int          AGT_stdcall agt_get_loader_version() AGT_noexcept;
 
 
+/**
+ * \defgroup ConfigFuncs Library Configuration
+ * @{
+ */
 
+/// \cond HIDDEN_API
+/**
+ * Equivalent to \code agt_init(pCtx, agt_get_config(AGT_ROOT_CONFIG, headerVersion)) \endcode
+ *
+ * @param [in] config Either a parent config object (provided by the component to which this component is linked),
+ *                    or AGT_ROOT_CONFIG if there is no parent (ie. this is being called by the executable)
+ * @param [in] headerVersion Must be AGT_API_VERSION
+ * */
+AGT_static_api agt_config_t AGT_stdcall _agt_get_config(agt_config_t config, int headerVersion) AGT_noexcept;
+/// \endcond
+/**
+ * Get a configuration object that may be used to configure the library, and subsequently
+ * passed to either \ref agt_init or \ref agt_init_with_callback.
+ *
+ * @param [in] config Either a parent config object (provided by the component to which this component is linked),
+ *                    or AGT_ROOT_CONFIG if there is no parent (ie. this is being called by the executable)
+ */
+#define agt_get_config(cfg) _agt_get_config(cfg, AGT_API_VERSION)
+
+
+/**
+ *
+ */
 AGT_static_api void         AGT_stdcall agt_config_init_modules(agt_config_t config, agt_init_necessity_t necessity, size_t moduleCount, const char* const* pModules) AGT_noexcept;
 
+/**
+ *
+ */
 AGT_static_api void         AGT_stdcall agt_config_init_user_modules(agt_config_t config, size_t userModuleCount, const agt_user_module_info_t* pUserModuleInfos) AGT_noexcept;
 
+/**
+ *
+ */
 AGT_static_api void         AGT_stdcall agt_config_set_options(agt_config_t config, size_t optionCount, const agt_config_option_t* pConfigOptions) AGT_noexcept;
 
+/**
+ *
+ */
 AGT_static_api void         AGT_stdcall agt_config_set_log_handler(agt_config_t config, agt_init_scope_t scope, agt_internal_log_handler_t handlerProc, void* userData) AGT_noexcept;
 
 
+/**
+ * @}
+ */
 
 
-
+/*!
+ * \defgroup LibraryInitFunctions Initialization
+ * These functions each initialize the agate library, but with slightly different interfaces.
+ * @{
+ */
 
 
 /**
@@ -191,26 +235,52 @@ AGT_static_api agt_status_t AGT_stdcall agt_init(agt_ctx_t* pLocalContext, agt_c
 
 
 /**
+ * Initializes agate for the local component, installing a callback to be invoked on upon successful initialization.
+ */
+AGT_static_api agt_status_t AGT_stdcall agt_init_with_callback(agt_config_t config, agt_init_callback_t callback, void* userData) AGT_noexcept;
+
+
+
+/// \cond HIDDEN_API
+/**
  * Equivalent to \code agt_init(pCtx, agt_get_config(AGT_ROOT_CONFIG, headerVersion)) \endcode
  *
- * @param [out] pCtx
+ * @param [out] pCtx pointer to which
  * @param [in]  headerVersion Must be AGT_API_VERSION
  * */
-AGT_static_api agt_status_t AGT_stdcall agt_default_init(agt_ctx_t* pCtx, int headerVersion) AGT_noexcept;
+AGT_static_api agt_status_t AGT_stdcall _agt_default_init(agt_ctx_t* pCtx, int headerVersion) AGT_noexcept;
+/// \endcond
+/**
+ *
+ *
+ *
+ * @param [out] pCtx
+ *
+ * @result A value of type agt_status_t indicating the result of the initialization
+ */
+#define agt_default_init(pCtx) _agt_default_init(pCtx, AGT_API_VERSION)
+
+
+
+/// \cond HIDDEN_API
+/**
+ * Equivalent to \code agt_init(pCtx, _agt_get_config(AGT_ROOT_CONFIG, headerVersion)) \endcode
+ *
+ * @param [in]  headerVersion Must be AGT_API_VERSION
+ * @param [in]  callback A callback function that is invoked on success
+ * @param [in]  userData An opaque pointer that is passed to the callback
+ * */
+AGT_static_api agt_status_t AGT_stdcall _agt_default_init_with_callback(int headerVersion, agt_init_callback_t callback, void* userData) AGT_noexcept;
+/// \endcond
+/**
+ *
+ */
+#define agt_default_init_with_callback(callback, userData) _agt_default_init_with_callback(AGT_API_VERSION, callback, userData)
 
 
 /**
- * Closes the provided context. Behaviour of this function depends on how the library was configured
- *
- * TODO: Decide whether to provide another API call with differing behaviour depending on whether or not
- *       one wishes to wait for processing to finish.
- * */
-AGT_core_api agt_status_t        AGT_stdcall agt_finalize(agt_ctx_t context) AGT_noexcept;
-
-
-
-AGT_static_api agt_proc_t   AGT_stdcall agt_get_proc_address(const char* symbol) AGT_noexcept;
-
+ * @}
+ */
 
 
 AGT_end_c_namespace

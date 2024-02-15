@@ -5,7 +5,7 @@
 #include "message.hpp"
 
 #include "modules/agents/agents.hpp"
-#include "modules/async/async.hpp"
+#include "modules/core/async.hpp"
 
 #include "agate/atomic.hpp"
 #include "agate/flags.hpp"

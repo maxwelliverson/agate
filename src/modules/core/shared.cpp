@@ -14,6 +14,7 @@
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include <agate/tagged_value.hpp>
 
 
 #pragma comment(lib, "mincore")
@@ -130,9 +131,9 @@ namespace {
 
     do {
       lockValue = 0;
-      if (agt::impl::atomicCompareExchange(cb->initializingLock, lockValue, 1))
+      if (agt::atomicCompareExchange(cb->initializingLock, lockValue, 1))
         break;
-      agt::impl::atomicWait(cb->initializingLock, lockValue);
+      agt::atomicWait(cb->initializingLock, lockValue);
     } while (true);
 
     if (!cb->initialized) {
@@ -140,19 +141,19 @@ namespace {
       cb->initialized = true;
     }
 
-    agt::impl::atomicStore(cb->initializingLock, 0);
-    agt::impl::atomicNotifyOne(cb->initializingLock);
+    agt::atomicStore(cb->initializingLock, 0);
+    agt::atomicNotifyOne(cb->initializingLock);
   }
 
   agt_status_t initSharedAllocationLookupTable(agt::shared_ctx* ctx) noexcept {
-
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
   }
 
 
 
   // Used internally by shalloc routines; creates a new shared allocation without relying on any of the internals.
   agt::shared_handle shallocRaw(agt::shared_ctx* ctx, void** ppVoid) noexcept {
-
+    return {};
   }
 
   // Used internally by shalloc routines; creates a new shared allocation without relying on any of the internals.
@@ -280,7 +281,7 @@ namespace {
 
 
 void* agt::shalloc(agt::shared_ctx &sharedCtx, size_t size, size_t alignment, agt::shared_handle &sharedHandle) noexcept {
-
+  return nullptr;
 }
 
 
