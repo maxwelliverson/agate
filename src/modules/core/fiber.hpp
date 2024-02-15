@@ -9,11 +9,17 @@
 
 #include "rc.hpp"
 
+
+#include <bitset>
+
 #include <utility>
 
 namespace agt {
 
-  inline constexpr static size_t FiberSaveDataSize = 512;
+  inline constexpr static agt_fiber_flags_t eFiberPartialRestore = 0x40000000;
+
+  inline constexpr static agt_flags32_t eFiberIsConverted = 0x1;
+
 
   using fiber_jump_flags_t = agt_flags32_t;
 
@@ -25,9 +31,56 @@ namespace agt {
     FIBER_SAVE_SUPPORTS_XSAVEOPT = 0x1000
   };
 
-  struct alignas(AGT_CACHE_LINE) fiber_data {
+  struct AGT_cache_aligned xsave_data {
+    uint16_t fcw;
+    uint16_t fsw;
+    uint8_t  ftw;
+    uint8_t  rsvd;
+    uint16_t fop;
+    uint64_t fip;
+    uint64_t fdp;
+    uint32_t mxcsr;
+    uint32_t mxcsrMask;
+    std::byte mmx0[10];
+    std::byte rsvd0[6];
+    std::byte mmx1[10];
+    std::byte rsvd1[6];
+    std::byte mmx2[10];
+    std::byte rsvd2[6];
+    std::byte mmx3[10];
+    std::byte rsvd3[6];
+    std::byte mmx4[10];
+    std::byte rsvd4[6];
+    std::byte mmx5[10];
+    std::byte rsvd5[6];
+    std::byte mmx6[10];
+    std::byte rsvd6[6];
+    std::byte mmx7[10];
+    std::byte rsvd7[6];
+    std::byte xmm0[16];
+    std::byte xmm1[16];
+    std::byte xmm2[16];
+    std::byte xmm3[16];
+    std::byte xmm4[16];
+    std::byte xmm5[16];
+    std::byte xmm6[16];
+    std::byte xmm7[16];
+    std::byte xmm8[16];
+    std::byte xmm9[16];
+    std::byte xmm10[16];
+    std::byte xmm11[16];
+    std::byte xmm12[16];
+    std::byte xmm13[16];
+    std::byte xmm14[16];
+    std::byte xmm15[16];
+    std::byte padding[96];
+    std::bitset<64> xstateBV;
+    std::bitset<64> xcompBV;
+  };
+
+  struct AGT_cache_aligned fiber_data {
     fiber_data*       prevData;
-    uintptr_t         rip;
+    uintptr_t         rip; // return address
     uintptr_t         rbx;
     uintptr_t         rbp;
     uintptr_t         rdi;
@@ -40,7 +93,8 @@ namespace agt {
     agt_u32_t         reserved;
     void*             transferAddress;
     uintptr_t         stack;
-    alignas(AGT_CACHE_LINE) std::byte data[FiberSaveDataSize];
+    xsave_data        xsave;
+    // alignas(AGT_CACHE_LINE) std::byte data[FiberSaveDataSize];
   };
 
   enum fiber_state {
@@ -71,6 +125,43 @@ namespace agt {
 
   };
 
+  AGT_final_object_type(pooled_fctx, ref_counted) {
+
+  };
+
+  AGT_final_object_type(fctx) {
+    agt_u32_t              fiberCount;
+    agt_u32_t              maxFiberCount;
+    agt_u32_t              stackReserveSize;
+    agt_u32_t              stackCommitSize;
+    agt_fiber_t            rootFiber;
+    fiber_data*            enterData;
+    agt_fiber_param_t      exitParam;
+    int                    exitCode;
+    pooled_fctx*           pooledFctx;
+  };
+
+
+  AGT_final_object_type(fiber) {
+    agt_u32_t         saveRegionSize;
+    uint64_t          storeStateFlags;
+    agt::fiber_data*  privateData;
+    void*             userData;
+    uintptr_t         stackBase;
+    uintptr_t         stackLimit;
+    uintptr_t         deallocStack;
+
+    AGT_cache_aligned
+    agt_ctx_t         ctx;
+    agt_fiber_t       defaultJumpTarget;
+    agt_executor_t    executor;
+    fctx*             fctx;
+    agt_async_t       blockingAsync;
+    agt_timestamp_t   blockDeadline;
+    agt_eagent_t      blockedExecAgentTag;
+    agt::fiber_state  state;
+  };
+
 
 
 
@@ -83,12 +174,12 @@ namespace agt {
     // fiber*              new_fiber(fiber_pool* pool) noexcept;
     // fiber*              free_fiber(fiber_pool* pool) noexcept;
 
-    struct fiber_init_info {
-      fiber_pool*            pool;
-      agt_fiber_proc_t       proc;
-      void*                  userData;
-      agt_u64_t              stateSaveMask;
-      agt_fiber_t            root;
+    struct fiber_stack_info {
+      void*            address;          // Address of the bottom of the stack
+      size_t           reserveSize;      // Reserved size of the stack (maximum stack size)
+      size_t           commitSize;       // Committed size of the stack (initial stack size)
+      agt_u32_t        guardPageSize;    // Size of guard pages used to detect stack overflow
+      agt_u32_t        randomOffset;     // Random value within [0, pageSize) that will be subtracted from the stackBase to obtain the initial stack address.
     };
 
     namespace assembly {
@@ -163,9 +254,15 @@ namespace agt {
        * Initialize the initial context for fiber,
        * such that it may be switch/jumped to like any other context.
        * **/
-      extern "C" void                 afiber_init(agt_fiber_t fiber, agt_fiber_proc_t proc, bool isConvertingThread);
+      extern "C" void                 afiber_init(agt_fiber_t fiber, agt_fiber_proc_t proc, const fiber_stack_info& stackInfo);
     }
 
+  }
+
+
+
+  inline static agt_fiber_t current_fiber() noexcept {
+    return static_cast<agt_fiber_t>(reinterpret_cast<PNT_TIB>(NtCurrentTeb())->ArbitraryUserPointer);
   }
 
 }
@@ -180,17 +277,18 @@ struct alignas(AGT_CACHE_LINE) agt_fiber_st {
   uintptr_t         stackBase;
   uintptr_t         stackLimit;
   uintptr_t         deallocStack;
+  agt_fiber_t       defaultJumpTarget;
 
   agt_ctx_t         ctx;
 
   agt_executor_t    executor;
-  agt::fiber_pool*  pool;
+  fctx*             fctx;
   agt_async_t       blockingAsync;
   agt_timestamp_t   blockDeadline;
   agt_eagent_t      blockedExecAgentTag;
-  agt_fiber_t       root;
   agt::fiber_state  state;
-  agt_fiber_flags_t flags;
+  agt_flags32_t     flags;
+  // agt_fiber_flags_t flags;
 };
 
 

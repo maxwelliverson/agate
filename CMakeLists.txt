@@ -1,8 +1,103 @@
 cmake_minimum_required(VERSION 3.21)
-project(agate)
+
+if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+    set(Catch2_ROOT $ENV{VCPKG_INSTALLED_PATH})
+endif()
+find_package(Catch2 3 CONFIG)
+
+set(INSTALL_BASE_DIR "C:\\Users\\Maxwell")
+
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX "${INSTALL_BASE_DIR}" CACHE PATH "Base installation directory" FORCE)
+endif()
+
+
+function(print_value var_)
+    # set(optionalArgs CACHE)
+    set(singleValueArgs)
+    set(multiValueArgs)
+    cmake_parse_arguments(PRINT_VAR "CACHE" "${singleValueArgs}" "${multiValueArgs}" ${ARGN})
+    if(PRINT_VAR_CACHE)
+        message(STATUS "${var_}: '$CACHE{${var_}}'")
+    else ()
+        message(STATUS "${var_}: '${${var_}}'")
+    endif()
+endfunction()
+
+include(getTargetArch.cmake)
+
+# Dumb fuckin workaround for a bug in CMake where MSVC expects runtime flags to be populated even when targeting assembly files, which do not need them or populate the variables.
+set(CMAKE_ASM_COMPILE_OPTIONS_MSVC_RUNTIME_LIBRARY_MultiThreaded         "")
+set(CMAKE_ASM_COMPILE_OPTIONS_MSVC_RUNTIME_LIBRARY_MultiThreadedDLL      "")
+set(CMAKE_ASM_COMPILE_OPTIONS_MSVC_RUNTIME_LIBRARY_MultiThreadedDebug    "")
+set(CMAKE_ASM_COMPILE_OPTIONS_MSVC_RUNTIME_LIBRARY_MultiThreadedDebugDLL "")
+
+set(AGATE_VERSION_MAJOR 0)
+set(AGATE_VERSION_MINOR 1)
+set(AGATE_VERSION_PATCH 0)
+
+set(AGATE_VERSION_STRING "${AGATE_VERSION_MAJOR}.${AGATE_VERSION_MINOR}.${AGATE_VERSION_PATCH}")
+
+
+
+project(agate LANGUAGES CXX ASM_MASM VERSION ${AGATE_VERSION_STRING})
 
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_CXX_STANDARD 23)
+
+
+if (DEFINED AGATE_RELWITHDEBINFO_BUILD)
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+        unset(CMAKE_CXX_FLAGS_DEBUG)
+        set(CMAKE_CXX_FLAGS_DEBUG "/Zi /O2 /Ob2 /DNDEBUG")
+        # add_compile_options(/O2)
+    else()
+        add_compile_options(-g)
+    endif()
+endif()
+
+
+
+
+if (NOT DEFINED CACHE{AGATE_TARGET_ARCH})
+    target_architecture(AGATE_TARGET_ARCH_TMP)
+    message(STATUS "AGATE_TARGET_ARCH=${AGATE_TARGET_ARCH_TMP}")
+    set(AGATE_TARGET_ARCH ${AGATE_TARGET_ARCH_TMP} CACHE INTERNAL "Target Architecture" FORCE)
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+        if (AGATE_TARGET_ARCH_TMP STREQUAL "x86")
+            set(AGATE_ASM_FILE_PREFIX "x86_nt_masm" CACHE INTERNAL "" FORCE)
+            set(AGATE_ASM_LANG ASM_MASM CACHE INTERNAL "" FORCE)
+        elseif(AGATE_TARGET_ARCH_TMP STREQUAL "x64")
+            set(AGATE_ASM_FILE_PREFIX "x64_nt_masm" CACHE INTERNAL "" FORCE)
+            set(AGATE_ASM_LANG ASM_MASM CACHE INTERNAL "" FORCE)
+        elseif(AGATE_TARGET_ARCH_TMP STREQUAL "arm")
+            set(AGATE_ASM_FILE_PREFIX "arm_nt_masm" CACHE INTERNAL "" FORCE)
+            set(AGATE_ASM_LANG ASM_MARMASM CACHE INTERNAL "" FORCE)
+        elseif(AGATE_TARGET_ARCH_TMP STREQUAL "arm64")
+            set(AGATE_ASM_FILE_PREFIX "arm64_nt_masm" CACHE INTERNAL "" FORCE)
+            set(AGATE_ASM_LANG ASM_MARMASM CACHE INTERNAL "" FORCE)
+        else()
+            message(SEND_ERROR "Invalid target architecture for Windows: '${CMAKE_VS_PLATFORM_TOOLSET_HOST_ARCHITECTURE}'   (expected 'x86', 'x64', or 'arm64')")
+            message(FATAL_ERROR "Could not determine target architecture")
+        endif()
+        set(AGATE_ASM_FILE_EXTENSION "asm" CACHE INTERNAL "" FORCE)
+    elseif()
+        message(FATAL_ERROR "Only Windows MSVC is supported for the time being (should be available on linux and possible OSX)")
+    endif()
+endif()
+
+print_value(AGATE_TARGET_ARCH CACHE)
+print_value(AGATE_ASM_FILE_PREFIX CACHE)
+print_value(AGATE_ASM_LANG CACHE)
+print_value(AGATE_ASM_FILE_EXTENSION CACHE)
+
+# print_value(CMAKE_CXX_FLAGS)
+# print_value(CMAKE_CXX_FLAGS_DEBUG)
+# print_value(CMAKE_CXX_FLAGS_RELEASE)
+
+
+
+
 
 
 add_library(asan INTERFACE)
@@ -55,19 +150,47 @@ function(add_agate_library target_)
         target_include_directories(${AGATE_LIB_SHARED_NAME} PRIVATE include src)
         target_include_directories(${AGATE_LIB_STATIC_NAME} PRIVATE include src)
         target_compile_definitions(${AGATE_LIB_SHARED_NAME} PUBLIC AGT_SHARED_LIB PRIVATE AGT_SHARED_LIB_EXPORT)
+
     endif()
 endfunction()
 
 
 function(add_agate_module target_)
     set(optionalArgs EXPORT)
-    set(singleValueArgs)
-    set(multiValueArgs SOURCES DEPENDENCIES DEFINES)
+    set(singleValueArgs ASM_BASEDIR)
+    set(multiValueArgs SOURCES DEPENDENCIES DEFINES ASM_SOURCES)
     cmake_parse_arguments(AGATE_MODULE "${optionalArgs}" "${singleValueArgs}" "${multiValueArgs}" ${ARGN})
     list(TRANSFORM AGATE_MODULE_SOURCES PREPEND src/modules/${target_}/)
+
+    set(ASM_SOURCE_OBJECTS "")
+
+    if (DEFINED AGATE_MODULE_ASM_SOURCES)
+        set(ASM_BASEDIR "src/modules/${target_}")
+        message(STATUS "ASM_BASEDIR before conditional=${ASM_BASEDIR}")
+        if (DEFINED AGATE_MODULE_ASM_BASEDIR)
+            message(STATUS "AGATE_MODULE_ASM_BASEDIR is defined (= '${AGATE_MODULE_ASM_BASEDIR}' )")
+            if (AGATE_MODULE_ASM_BASEDIR MATCHES "^[/\\]")
+                message(FATAL_ERROR "Value of ASM_BASEDIR argument to add_agate_module must not begin with a slash.")
+            endif()
+            message(STATUS "ASM_BASEDIR before append=${ASM_BASEDIR}")
+            string(APPEND ASM_BASEDIR "/${AGATE_MODULE_ASM_BASEDIR}")
+            message(STATUS "ASM_BASEDIR after append=${ASM_BASEDIR}")
+            string(REGEX REPLACE "[/\\]$" "" ASM_BASEDIR ${ASM_BASEDIR}) # strips the end of the string of any slashes
+            message(STATUS "ASM_BASEDIR after regex replace=${ASM_BASEDIR}")
+        endif ()
+
+        foreach(asm_source ${AGATE_MODULE_ASM_SOURCES})
+            set(ASM_TARGET_NAME "agate.${target_}.asm.${asm_source}")
+            set(ASM_SOURCE_FILE "${ASM_BASEDIR}/$CACHE{AGATE_ASM_FILE_PREFIX}-${asm_source}.$CACHE{AGATE_ASM_FILE_EXTENSION}")
+            add_library(${ASM_TARGET_NAME} OBJECT ${ASM_SOURCE_FILE})
+            set(ASM_SOURCE_OBJECTS "${ASM_SOURCE_OBJECTS};$<TARGET_OBJECTS:${ASM_TARGET_NAME}>")
+        endforeach ()
+    endif()
+
+
     set(AGATE_MODULE_EXPORTS_FILE src/modules/${target_}/exports.cpp)
 
-    add_library(agate.${target_}        SHARED ${AGATE_MODULE_EXPORTS_FILE} ${AGATE_MODULE_SOURCES})
+    add_library(agate.${target_}        SHARED ${AGATE_MODULE_EXPORTS_FILE} ${AGATE_MODULE_SOURCES} ${ASM_SOURCE_OBJECTS})
 
     string(TOUPPER ${target_} MODULE_NAME_DEF)
     string(PREPEND MODULE_NAME_DEF AGT_BUILDING_)
@@ -81,6 +204,10 @@ function(add_agate_module target_)
             AGT_MODULE_VERSION_MINOR=${AGATE_VERSION_MINOR}
             AGT_MODULE_VERSION_PATCH=${AGATE_VERSION_PATCH})
 
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+        target_compile_options(agate.${target_} PRIVATE /Zc:preprocessor)
+    endif()
+
 
     target_include_directories(agate.${target_} PRIVATE include src src/modules)
 
@@ -91,6 +218,9 @@ function(add_agate_module target_)
     endif()
 
     set_target_properties(agate.${target_} PROPERTIES OUTPUT_NAME agate-${target_})
+
+    list(APPEND AGATE_MODULES agate.${target_})
+    set(AGATE_MODULES ${AGATE_MODULES} PARENT_SCOPE)
 endfunction()
 
 
@@ -148,22 +278,29 @@ function(add_agate_executable target_)
 endfunction()
 
 
-set(AGATE_VERSION_MAJOR 0)
-set(AGATE_VERSION_MINOR 1)
-set(AGATE_VERSION_PATCH 0)
+
+
+
+
+
+#set(CMAKE_ASM_MASM_COMPILER )
+
+#set(CMAKE_ASM-)
 
 
 
 
 add_library(agate-support
-            src/agate/atomic.cpp
+            SHARED
+            # src/agate/atomic.cpp
             src/agate/codex.cpp
             src/agate/dictionary.cpp
             src/agate/dynamic_code.cpp
             src/agate/processor.cpp
-        src/agate/thread.cpp
-        src/agate/vector.cpp)
+            src/agate/thread.cpp
+            src/agate/vector.cpp)
 target_include_directories(agate-support PRIVATE include src)
+
 
 add_agate_module(
         core
@@ -173,15 +310,22 @@ add_agate_module(
                 ctx.cpp
                 error.cpp
                 fiber.cpp
-                init.cpp
                 instance.cpp
-                object_allocator.cpp
+                # object_allocator.cpp
                 random.cpp
                 segment.cpp
                 shared.cpp
                 rcpool.cpp
                 rcmem.cpp
                 rcweak.cpp
+            ASM_BASEDIR
+                asm
+            ASM_SOURCES
+                afiber_fork
+                afiber_init
+                afiber_jump
+                afiber_loop
+                afiber_switch
 )
 
 
@@ -192,7 +336,6 @@ add_agate_module(
                 agents.cpp
                 dispatch.cpp
                 executor.cpp
-                state.cpp
                 send.cpp
 )
 
@@ -240,7 +383,6 @@ add_agate_module(
 
 
 
-
 #[[add_agate_library(
         agate
             SOURCES
@@ -257,8 +399,14 @@ add_agate_module(
 
 add_library(agate STATIC src/agate.cpp src/config.cpp)
 target_include_directories(agate PRIVATE src include src/modules)
-target_link_libraries(agate PRIVATE agate-support)
-target_compile_definitions(agate PRIVATE AGT_BUILD_SHARED AGT_BUILDING_CORE_LIBRARY)
+target_link_libraries(agate PUBLIC agate-support)
+target_compile_definitions(agate PRIVATE AGT_BUILDING_CORE_LIBRARY)
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    target_link_libraries(agate-support PUBLIC Synchronization.lib)
+    target_compile_options(agate-support PRIVATE /Zc:preprocessor)
+    target_compile_options(agate PRIVATE /Zc:preprocessor)
+endif()
 
 
 #[[add_library(agate-static STATIC src/agate.cpp src/loader.cpp)
@@ -337,6 +485,38 @@ add_agate_executable(
             SOURCES
                 main.cpp
 )
+
+
+
+
+if (Catch2_FOUND)
+
+
+    add_library(config-test-first SHARED test/catch/first_dll.cpp)
+    add_library(config-test-second SHARED test/catch/second_dll.cpp)
+    add_library(config-test-third SHARED test/catch/third_dll.cpp)
+    target_include_directories(config-test-first PRIVATE include)
+    target_include_directories(config-test-second PRIVATE include)
+    target_include_directories(config-test-third PRIVATE include)
+    target_link_libraries(config-test-first PRIVATE agate config-test-third)
+    target_link_libraries(config-test-second PRIVATE agate)
+    target_link_libraries(config-test-third PRIVATE agate)
+    target_compile_definitions(config-test-first PRIVATE AGATE_COMPILING_FIRST_DLL)
+    target_compile_definitions(config-test-second PRIVATE AGATE_COMPILING_SECOND_DLL)
+    target_compile_definitions(config-test-third PRIVATE AGATE_COMPILING_THIRD_DLL)
+
+    add_executable(tests test/catch/config.cpp test/catch/fibers.cpp)
+    target_link_libraries(tests PRIVATE agate config-test-first config-test-second config-test-third Catch2::Catch2WithMain)
+    add_dependencies(tests agate.core agate.log)
+
+    include(CTest)
+    include(Catch)
+    catch_discover_tests(tests)
+endif()
+
+
+add_executable(scratch test/scratch.cpp)
+
 
 
 add_library(DUMMY src/dummy.cpp)

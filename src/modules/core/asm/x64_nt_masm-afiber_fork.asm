@@ -1,6 +1,9 @@
 
 .code
 
+
+$tibFiberField = 40
+
 ; generate function table entry in .pdata and unwind information in
 afiber_fork PROC EXPORT FRAME
     ; .xdata for a function's structured exception handling unwind behavior
@@ -20,16 +23,20 @@ afiber_fork PROC EXPORT FRAME
     ;    mov r11, QWORD PTR gs:48
     ;    mov r11, QWORD PTR [r11+32]
 
-    mov r11, QWORD PTR gs:32     ; load TEB->fiber to r11
+    mov r11, QWORD PTR gs:[$tibFiberField]   ; load TEB->fiber to r11
 
     and rsp, -64                 ; align stack to 64 bytes
 
     test r9b, 1                  ; if (flags & AGT_FIBER_SAVE_EXTENDED_STATE) != 0
     je SHORT $LN2@afiber_fork    ;    goto $LN2@afiber_fork
 
+    sub  rsp, QWORD PTR [r11+24] ; allocate fiber->saveRegionSize bytes to stack
+    xor     rax, rax                   ; zero rax
+    mov     QWORD PTR [rsp+512], rax   ; zero the value of XSTATE_BV
+    mov     QWORD PTR [rsp+520], rax   ; zero the value of XCOMP_BV
+    mov     QWORD PTR [rsp+528], rax   ; zero bytes 16:23 of the XSAVE header (for whatever reason, if this doesn't happen, a GP exception is raised by the processor when xrstor is executed)
     push rdx                     ; copy rdx to stack (as the register is needed as an implicit parameter to xsave)
     mov  rax, QWORD PTR [r11+16] ; load storeStateFlags to rax
-    sub  rsp, QWORD PTR [r11+24] ; allocate fiber->saveRegionSize bytes to stack
     mov  rdx, rax                ; copy rax to rdx (flags)
     shr  rdx, 32                 ; shift rdx 32 bits to the right (now eax contains the low 32 flag bits, and edx contains the high 32 flag bits)
     xsaveopt64 QWORD PTR [rsp+8] ; save extended state to data (implicit params eax and edx, offset of 8 bytes because rdx was pushed to the stack)
@@ -67,7 +74,11 @@ $LN2@afiber_fork:
 
     mov rbx, r11                 ; save fiber to rbx
 
+    sub rsp, 32                ; allocate stack space for arguments (24 bytes for 3 qword args, plus an additional 8 to retain 16 byte stack alignment).
+
     call r9                      ; call proc
+
+    add rsp, 32                ; deallocate stack space for arguments
 
     ; NOTE: If proc does not return directly, and this context is instead jumped to,
     ;       it will bypass the rest of afiber_fork and return directly to the caller

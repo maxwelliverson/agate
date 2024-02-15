@@ -116,7 +116,7 @@ typedef agt_flags32_t agt_fiber_flags_t;
 
 
 typedef struct agt_fiber_transfer_t {
-  agt_fiber_t       parent;
+  agt_fiber_t       source;
   agt_fiber_param_t param;
 } agt_fiber_transfer_t;
 
@@ -145,10 +145,10 @@ typedef agt_fiber_param_t (* AGT_stdcall agt_fiber_proc_t)(agt_fiber_t fromFiber
 
 
 typedef struct agt_fctx_desc_t {
-  agt_fctx_flags_t flags;
-  agt_u32_t        stackSize;
-  agt_u32_t        maxFiberCount;
-  agt_fiber_t      parent;
+  agt_fctx_flags_t flags;          ///<
+  agt_u32_t        stackSize;      ///< If zero, the value of AGT_ATTR_DEFAULT_FIBER_STACK_SIZE will be used instead
+  agt_u32_t        maxFiberCount;  ///< If zero, an implementation defined value will be used instead.
+  agt_ctx_t        parent;         ///< If not null, this should point to the context of the thread that spawned the current thread. Doing so will bind this new fctx to the fctx bound to the given context, such that fibers from a given fctx may execute on any thread bound to the shared fctx.
   agt_fiber_proc_t proc;
   agt_u64_t        initialParam;
   void*            userData;
@@ -183,17 +183,22 @@ AGT_core_api void         AGT_stdcall agt_exit_fctx(agt_ctx_t ctx, int exitCode)
  *       jumped to, and a jump operation always has a parameter. Therefore, the initial
  *       parameter to proc will be the parameter passed the first time the fiber is jumped to.
  */
-AGT_core_api agt_status_t AGT_stdcall agt_new_fiber(agt_ctx_t ctx, agt_fiber_t* pFiber, agt_fiber_proc_t proc, void* userData) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_new_fiber(agt_fiber_t* pFiber, agt_fiber_proc_t proc, void* userData) AGT_noexcept;
 
-AGT_core_api void         AGT_stdcall agt_destroy_fiber(agt_ctx_t ctx, agt_fiber_t fiber) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_destroy_fiber(agt_fiber_t fiber) AGT_noexcept;
 
 
 
+/**
+ * Sets the userData pointer that is passed to any instance of agt_fiber_proc_t executed by fiber.
+ *
+ * @returns The previous userData bound to fiber
+ */
 AGT_core_api void*        AGT_stdcall agt_set_fiber_data(agt_fiber_t fiber, void* userData) AGT_noexcept;
 
 AGT_core_api void*        AGT_stdcall agt_get_fiber_data(agt_fiber_t fiber) AGT_noexcept;
 
-AGT_core_api agt_fiber_t  AGT_stdcall agt_get_current_fiber() AGT_noexcept;
+AGT_core_api agt_fiber_t  AGT_stdcall agt_get_current_fiber(agt_ctx_t ctx) AGT_noexcept;
 
 
 
@@ -204,9 +209,11 @@ AGT_core_api agt_fiber_transfer_t AGT_stdcall agt_fiber_switch(agt_fiber_t fiber
 
 // Jumps to another fiber context with @param param
 // Does not save current context
-// If fiber is AGT_CURRENT_FIBER, the context will jump back to the previous context save in this fiber,
-//   whether by agt_fiber_divert,
+// If fiber is AGT_CURRENT_FIBER, the context will jump back to the previous context save in this fiber.
 AGT_core_api AGT_noreturn void    AGT_stdcall agt_fiber_jump(agt_fiber_t fiber, agt_fiber_param_t param) AGT_noexcept;
+
+
+// Probably can modify agt_fiber_fork to only need a function with the signature void(*)(void*, void*), taking both the fiber's userData, and a pointer supplied in the call.
 
 // Saves current context,
 // After saving, calls @param proc with @param param
@@ -225,7 +232,7 @@ AGT_core_api agt_fiber_transfer_t AGT_stdcall agt_fiber_fork(agt_fiber_proc_t pr
 ///   the fctx saved by agt_fiber_loop again calls @param proc.
 /// Returns the value returned by proc. Unlike agt_fiber_fork, this does not need to be an
 ///   agt_fiber_transfer_t, because control can only ever return from the current fiber.
-AGT_core_api agt_fiber_transfer_t AGT_stdcall agt_fiber_loop(agt_fiber_proc_t proc, agt_fiber_param_t param, agt_fiber_flags_t flags) AGT_noexcept;
+AGT_core_api agt_fiber_param_t    AGT_stdcall agt_fiber_loop(agt_fiber_proc_t proc, agt_fiber_param_t param, agt_fiber_flags_t flags) AGT_noexcept;
 
 
 
