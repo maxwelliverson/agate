@@ -909,6 +909,28 @@ const cpu::cache_info *agt::cpu::getInfoL3() noexcept {
   return &cpu.cacheInfo[cpu.cacheInfoIndices[CACHE_L3]];
 }
 
+
+
+uint16_t agt::cpu::getMinMonitorLineSize() noexcept {
+  return info().minMonitorLineSize;
+}
+uint16_t agt::cpu::getMaxMonitorLineSize() noexcept {
+  return info().maxMonitorLineSize;
+}
+bool     agt::cpu::supportsMonitorExtensionEnumeration() noexcept {
+  return info().supports_monitorWaitEnumeration;
+}
+bool     agt::cpu::supportsMWaitInteruptAlwaysBreak() noexcept {
+  return info().supports_mwaitInteruptBreak;
+}
+
+std::span<const uint8_t> agt::cpu::mwaitSubCStates() noexcept {
+  return info().supportedMWAITSubCStates;
+}
+
+
+
+
 std::span<const cpu::cache_info> agt::cpu::getCacheInfos() noexcept {
   auto&& cpu = info();
   return { &cpu.cacheInfo[0], cpu.cacheInfoCount };

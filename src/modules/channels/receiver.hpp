@@ -56,6 +56,7 @@ namespace agt {
   agt_status_t receiveSpSharedBQueue(receiver_t receiver,  message*& message, agt_timeout_t timeout) noexcept;
   agt_status_t receiveMpSharedBQueue(receiver_t receiver,  message*& message, agt_timeout_t timeout) noexcept;
 
+
   
   inline agt_status_t receive(receiver_t r, message*& message, agt_timeout_t timeout) noexcept {
     using receive_pfn = agt_status_t(*)(receiver_t, agt::message*&, agt_timeout_t);

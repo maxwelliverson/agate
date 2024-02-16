@@ -6,6 +6,8 @@
 #include "exports.hpp"
 #include "../config_options.hpp"
 
+#include "agate/processor.hpp"
+
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include "fiber.hpp"
@@ -130,6 +132,10 @@ namespace {
   }
 
   uint32_t getMaxSystemThreadCount() noexcept {
+    const auto caches = agt::cpu::getCacheInfos();
+    for (auto cache : caches) {
+
+    }
     return GetMaximumProcessorCount(ALL_PROCESSOR_GROUPS);
   }
 

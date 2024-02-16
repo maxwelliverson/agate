@@ -148,6 +148,11 @@ namespace agt {
 
 
 
+  message try_receive(private_receiver* receiver) noexcept;
+  message try_receive(local_mpsc_receiver* receiver) noexcept;
+
+
+
 
   // These are the underlying function calls, which are differentiated by name rather than by
   // parameter types such that the generic enqueue/dequeue calls can dispatch with jump tables

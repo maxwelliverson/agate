@@ -473,6 +473,18 @@ namespace agt {
     return AGT_SUCCESS;
   }
 
+
+  // Should be blocked from making any fctx calls while in an agent execution context
+  // ie.
+  //   enter_fctx
+  //   exit_fctx
+  //   new_fiber
+  //   destroy_fiber
+  //   current_fiber
+  // This way, agent code has no way of acquiring an agt_fiber_t object, and thus we avoid
+  // having to add checks to the actual fiber save/restore routines (which in theory, are
+  // more frequently called anyways).
+
   void         AGT_stdcall exit_fctx(agt_ctx_t ctx, int exitCode) AGT_noexcept {
     // Dunno how exactly this function should work??
     // What should it destroy?

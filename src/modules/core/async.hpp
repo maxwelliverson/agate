@@ -48,6 +48,10 @@ namespace agt {
   };
 
 
+  using async_callback_t = void(*)(async_data* data, agt_status_t result, agt_u64_t value, void* callbackData);
+
+
+  // figure out some way to align to 64 bytes maybe?
   AGT_virtual_object_type(async_data) {
     agt_u32_t    epoch;           // key
     agt_u64_t    refCount;
@@ -60,7 +64,8 @@ namespace agt {
   };
 
   AGT_final_object_type(local_async_data, extends(async_data)) {
-
+    async_callback_t callback;
+    void*            callbackData;
   };
 
   AGT_final_object_type(shared_async_data, extends(async_data)) {

@@ -115,6 +115,9 @@ using agt_char_t = char;
 #define PP_AGT_impl_VIRTUAL_OBJECT_TYPE_extends_indirect(type) type
 #define PP_AGT_impl_VIRTUAL_OBJECT_TYPE_extends PP_AGT_impl_VIRTUAL_OBJECT_TYPE_extends_indirect
 
+#define PP_AGT_impl_VIRTUAL_OBJECT_TYPE_aligned_indirect(val)
+#define PP_AGT_impl_VIRTUAL_OBJECT_TYPE_aligned
+
 #define PP_AGT_impl_OBJECT_BASE(...) AGT_concat(PP_AGT_impl_, VIRTUAL_OBJECT_TYPE_##__VA_ARGS__)
 #define PP_AGT_impl_SPECIALIZE_OBJECT_ENUM(objType) \
   template <> \

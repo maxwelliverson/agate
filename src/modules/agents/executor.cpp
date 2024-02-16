@@ -95,6 +95,14 @@ inline constexpr static agt_fiber_param_t IdleFiber       = 3;
 inline constexpr static agt_fiber_param_t DestroyFiber    = 4;
 inline constexpr static agt_fiber_param_t YieldFiber      = 5;
 
+using fiber_action_t = agt_fiber_param_t;
+
+inline constexpr static fiber_action_t FiberActionPoll = 0;
+inline constexpr static fiber_action_t FiberActionResumeSuccess = 1;
+inline constexpr static fiber_action_t FiberActionResumeTimedOut = 2;
+inline constexpr static fiber_action_t FiberActionExecuteMessage = 3;
+
+
 
 
 agt_fiber_param_t local_event_executor_proc(agt_fiber_t fromFiber, agt_fiber_param_t param, void* userData);
@@ -215,6 +223,7 @@ struct agt::local_event_eagent : object {
   agt_fiber_t                boundFiber;
   set<owner_ref<agent_self>>::iterator setPos;
   agent_self*                self;
+  bool                       timedOut;
   bool                       isBlocked;
   bool                       isReady;
   agt_timestamp_t            deadline;
@@ -239,7 +248,7 @@ namespace {
     if (!exec->freeFibers.empty())
       return exec->freeFibers.pop_back_val();
     agt_fiber_t fiber;
-    auto status = AGT_ctx_api(new_fiber, exec->ctx)(exec->ctx, &fiber, local_fiber_proc, exec);
+    auto status = AGT_ctx_api(new_fiber, exec->ctx)(&fiber, local_fiber_proc, exec);
     assert( status == AGT_SUCCESS );
     return fiber;
   }
@@ -248,6 +257,33 @@ namespace {
     if (auto readyAgent = get_ready_agent(exec))
       return readyAgent->boundFiber;
     return get_free_fiber(exec);
+  }
+
+  void        make_timed_out_agents_ready(local_event_executor* exec) noexcept {
+    if (!exec->timedBlockedAgents.empty()) {
+      const auto now = agt::now();
+      auto from = exec->timedBlockedAgents.front();
+      auto to = from;
+      auto pos = from;
+      uint32_t count = 0;
+
+      while (pos->deadline <= now) {
+        count += 1;
+        to = pos;
+        pos->timedOut = true;
+        if (pos->next == nullptr)
+          break;
+        pos = pos->next;
+      }
+
+      // This loop ensures that the range [from, to] consists of #count agents that have timed out.
+
+      if (count == 0)
+        return;
+
+      exec->timedBlockedAgents.pop_front(to, count);
+      exec->readyAgents.push_front(from, to, count);
+    }
   }
 
 
@@ -422,6 +458,42 @@ namespace {
     .releaseMessage = [](basic_executor* exec, message msg) {},
     .commitMessage = [](basic_executor* exec, message msg) -> agt_status_t {}
   };
+
+
+  agt::message try_get_message(local_event_executor* localExec) noexcept {
+    return try_receive(&localExec->receiver);
+  }
+
+
+  void dispatch_message(local_event_executor* localExec, agent_self* self, message msg) noexcept {
+
+  }
+
+  void yield(local_event_executor* localExec, agent_self* self) noexcept {
+    const auto ctx = localExec->ctx;
+    auto selfEAgent = static_cast<local_event_eagent*>(self->execAgentTag);
+    fiber_action_t action;
+
+    make_timed_out_agents_ready(localExec);
+
+    if (local_event_eagent* readyAgent = get_ready_agent(localExec)) {
+      if (readyAgent->timedOut)
+        action = FiberActionResumeTimedOut;
+      else
+        action = FiberActionResumeSuccess;
+      localExec->readyAgents.push_front(selfEAgent);
+      const auto message = ctx->currentMessage;
+      auto [ sourceFiber, switchParam ] = AGT_ctx_api(fiber_switch, ctx)(readyAgent->boundFiber, action, AGT_FIBER_SAVE_EXTENDED_STATE);
+      (void) sourceFiber;
+      (void) switchParam;
+      ctx->boundAgent = self;
+      ctx->currentMessage = message;
+    }
+    else if (auto msg = try_get_message(localExec)) {
+      dispatch_message(localExec, self, msg);
+    }
+  }
+
 }
 
 
@@ -444,8 +516,48 @@ agt_status_t agt::executor_block_agent_until(executor* exec, agt_agent_t agent, 
 
 }
 
-void         agt::executor_yield(executor* exec, agt_agent_t agent) noexcept {
+void         agt::yield(basic_executor* exec, agent_self* agent) noexcept {
+  switch (exec->type) {
+    case object_type::local_event_executor: {
+      const auto localExec = static_cast<local_event_executor*>(exec);
+      const auto ctx = localExec->ctx;
+      auto selfEAgent = static_cast<local_event_eagent*>(agent->execAgentTag);
+      fiber_action_t action;
 
+      make_timed_out_agents_ready(localExec);
+
+      if (local_event_eagent* readyAgent = get_ready_agent(localExec)) {
+        if (readyAgent->timedOut)
+          action = FiberActionResumeTimedOut;
+        else
+          action = FiberActionResumeSuccess;
+        localExec->readyAgents.push_front(selfEAgent);
+        const auto message = ctx->currentMessage;
+        auto [ sourceFiber, switchParam ] = AGT_ctx_api(fiber_switch, ctx)(readyAgent->boundFiber, action, AGT_FIBER_SAVE_EXTENDED_STATE);
+        (void) sourceFiber;
+        (void) switchParam;
+        ctx->boundAgent = agent;
+        ctx->currentMessage = message;
+      }
+      else if () {
+
+      }
+
+
+    }
+
+
+    case object_type::local_busy_executor:
+      SwitchToThread();
+    case object_type::local_user_executor:
+
+    case object_type::local_proxy_executor:
+      //
+    case object_type::local_parallel_executor:
+      return AGT_ERROR_NOT_YET_IMPLEMENTED;
+    default:
+      raise(AGT_ERROR_INVALID_HANDLE_TYPE, exec);
+  }
 }
 
 agt_status_t agt::executor_acquire_message(executor* exec, const acquire_message_info& msgInfo, message*& msg) noexcept {

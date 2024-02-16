@@ -25,6 +25,9 @@ struct agt::basic_message {
 
 
 
+
+
+
 agt_status_t agt::sendLocalSPSCQueue(sender_t sender,  agt_message_t message) noexcept {
   AGT_assert_is_a(sender, local_spsc_queue_sender);
   // AGT_assert( AGT_queue_kind(queue) == local_spsc_queue_kind );
@@ -63,6 +66,13 @@ agt_status_t agt::sendPrivateQueue(sender_t sender,    agt_message_t message) no
   *q->tail = message;
   q->tail  = &message->next;
   return AGT_SUCCESS;
+}
+
+message agt::try_receive(private_receiver* receiver) noexcept {
+
+}
+message agt::try_receive(local_mpsc_receiver* receiver) noexcept {
+
 }
 
 

@@ -100,21 +100,21 @@ namespace agt {
   struct local_event_eagent;
 
   AGT_final_object_type(local_event_executor, extends(basic_executor)) {
-    agt_ctx_t                  ctx;
-    local_mpsc_receiver        receiver;
-    private_sized_message_pool selfPool;
-    private_sender             selfSender;
-    private_receiver           selfReceiver;
-    local_spmc_message_pool    defaultPool; // Only this executor allocates from pool, others deallocate
-    set<owner_ref<agent_self>> agents;
+    agt_ctx_t                  ctx;                // Reference to local context for efficient retrieval
+    local_mpsc_receiver        receiver;           // Primary receiver from which new messages are obtained.
+    private_sized_message_pool selfPool;           // Message pool if the need to send *new* messages to self arises
+    private_sender             selfSender;         // Send messages to self
+    private_receiver           selfReceiver;       // Receive messages to self (this implemented a very efficient private message queue)
+    local_spmc_message_pool    defaultPool;        // Only this executor allocates from pool, others deallocate
+    set<owner_ref<agent_self>> agents;             // Set of agents attached to this executor. Should maybe hold a set of eagents?
     agt_u32_t                  initialFiberCount;
     agt_u32_t                  maxFiberCount;
-    agt_fiber_t                mainFiber;
+    agt_fiber_t                mainFiber;          // Ideally, I want to phase out the notion of a "main" fiber in favor of there being a fiber context, that is exited when the fibers all exit, or when fctx_exit is called.
     agt_fiber_t                currentFiber;
-    vector<agt_fiber_t, 0>     freeFibers;
-    flist<local_event_eagent>  readyAgents;
-    flist<local_event_eagent>  timedBlockedAgents;
-    flist<local_event_eagent>  blockedAgents;
+    vector<agt_fiber_t, 0>     freeFibers;         // These are unbound, idle fibers. Maybe there should be a maximum number of idle fibers so as to keep excess memory use low?
+    flist<local_event_eagent>  readyAgents;        // This needs to be a *queue*, I think it only needs to be agt_fiber_t objects?
+    flist<local_event_eagent>  timedBlockedAgents; // this should be a min heap, sorted by deadline
+    flist<local_event_eagent>  blockedAgents;      // this need only be a linked list. Does this even need to be here?
   };
 
   AGT_final_object_type(local_parallel_executor, extends(basic_executor)) {
@@ -125,6 +125,13 @@ namespace agt {
 
   };
 
+
+
+  void yield(basic_executor* executor, agent_self* self) noexcept;
+
+  void block_agent(basic_executor* executor, agent_self* self) noexcept;
+
+  void block_agent_until(basic_executor* executor, agent_self* self, agt_timeout_t timeout) noexcept;
 
   class executor {
     basic_executor* exec;
@@ -300,11 +307,6 @@ namespace agt {
   agt_status_t create_local_busy_executor(agt_ctx_t ctx, local_busy_executor*& executor) noexcept;
 
   agt_status_t create_local_event_executor(agt_ctx_t ctx, const event_executor_create_info& createInfo, local_event_executor*& exec) noexcept;
-
-
-
-
-
 
 
   // void         executor_attach_agent() noexcept;

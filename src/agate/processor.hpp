@@ -114,6 +114,13 @@ namespace agt {
     static const cache_info* getInfoL2()  noexcept;
     static const cache_info* getInfoL3()  noexcept;
 
+    static uint16_t getMinMonitorLineSize() noexcept;
+    static uint16_t getMaxMonitorLineSize() noexcept;
+    static bool     supportsMonitorExtensionEnumeration() noexcept;
+    static bool     supportsMWaitInteruptAlwaysBreak() noexcept;
+
+    static std::span<const uint8_t>    mwaitSubCStates() noexcept;
+
     static std::span<const cache_info> getCacheInfos() noexcept;
   };
 

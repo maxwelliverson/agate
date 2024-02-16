@@ -86,12 +86,28 @@ namespace agt {
       ++m_size;
     }
 
+    // to is inclusive.
+    void push_back(pointer from, pointer to, uint32_t count) noexcept {
+      *m_tail = from;
+      m_tail = &to->next;
+      m_size += count;
+    }
+
     void push_front(pointer obj) noexcept {
       if (m_head == nullptr)
         m_tail = &obj->next;
       obj->next = m_head;
       m_head = obj;
       ++m_size;
+    }
+
+    // to is inclusive.
+    void push_front(pointer from, pointer to, uint32_t count) noexcept {
+      if (m_head == nullptr)
+        m_tail = &to->next;
+      to->next = m_head;
+      m_head = from;
+      m_size += count;
     }
 
     void pop_front() noexcept {
@@ -101,8 +117,25 @@ namespace agt {
       --m_size;
     }
 
+    // to is inclusive.
+    void pop_front(pointer to, uint32_t count) noexcept {
+      if (count == m_size)
+        m_tail = &m_head;
+      m_head = to->next;
+      m_size -= count;
+    }
+
+
+
+
+
     [[nodiscard]] pointer front() const noexcept {
       return m_head;
+    }
+
+    [[nodiscard]] pointer back() const noexcept {
+      assert( !empty() );
+      return *m_tail;
     }
 
   private:

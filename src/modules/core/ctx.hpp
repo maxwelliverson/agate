@@ -26,6 +26,7 @@
 namespace agt {
 
   struct fctx;
+  struct agent_self;
 
 
   // If a context was already initialized on the current thread, return it. Otherwise, create a new one with the given params (may be null), initialize, and return it.
@@ -45,9 +46,10 @@ namespace agt {
 
   [[nodiscard]] inline agt_executor_t get_executor(agt_ctx_t ctx) noexcept;
 
-  [[nodiscard]] inline agt_agent_t    get_bound_agent(agt_ctx_t ctx) noexcept;
+  [[nodiscard]] inline agent_self*    get_bound_agent(agt_ctx_t ctx) noexcept;
 
   [[nodiscard]] inline agt_message_t  get_current_message(agt_ctx_t ctx) noexcept;
+
 
 }// namespace agt
 
@@ -57,7 +59,7 @@ struct agt_ctx_st {
   agt_u32_t                      refCount;
   agt_flags32_t                  flags;
   agt_executor_t                 executor;
-  agt_agent_t                    boundAgent;
+  agt::agent_self*               boundAgent;
   agt_message_t                  currentMessage;
   agt::fctx*                     fctx; // null if this thread isn't using fibers
   agt_instance_t                 instance;
@@ -108,7 +110,7 @@ AGT_forceinline agt_executor_t agt::get_executor(agt_ctx_t ctx) noexcept {
   return ctx->executor;
 }
 
-AGT_forceinline agt_agent_t    agt::get_bound_agent(agt_ctx_t ctx) noexcept {
+AGT_forceinline agt::agent_self* agt::get_bound_agent(agt_ctx_t ctx) noexcept {
   return ctx->boundAgent;
 }
 
