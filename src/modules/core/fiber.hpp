@@ -31,6 +31,10 @@ namespace agt {
     FIBER_SAVE_SUPPORTS_XSAVEOPT = 0x1000
   };
 
+  enum {
+    FIBER_CONTROL_LOOP_CTX = 0x1
+  };
+
   struct AGT_cache_aligned xsave_data {
     uint16_t fcw;
     uint16_t fsw;
@@ -80,7 +84,12 @@ namespace agt {
 
   struct AGT_cache_aligned fiber_data {
     fiber_data*       prevData;
+    agt_flags32_t     controlFlags;
+    agt_fiber_flags_t userFlags;
+    uintptr_t         stack;
     uintptr_t         rip; // return address
+    // General Data
+    void*             transferAddress;
     uintptr_t         rbx;
     uintptr_t         rbp;
     uintptr_t         rdi;
@@ -89,10 +98,7 @@ namespace agt {
     uintptr_t         r13;
     uintptr_t         r14;
     uintptr_t         r15;
-    agt_fiber_flags_t saveFlags;
-    agt_u32_t         reserved;
-    void*             transferAddress;
-    uintptr_t         stack;
+
     xsave_data        xsave;
     // alignas(AGT_CACHE_LINE) std::byte data[FiberSaveDataSize];
   };

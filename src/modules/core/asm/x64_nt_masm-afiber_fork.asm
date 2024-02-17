@@ -15,7 +15,7 @@ afiber_fork PROC EXPORT FRAME
     ;   r8:  agt_fiber_param_t     param
     ;   r9:  agt_fiber_flags_t     flags
 
-
+    ; maybe store a base pointer for purposes of properly supporting unwinding?
 
     lea r10, QWORD PTR [rsp+8]   ; load the caller's stack address to %r10.
 
@@ -45,27 +45,27 @@ afiber_fork PROC EXPORT FRAME
 $LN2@afiber_fork:
 
     sub rsp, 128                 ; allocate 128 bytes to stack
-
+    shl r9,  32                  ; shift userFlags into the high 32 bits of r9 (implicitly setting controlFlags to 0)
     mov rax, QWORD PTR [r11]     ; load fiber->privateData to rax
     mov QWORD PTR [r11], rsp     ; write data to fiber->privateData
     mov QWORD PTR [rsp], rax     ; write fiber->privateData to data->prevData
-
-    mov DWORD PTR [rsp+80], r9d  ; store flags to data->saveFlags
-
-    mov QWORD PTR [rsp+16], rbx  ; store rbx to data->rbx
-    mov QWORD PTR [rsp+24], rbp  ; store rbp to data->rbp
-    mov QWORD PTR [rsp+32], rdi  ; store rdi to data->rdi
-    mov QWORD PTR [rsp+40], rsi  ; store rsi to data->rsi
-    mov QWORD PTR [rsp+48], r12  ; store r12 to data->r12
-    mov QWORD PTR [rsp+56], r13  ; store r13 to data->r13
-    mov QWORD PTR [rsp+64], r14  ; store r14 to data->r14
-    mov QWORD PTR [rsp+72], r15  ; store r15 to data->r15
-
+    mov QWORD PTR [rsp+8], r9    ; store flags to data->controlFlags and data->userFlags
+    mov QWORD PTR [rsp+16], r10  ; store stack address of the callee to data->stack
     mov r9, QWORD PTR [r10-8]    ; load caller's return address
-    mov QWORD PTR [rsp+8], r9    ; write return address to data->rip
+    mov QWORD PTR [rsp+24], r9   ; write return address to data->rip
+    mov QWORD PTR [rsp+32], rcx  ; store hidden address to data->tranferAddress
 
-    mov QWORD PTR [rsp+88], rcx  ; store hidden address to data->tranferAddress
-    mov QWORD PTR [rsp+96], r10  ; store stack address of the callee to data->stack
+    ; mov DWORD PTR [rsp+80], r9d  ; store flags to data->saveFlags
+
+    mov QWORD PTR [rsp+40], rbx  ; store rbx to data->rbx
+    mov QWORD PTR [rsp+48], rbp  ; store rbp to data->rbp
+    mov QWORD PTR [rsp+56], rdi  ; store rdi to data->rdi
+    mov QWORD PTR [rsp+64], rsi  ; store rsi to data->rsi
+    mov QWORD PTR [rsp+72], r12  ; store r12 to data->r12
+    mov QWORD PTR [rsp+80], r13  ; store r13 to data->r13
+    mov QWORD PTR [rsp+88], r14  ; store r14 to data->r14
+    mov QWORD PTR [rsp+96], r15  ; store r15 to data->r15
+
 
     mov r9, rdx                  ; move proc address to r9
     mov rcx, r11                 ; arg[0] = fiber
@@ -74,11 +74,11 @@ $LN2@afiber_fork:
 
     mov rbx, r11                 ; save fiber to rbx
 
-    sub rsp, 32                ; allocate stack space for arguments (24 bytes for 3 qword args, plus an additional 8 to retain 16 byte stack alignment).
+    sub rsp, 32                  ; allocate stack space for arguments (24 bytes for 3 qword args, plus an additional 8 to retain 16 byte stack alignment).
 
     call r9                      ; call proc
 
-    add rsp, 32                ; deallocate stack space for arguments
+    add rsp, 32                  ; deallocate stack space for arguments
 
     ; NOTE: If proc does not return directly, and this context is instead jumped to,
     ;       it will bypass the rest of afiber_fork and return directly to the caller
@@ -86,14 +86,15 @@ $LN2@afiber_fork:
 
     mov rcx, rax            ; copy return value of proc to rcx (retValue)
 
-    mov rax, QWORD PTR [rsp+88] ; copy hidden address to return value
-    mov QWORD PTR [rax], rbx    ; transfer->parent = fiber
+    mov rax, QWORD PTR [rsp+32] ; copy hidden address to return value
+    mov QWORD PTR [rax], rbx    ; transfer->parent = fiber (rbx is callee saved, so it *should* still hold the address of thisFiber)
     mov QWORD PTR [rax+8], rcx  ; transfer->param = retValue
 
-    mov rbx, QWORD PTR [rsp+16] ; restore rbx (no need to restore any of the others, given that execution reached this point by returning from proc, and rbx is callee saved)
+    mov rbx, QWORD PTR [rsp+40] ; restore rbx (no need to restore any of the others, given that execution reached this point by returning from proc, and rbx is callee saved)
 
-    mov rdx, QWORD PTR [rsp+8]  ; load return address
-    mov rsp, QWORD PTR [rsp+96] ; reset stack address
+    mov rdx, QWORD PTR [rsp+24]  ; load return address
+    mov rsp, QWORD PTR [rsp+16]  ; reset stack address
+
 
     jmp rdx                     ; return
 

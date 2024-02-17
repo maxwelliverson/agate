@@ -19,9 +19,12 @@ $stackLimit      = 40
 $deallocStack    = 48
 
  ; struct fiber_data
-$prevData = 0
-$rip      = 8
-$stack    = 96 ; change to 16
+$prevData     = 0
+$controlFlags = 8
+$userFlags    = 12
+$stack        = 16
+$rip          = 24
+
 
 ; generate function table entry in .pdata and unwind information in
 afiber_init PROC EXPORT FRAME
@@ -38,33 +41,42 @@ afiber_init PROC EXPORT FRAME
     ; rdx: agt_fiber_proc_t proc
     ; r8:  const fiber_stack_info* stackInfo
 
-    mov    r9,  QWORD PTR [r8]        ; load stackInfo->address to r9
-    mov    QWORD PTR [rcx+48], r9     ; fiber->deallocationStack = stackInfo->address
-    add    r9, QWORD PTR [r8+8]       ; add stackInfo->reserveSize to address == stackBase
-    mov    r10, r9                    ; copy stackBase to r11
-    mov    QWORD PTR [rcx+32], r9     ; fiber->stackBase = stackBase
-    sub    r10, QWORD PTR [r8+16]     ;
-    mov    QWORD PTR [rcx+40], r10    ; fiber->stackLimit = stackBase - stackInfo->commitSize
+    mov    r9,  QWORD PTR [r8]                ; load stackInfo->address to r9
+    mov    QWORD PTR [rcx+$deallocStack], r9  ; fiber->deallocationStack = stackInfo->address
+    add    r9, QWORD PTR [r8+$reserveSize]    ; add stackInfo->reserveSize to address == stackBase
+    mov    r10, r9                            ; copy stackBase to r11
+    mov    QWORD PTR [rcx+$stackBase], r9     ; fiber->stackBase = stackBase
+    sub    r10, QWORD PTR [r8+$commitSize]    ;
+    mov    QWORD PTR [rcx+$stackLimit], r10   ; fiber->stackLimit = stackBase - stackInfo->commitSize
 
+    mov    r11d, DWORD PTR [r8+28]    ; load stackInfo->randomOffset
+    sub    r9,   r11                  ; subtract random offset from stackBase
+
+    and    r9,   -16                  ; align stack to 16 bytes
+    sub    r9,   32                   ; allocate 32 bytes for the loop context
                                       ; for added security, it might be best to add a random offset to the stackBase here...
            ; r9 holds stackBase
-    and    r9,                -64     ; align stack to 64 bytes (should already be, but just to be safe!)
-    sub    r9,                 128    ; allocate 128 bytes for the simple context
-    xor    rax,                rax    ; zero rax
-
+    ; and    r9,                -64     ; align stack to 64 bytes (should already be, but just to be safe!)
+    ; sub    r9,                 128    ; allocate 128 bytes for the simple context
+    mov    eax, 1                       ; set rax to 1
+    lea    r10, QWORD PTR [r9-40]     ; load next stack frame address to r10
     mov    QWORD PTR [rcx],    r9     ; set fiber->privateData to this data.
     mov    QWORD PTR [r9],     r9     ; set data->prevData to data (similarly to afiber_loop, this causes the context to not be popped when it is jumped to).
-    mov    QWORD PTR [r9+8],  rdx     ; set data->rip to proc
-    mov    DWORD PTR [r9+80], eax     ; set flags to 0
-    mov    QWORD PTR [r9+88], rax     ; set transferAddress to null
-    lea    r10, QWORD PTR [r9-40]     ; load next stack frame address to r10
-    mov    QWORD PTR [r9+96], r10     ; store next stack frame address to data->stack
+    ; inc    eax
+    mov    QWORD PTR [r9+8],    rax    ; set data->controlFlags to 0x1 (FIBER_CONTROL_LOOP_CTX) and data->userFlags to 0
+    ; mov    DWORD PTR [r9+12],   eax    ; set data->userFlags to 0
+    ; inc    eax                        ; set eax to 0x1
+    ; mov    DWORD PTR [r9+8],  eax    ; set data->controlFlags to 0x1 (FIBER_CONTROL_LOOP_CTX)
+    mov    QWORD PTR [r9+16], r10     ; store next stack frame address to data->stack
+    mov    QWORD PTR [r9+24],  rdx    ; set data->rip to proc
+
     mov    r11, $LN2@afiber_init      ; load address of $LN2$afiber_init label
-    ; lea    r11, QWORD PTR [rel $LN2@afiber_init] ; load address of $LN2$afiber_init label
     mov    QWORD PTR [r10+32], rcx     ; write thisFiber to the stack (for fast access in $LN2@afiber_init)
     mov    QWORD PTR [r10],   r11     ; manually write a 'return address' for when proc is 'called'
     ret                               ; return!
 
+    ; if the fiber proc ever returns, it'll return as though from the following instruction:
+    ; call rdx
 $LN2@afiber_init:
 
     mov r9, QWORD PTR[rsp+24]         ; retrieve the fiber pointer stored above (mov QWORD PTR [r10+32], rcx)
