@@ -11,6 +11,7 @@
 #include "agate/flags.hpp"
 #include "agate/time.hpp"
 #include "core/async.hpp"
+#include "core/ctx.hpp"
 
 
 #include <utility>
@@ -311,6 +312,10 @@ namespace agt {
     }
 
     void try_release() noexcept {
+
+    }
+
+    void release(agt_ctx_t ctx) noexcept {
 
     }
 

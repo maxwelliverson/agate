@@ -151,6 +151,9 @@ namespace agt {
   message try_receive(private_receiver* receiver) noexcept;
   message try_receive(local_mpsc_receiver* receiver) noexcept;
 
+  agt_status_t receive(private_receiver& receiver, message& msg, agt_timeout_t timeout) noexcept;
+  agt_status_t receive(local_mpsc_receiver& receiver, message& msg, agt_timeout_t timeout) noexcept;
+
 
 
 

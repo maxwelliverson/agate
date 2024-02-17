@@ -107,6 +107,9 @@ namespace agt {
     private_receiver           selfReceiver;       // Receive messages to self (this implemented a very efficient private message queue)
     local_spmc_message_pool    defaultPool;        // Only this executor allocates from pool, others deallocate
     set<owner_ref<agent_self>> agents;             // Set of agents attached to this executor. Should maybe hold a set of eagents?
+    agt_timeout_t              receiveTimeout;     // timeout waiting on message receive before trying something else.
+    message                    messageToBeHandled; // A message that needs to be handled on a new fiber
+    agt_u32_t                  fiberStackSize;
     agt_u32_t                  initialFiberCount;
     agt_u32_t                  maxFiberCount;
     agt_fiber_t                mainFiber;          // Ideally, I want to phase out the notion of a "main" fiber in favor of there being a fiber context, that is exited when the fibers all exit, or when fctx_exit is called.
@@ -115,6 +118,7 @@ namespace agt {
     flist<local_event_eagent>  readyAgents;        // This needs to be a *queue*, I think it only needs to be agt_fiber_t objects?
     flist<local_event_eagent>  timedBlockedAgents; // this should be a min heap, sorted by deadline
     flist<local_event_eagent>  blockedAgents;      // this need only be a linked list. Does this even need to be here?
+    agt_fiber_param_t          fiberExitResult;    // result of the fiber exiting...
   };
 
   AGT_final_object_type(local_parallel_executor, extends(basic_executor)) {

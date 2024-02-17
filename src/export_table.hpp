@@ -208,6 +208,8 @@ namespace agt {
 
 
 
+    agt_status_t         (* AGT_stdcall _pfn_new_thread)(agt_ctx_t ctx, agt_thread_t* pThread, const agt_thread_desc_t* pThreadDesc);
+
 
 
     fiber_pool*          (* AGT_stdcall _pfn_new_fiber_pool)(agt_ctx_t ctx, const agt_fctx_desc_t* fiberDesc);
