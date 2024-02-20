@@ -360,38 +360,6 @@ agt_fiber_param_t local_fiber_proc(agt_fiber_t fromFiber, agt_fiber_param_t acti
 
 
 
-  bool hasError    = false;
-  bool shouldClose = false;
-  bool shouldCleanup = true;
-
-  handle_fiber_transfer(fromFiber, param, exec);
-
-  while (!shouldClose) {
-    agt::message* msg;
-    switch(receive(&exec->receiver, msg, exec->timeout)) {
-      case AGT_SUCCESS:
-        switch(static_cast<agt_ecmd_t>(msg->cmd)) {
-          case AGT_ECMD_NOOP:
-            break;
-          case AGT_ECMD_KILL:
-            shouldClose   = true;
-            shouldCleanup = false;
-          break;
-          case AGT_ECMD_AGENT_MESSAGE:
-
-        }
-      case AGT_NOT_READY:
-      default:
-    }
-
-  }
-
-  if (shouldCleanup) {
-
-
-
-
-  }
 }
 
 void executor_proc(agt::local_event_executor* exec) {

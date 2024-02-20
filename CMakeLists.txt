@@ -1,9 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
-    set(Catch2_ROOT $ENV{VCPKG_INSTALLED_PATH})
-endif()
-find_package(Catch2 3 CONFIG)
+
 
 set(INSTALL_BASE_DIR "C:\\Users\\Maxwell")
 
@@ -57,6 +54,17 @@ if (DEFINED AGATE_RELWITHDEBINFO_BUILD)
 endif()
 
 
+
+
+if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+    set(Catch2_ROOT $ENV{VCPKG_INSTALLED_PATH})
+    set(nlohmann_json_ROOT $ENV{VCPKG_INSTALLED_PATH})
+    set(benchmark_ROOT $ENV{VCPKG_INSTALLED_PATH})
+endif()
+find_package(Catch2 3 CONFIG)
+
+find_package(nlohmann_json REQUIRED)
+find_package(benchmark REQUIRED)
 
 
 if (NOT DEFINED CACHE{AGATE_TARGET_ARCH})
@@ -218,6 +226,10 @@ function(add_agate_module target_)
     endif()
 
     set_target_properties(agate.${target_} PROPERTIES OUTPUT_NAME agate-${target_})
+
+    target_link_options(agate.${target_} PRIVATE
+            $<$<CONFIG:Release>:/LTCG>
+    )
 
     list(APPEND AGATE_MODULES agate.${target_})
     set(AGATE_MODULES ${AGATE_MODULES} PARENT_SCOPE)
@@ -513,6 +525,32 @@ if (Catch2_FOUND)
     include(Catch)
     catch_discover_tests(tests)
 endif()
+
+
+
+add_executable(benchmarks
+        test/benchmark/main.cpp
+        test/benchmark/benchmark_utils.cpp
+        test/benchmark/benchmark_ops.asm
+        # test/benchmark/googleMain.cpp
+)
+target_include_directories(benchmarks PRIVATE include)
+target_link_libraries(benchmarks PRIVATE agate nlohmann_json::nlohmann_json)
+add_dependencies(benchmarks agate.core)
+
+
+add_executable(gbenchmarks
+        test/benchmark/benchmark_utils.cpp
+        test/benchmark/benchmark_ops.asm
+        test/benchmark/googleMain.cpp
+)
+target_include_directories(gbenchmarks PRIVATE include)
+target_link_libraries(gbenchmarks PRIVATE agate benchmark::benchmark)
+add_dependencies(gbenchmarks agate.core)
+target_link_options(gbenchmarks PRIVATE $<$<CONFIG:Release>:/LTCG>)
+
+
+
 
 
 add_executable(scratch test/scratch.cpp)

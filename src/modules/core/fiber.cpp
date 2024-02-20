@@ -367,6 +367,7 @@ namespace {
 
 namespace agt {
 
+  agt_status_t AGT_stdcall destroy_fiber(agt_fiber_t fiber) AGT_noexcept;
 
   static fctx* make_fctx(agt_ctx_t ctx, const agt_fctx_desc_t& desc) noexcept {
     // auto f = alloc<fctx>(ctx);
@@ -536,12 +537,10 @@ namespace agt {
 
   agt_status_t AGT_stdcall destroy_fiber(agt_fiber_t fiber) AGT_noexcept {
 
-    auto thisFiber = current_fiber();
-
-    if (thisFiber == nullptr)
+    if (current_fiber() == nullptr)
       return AGT_ERROR_NO_FCTX;
 
-    if (thisFiber == fiber || fiber == nullptr || (fiber->flags & eFiberIsConverted))
+    if (fiber == nullptr || (fiber->flags & eFiberIsConverted))
       return AGT_ERROR_INVALID_ARGUMENT;
 
     freeStack(fiber);
