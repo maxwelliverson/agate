@@ -29,6 +29,7 @@ AGT_core_api void         AGT_stdcall agt_close_signal(agt_signal_t signal) AGT_
 
 
 AGT_core_api void         AGT_stdcall agt_attach_signal(agt_signal_t signal, agt_async_t async) AGT_noexcept;
+
 /**
  * if waitForN is 0,
  * */
@@ -36,6 +37,8 @@ AGT_core_api void         AGT_stdcall agt_attach_many_signals(const agt_signal_t
 
 
 AGT_core_api void         AGT_stdcall agt_raise_signal(agt_signal_t signal) AGT_noexcept;
+
+
 /**
  * Equivalent to
  *

@@ -18,6 +18,7 @@ namespace {
 
 
 
+#if defined(_MSC_VER) && !defined(__clang__)
   [[msvc::noinline]] void printWin32Error(DWORD err = GetLastError(), std::source_location loc = std::source_location::current()) noexcept {
     LPVOID lpMsgBuf;
     FormatMessage(
@@ -34,7 +35,31 @@ namespace {
     LocalFree(lpMsgBuf);
     ExitProcess(err);
   }
+#else
+  [[gnu::noinline]] void _printWin32Error(DWORD err, const char* func, const char* file, int line) noexcept {
+    LPVOID lpMsgBuf;
+    FormatMessage(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER |
+        FORMAT_MESSAGE_FROM_SYSTEM |
+        FORMAT_MESSAGE_IGNORE_INSERTS,
+        NULL,
+        err,
+        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        (LPTSTR) &lpMsgBuf,
+        0, NULL );
 
+    fprintf_s(stderr, "Error at %s:%d\n%s failed with error %#lX: %s", file, line, func, err, static_cast<const char*>(lpMsgBuf));
+    LocalFree(lpMsgBuf);
+    ExitProcess(err);
+  }
+
+  void _printWin32Error(const char* func, const char* file, int line) noexcept {
+    _printWin32Error(GetLastError(), func, file, line);
+  }
+
+#define printWin32Error(...) _printWin32Error(__VA_ARGS__ __VA_OPT__(,) __FUNCSIG__, __FILE__, __LINE__)
+
+#endif
 
   struct thread_profiler {
     HANDLE handle = nullptr;

@@ -114,9 +114,9 @@ AGT_forceinline agt::agent_self* agt::get_bound_agent(agt_ctx_t ctx) noexcept {
   return ctx->boundAgent;
 }
 
-AGT_forceinline agt_message_t  agt::get_current_message(agt_ctx_t ctx) noexcept {
+/*AGT_forceinline agt_message_t  agt::get_current_message(agt_ctx_t ctx) noexcept {
   return ctx->currentMessage;
-}
+}*/
 
 
 

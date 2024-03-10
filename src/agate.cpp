@@ -288,6 +288,40 @@ AGT_static_api agt_error_handler_t AGT_stdcall agt_set_error_handler(agt_instanc
 }
 
 
+AGT_core_api agt_timestamp_t AGT_stdcall agt_now(agt_ctx_t ctx) AGT_noexcept {
+  // This is implemented inline for efficiency, and because its implementation shouldn't change depending on configuration (or should it?)
+  LARGE_INTEGER lrgInt;
+  QueryPerformanceCounter(&lrgInt);
+  return lrgInt.QuadPart;
+}
+
+
+AGT_core_api void            AGT_stdcall agt_get_timespec(agt_ctx_t ctx, agt_timestamp_t timestamp, struct timespec* ts) AGT_noexcept {
+  if (!ts)
+    return;
+
+  FILETIME filetime;
+  LARGE_INTEGER qpc;
+  GetSystemTimePreciseAsFileTime(&filetime);
+  QueryPerformanceCounter(&qpc);
+  LARGE_INTEGER systime;
+  systime.LowPart = filetime.dwLowDateTime;
+  systime.HighPart = filetime.dwHighDateTime;
+  // qpc.QuadPart /= 100;
+  auto signedTimestamp = static_cast<int64_t>(timestamp)/* / 100*/;
+  const auto offset = qpc.QuadPart - signedTimestamp;
+  // int64_t timestampOffset = systime.QuadPart - qpc.QuadPart;
+  // int64_t result = signedTimestamp + timestampOffset;
+  const auto result = systime.QuadPart - offset;
+  int64_t seconds = result / 10000000LL;
+  int64_t nsec = (result - (seconds * 10000000LL)) * 100;
+  seconds -= 11644473600LL; // difference in seconds between windows and unix epoch.... BLECH
+  ts->tv_sec = seconds;
+  ts->tv_nsec = static_cast<long>(nsec);
+}
+
+
+
 
 /** ==========================[ Agents API ]=========================== **/
 

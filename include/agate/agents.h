@@ -153,7 +153,6 @@ typedef struct agt_agent_inherit_ownership_info_t {
 
 
 typedef struct agt_agent_type_info_t {
-
   agt_agent_init_t         initFn;           ///< [optional] Initial callback executed in the agent's context before it starts receiving messages.
   agt_agent_proc_t         procFn;           ///< Main callback executed in the agent's context
   agt_agent_dtor_t         dtorFn;           ///< [optional] Destructor, called on state when agent is destroyed
@@ -300,7 +299,13 @@ AGT_core_api agt_status_t AGT_stdcall agt_raw_reply_as(agt_self_t self, agt_agen
 
 
 
-
+/**
+ * Forwards the current message to recipient, as though it was sent directly to recipient in the first place.
+ *
+ * Primarily intended for use by delegation agents, whose primary responsibility is to sort through received
+ * messages and forward them to the agents that will actually process them.
+ *
+ */
 AGT_core_api void         AGT_stdcall agt_delegate(agt_self_t self, agt_agent_t recipient) AGT_noexcept;
 
 

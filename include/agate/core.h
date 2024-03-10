@@ -478,9 +478,14 @@ namespace agtxx {
 
 
 #define AGT_INVALID_OBJECT_ID ((agt_object_id_t)-1)
+
+
 #define AGT_SYNCHRONIZE ((agt_async_t)AGT_NULL_HANDLE)
+#define AGT_ASYNC_FORGET ((agt_async_t)-1)
 
 #define AGT_INVALID_INSTANCE ((agt_instance_t)AGT_NULL_HANDLE)
+
+
 #define AGT_INVALID_CTX ((agt_ctx_t)AGT_NULL_HANDLE)
 #define AGT_DEFAULT_CTX ((agt_ctx_t)AGT_NULL_HANDLE)
 
@@ -500,6 +505,7 @@ namespace agtxx {
 #define AGT_TIMEOUT_MS(milliseconds) ((agt_timeout_t)((milliseconds) * (1000000ULL / AGT_NATIVE_TIMEOUT_GRANULARITY)))
 #define AGT_TIMEOUT_US(microseconds) ((agt_timeout_t)((microseconds) * (1000ULL / AGT_NATIVE_TIMEOUT_GRANULARITY)))
 #define AGT_TIMEOUT_NS(nanoseconds) ((agt_timeout_t)((nanoseconds) / AGT_NATIVE_TIMEOUT_GRANULARITY))
+
 #define AGT_DO_NOT_WAIT ((agt_timeout_t)0)
 #define AGT_WAIT ((agt_timeout_t)-1)
 
@@ -1006,6 +1012,7 @@ AGT_core_api agt_timestamp_t AGT_stdcall agt_now(agt_ctx_t ctx) AGT_noexcept;
  * */
 AGT_core_api void            AGT_stdcall agt_get_timespec(agt_ctx_t ctx, agt_timestamp_t timestamp, struct timespec* ts) AGT_noexcept;
 
+// TODO: Add a similar function for converting durations? Like agt_get_duration_timespec(ctx, fromTimestamp, toTimestamp, *ts)
 
 
 /**

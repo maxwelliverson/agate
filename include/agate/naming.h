@@ -52,7 +52,6 @@ typedef struct agt_name_filter_info_t {
 *
 *              \code
 *              function new_object(desiredName, params)
-*                  object = null
 *                  name = reserve_name(desiredName)
 *                  if name is null:
 *                      throw name_clash_exception
@@ -122,7 +121,7 @@ AGT_core_api void         AGT_stdcall agt_release_name(agt_ctx_t ctx, agt_name_t
  * \note nameToken must have been previously obtained from a call to agt_reserve_name,
  *       and must not have already been bound.
  * */
-AGT_core_api agt_status_t AGT_stdcall agt_bind_name(agt_ctx_t ctx, agt_name_t name, void* object) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_bind_name(agt_ctx_t ctx, agt_name_t name, agt_object_t object) AGT_noexcept;
 
 
 // TODO: Figure out a good API for named object lookup/enumeration with pattern matching.

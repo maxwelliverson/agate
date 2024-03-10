@@ -128,6 +128,20 @@ namespace agt {
 
 
 
+    // inserts element after pos
+    void insert(pointer pos, pointer element) noexcept {
+      assert( pos != nullptr );
+      assert( element != nullptr );
+      if (m_tail == &pos->next)
+        m_tail = &element->next; // this is effectively pushing to back in this case, so we adjust the tail as necessary.
+      element->next = pos->next;
+      pos->next = element;
+      ++m_size;
+    }
+
+
+
+
 
     [[nodiscard]] pointer front() const noexcept {
       return m_head;

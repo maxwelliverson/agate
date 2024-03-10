@@ -28,6 +28,7 @@ struct agt::local_event_eagent : object {
   bool                       timedOut;
   bool                       isBlocked;
   bool                       isReady;
+  agt_fiber_flags_t          fiberFlags;
   agt_timestamp_t            deadline;
 };
 
@@ -143,11 +144,18 @@ inline constexpr static fiber_action_t FiberActionPoll           = 1;
 inline constexpr static fiber_action_t FiberActionResumeSuccess  = 2;
 inline constexpr static fiber_action_t FiberActionResumeTimedOut = 3;
 inline constexpr static fiber_action_t FiberActionExecuteMessage = 4;
+inline constexpr static fiber_action_t FiberActionFallthrough    = 5;
 
 
 
 
 agt_fiber_param_t local_event_executor_proc(agt_fiber_t fromFiber, agt_fiber_param_t param, void* userData);
+
+
+agt_fiber_param_t local_fiber_proc(agt_fiber_t fromFiber, agt_fiber_param_t action, void* userData);
+
+
+
 
 void init_fibers(agt::local_event_executor* exec) noexcept {
   auto ctx = agt::get_ctx();
@@ -209,16 +217,76 @@ void handle_fiber_transfer(agt_fiber_t fromFiber, agt_fiber_param_t param, agt::
 }
 
 
+local_event_eagent* get_ready_agent(local_event_executor* exec) noexcept {
+  // TODO: Implement some shit to check whether a blocked agent is ready
+  if (exec->readyAgents.empty())
+    return nullptr;
+  auto result = exec->readyAgents.front();
+  exec->readyAgents.pop_front();
+  return result;
+}
+
+agt_fiber_t get_free_fiber(local_event_executor* exec) noexcept {
+  if (!exec->freeFibers.empty())
+    return exec->freeFibers.pop_back_val();
+  agt_fiber_t fiber;
+  auto status = AGT_ctx_api(new_fiber, exec->ctx)(&fiber, local_fiber_proc, exec);
+  assert( status == AGT_SUCCESS );
+  return fiber;
+}
+
+agt_fiber_t get_next_fiber(local_event_executor* exec) noexcept {
+  if (auto readyAgent = get_ready_agent(exec))
+    return readyAgent->boundFiber;
+  return get_free_fiber(exec);
+}
+
+
 
 struct fiber_proc_state {
   bool shouldClose = false;
   bool isInitialLoop = false;
   bool shouldCleanup = true;
   agt_timeout_t receiveTimeout;
+  agt_status_t status = AGT_SUCCESS;
 };
 
 
-void execute_message(local_event_executor* exec, fiber_proc_state& state, message msg) {
+void block_eagent(local_event_executor* exec, local_event_eagent* agent) noexcept {
+
+  if (agent->isReady) [[unlikely]] {
+    exec->readyAgents.push_front(agent); // maybe try push back instead, depending...
+    return;
+  }
+
+  if (agent->deadline != 0) {
+    auto pos = exec->timedBlockedAgents.front();
+    if (!pos) [[likely]] {
+      exec->timedBlockedAgents.push_back(agent);
+    }
+    else if (agent->deadline < pos->deadline) {
+      exec->timedBlockedAgents.push_front(agent);
+    }
+    else {
+      local_event_eagent* prev;
+      // walk down the list until we reach either the end of the list, or a blocked agent that has a later deadline. insert right before that point.
+      do {
+        prev = std::exchange(pos, pos->next);
+      } while(pos && pos->deadline < agent->deadline);
+
+      exec->timedBlockedAgents.insert(prev, agent);
+    }
+  }
+  else {
+    exec->blockedAgents.push_back(agent);
+  }
+  agent->isBlocked = true;
+  agent->timedOut = false;
+}
+
+
+// currentFiberIsBlocked should be true when messages are dispatched to from within a "block" loop
+void execute_message(local_event_executor* exec, fiber_proc_state& state, message msg, local_event_eagent* blockedAgent = nullptr) {
   auto ctx = exec->ctx;
 
   switch (msg.cmd()) {
@@ -228,25 +296,32 @@ void execute_message(local_event_executor* exec, fiber_proc_state& state, messag
       state.shouldClose   = true;
       state.shouldCleanup = false;
     break;
-    case AGT_ECMD_AGENT_MESSAGE: {
-      auto agentMsg = msg.get_as<agent_message>();
-      auto receiveAgent = agentMsg->receiver;
-      ctx->boundAgent = receiveAgent;
-      ctx->currentMessage = (agt_message_t)agentMsg;
-      agentMsg->state = AGT_MSG_STATE_ACTIVE;
-      receiveAgent->proc((agt_self_t)receiveAgent,
-        receiveAgent->state,
-        reinterpret_cast<std::byte*>(agentMsg->buffer) + agentMsg->userDataOffset,
-        agentMsg->payloadSize);
-
-      if (agentMsg->state != AGT_MSG_STATE_PINNED) [[likely]] {
-        if (agentMsg->state != AGT_MSG_STATE_COMPLETE) [[likely]]
-          msg.complete<false>(ctx);
-        msg.release(ctx);
+    case AGT_ECMD_AGENT_MESSAGE:
+      if (blockedAgent != nullptr) {
+        auto fiber = get_free_fiber(exec);
+        block_eagent(exec, blockedAgent);
+        exec->messageToBeHandled = msg;
+        AGT_ctx_api(fiber_jump, ctx)(fiber, FiberActionExecuteMessage);
       }
+      else {
+        auto agentMsg = msg.get_as<agent_message>();
+        auto receiveAgent = agentMsg->receiver;
+        ctx->boundAgent = receiveAgent;
+        ctx->currentMessage = (agt_message_t)agentMsg;
+        agentMsg->state = AGT_MSG_STATE_ACTIVE;
+        receiveAgent->proc((agt_self_t)receiveAgent,
+          receiveAgent->state,
+          reinterpret_cast<std::byte*>(agentMsg->buffer) + agentMsg->userDataOffset,
+          agentMsg->payloadSize);
 
+        if (agentMsg->state != AGT_MSG_STATE_PINNED) [[likely]] {
+          if (agentMsg->state != AGT_MSG_STATE_COMPLETE) [[likely]]
+            msg.complete<false>(ctx);
+          msg.release(ctx);
+        }
+      }
       break;
-    }
+
     default:
       abort();
   }
@@ -279,96 +354,8 @@ void        make_timed_out_agents_ready(local_event_executor* exec) noexcept {
   }
 }
 
-agt_fiber_param_t local_fiber_proc(agt_fiber_t fromFiber, agt_fiber_param_t action, void* userData);
-
-local_event_eagent* get_ready_agent(local_event_executor* exec) noexcept {
-  // TODO: Implement some shit to check whether a blocked agent is ready
-  if (exec->readyAgents.empty())
-    return nullptr;
-  auto result = exec->readyAgents.front();
-  exec->readyAgents.pop_front();
-  return result;
-}
-
-agt_fiber_t get_free_fiber(local_event_executor* exec) noexcept {
-  if (!exec->freeFibers.empty())
-    return exec->freeFibers.pop_back_val();
-  agt_fiber_t fiber;
-  auto status = AGT_ctx_api(new_fiber, exec->ctx)(&fiber, local_fiber_proc, exec);
-  assert( status == AGT_SUCCESS );
-  return fiber;
-}
-
-agt_fiber_t get_next_fiber(local_event_executor* exec) noexcept {
-  if (auto readyAgent = get_ready_agent(exec))
-    return readyAgent->boundFiber;
-  return get_free_fiber(exec);
-}
 
 
-agt_fiber_param_t local_fiber_proc(agt_fiber_t fromFiber, agt_fiber_param_t action, void* userData) {
-  auto exec = (agt::local_event_executor*)userData;
-
-  fiber_proc_state state{};
-
-  state.receiveTimeout = exec->receiveTimeout;
-
-  switch (action) {
-    case FiberActionInitialize:
-      state.isInitialLoop = true;
-      init_fibers(exec);
-      break;
-    case FiberActionExecuteMessage:
-      execute_message(exec, state, exec->messageToBeHandled);
-      break;
-    case FiberActionPoll:
-      break;
-    default:
-      raise(AGT_ERROR_INVALID_ARGUMENT, &action, exec->ctx);
-  }
-
-  do {
-
-    if (auto readyAgent = get_ready_agent(exec)) {
-      if (readyAgent->timedOut)
-        action = FiberActionResumeTimedOut;
-      else
-        action = FiberActionResumeSuccess;
-
-      AGT_ctx_api(fiber_jump, exec->ctx)(readyAgent->boundFiber, action);
-    }
-
-
-    message msg;
-    switch (receive(exec->receiver, msg, exec->receiveTimeout)) {
-      case AGT_SUCCESS:
-        execute_message(exec, state, msg);
-      state.receiveTimeout = exec->receiveTimeout;
-      break;
-      case AGT_NOT_READY:
-      case AGT_TIMED_OUT:
-        exec->receiveTimeout *= 2;
-        break;
-      case AGT_ERROR_NO_SENDERS:
-        // then maybe disconnect??
-      default:
-        // ehhhhhhhhh
-    }
-
-    make_timed_out_agents_ready(exec);
-  } while(!state.shouldClose);
-
-
-
-}
-
-void executor_proc(agt::local_event_executor* exec) {
-
-
-
-
-  // TODO: Handle possible error
-}
 
 
 
@@ -383,9 +370,79 @@ using namespace agt;
 
 namespace {
 
+  bool try_poll_message(local_event_executor* exec, fiber_proc_state& state, local_event_eagent* blockedAgent = nullptr) noexcept {
+    message msg;
+    switch (auto result = receive(exec->receiver, msg, state.receiveTimeout)) {
+      case AGT_SUCCESS:
+        execute_message(exec, state, msg, blockedAgent);
+        state.receiveTimeout = exec->receiveTimeout;
+        return true;
+      case AGT_NOT_READY:
+      case AGT_TIMED_OUT:
+        state.receiveTimeout *= 2;
+        return false;
+      case AGT_ERROR_NO_SENDERS:
+        state.shouldClose = true;
+        state.status = AGT_ERROR_NO_SENDERS;
+        return false;
+        // then maybe disconnect??
+      default:
+        state.shouldCleanup = false; // ???
+        state.shouldClose = true;
+        state.status = result;
+        return false;
+        // ehhhhhhhhh
+      }
+  }
+
+  [[noreturn]] void continue_ready_agent(local_event_executor* exec, local_event_eagent* readyAgent) noexcept {
+    agt_fiber_param_t action;
+    if (readyAgent->timedOut)
+      action = FiberActionResumeTimedOut;
+    else
+      action = FiberActionResumeSuccess;
+
+    AGT_ctx_api(fiber_jump, exec->ctx)(readyAgent->boundFiber, action);
+  }
 
 
+  agt_fiber_param_t local_fiber_proc(agt_fiber_t fromFiber, agt_fiber_param_t action, void* userData) {
+    auto exec = (agt::local_event_executor*)userData;
 
+    fiber_proc_state state{};
+
+    state.receiveTimeout = exec->receiveTimeout;
+
+    switch (action) {
+      case FiberActionInitialize:
+        state.isInitialLoop = true;
+      init_fibers(exec);
+      break;
+      case FiberActionExecuteMessage:
+        execute_message(exec, state, exec->messageToBeHandled);
+      break;
+      case FiberActionPoll:
+        break;
+      default:
+        raise(AGT_ERROR_INVALID_ARGUMENT, &action, exec->ctx);
+    }
+
+    do {
+
+      if (auto readyAgent = get_ready_agent(exec))
+        continue_ready_agent(exec, readyAgent);
+
+      try_poll_message(exec, state); // may ignore return value?
+
+      make_timed_out_agents_ready(exec);
+    } while(!state.shouldClose);
+
+
+    if (state.shouldCleanup) {
+      // blehhhhhhh
+    }
+
+  }
 
 
 
@@ -469,7 +526,7 @@ namespace {
       release(eagent);
       return AGT_SUCCESS;
     },
-    .blockAgent = [](basic_executor* exec_, agent_self* agent, async& async) -> agt_status_t {
+    .blockAgent = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {
       assert( exec_ != nullptr );
       assert( agent != nullptr );
       assert( agent->execAgentTag != nullptr );
@@ -482,9 +539,6 @@ namespace {
       auto transfer = AGT_ctx_api(fiber_switch, exec->ctx)(targetFiber, BlockFiber, 0);
       handle_fiber_transfer(transfer.source, transfer.param, exec);
       return AGT_SUCCESS;
-    },
-    .blockAgentUntil = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {
-      return AGT_ERROR_NOT_YET_IMPLEMENTED;
     },
     .yield = [](basic_executor* exec_, agent_self* agent){
       assert( exec_ != nullptr );
@@ -514,8 +568,7 @@ namespace {
     .detachAgentDirect = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {
 
     },
-    .blockAgent = [](basic_executor* exec_, agent_self* agent, async& async) -> agt_status_t {},
-    .blockAgentUntil = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {},
+    .blockAgent = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {},
     .yield = [](basic_executor* exec_, agent_self* agent) {},
     .acquireMessage = [](basic_executor* exec, const acquire_message_info& msgInfo, message& msg) -> agt_status_t {},
     .releaseMessage = [](basic_executor* exec, message msg) {},
@@ -527,8 +580,7 @@ namespace {
     .detachAgentDirect = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {
 
     },
-    .blockAgent = [](basic_executor* exec_, agent_self* agent, async& async) -> agt_status_t {},
-    .blockAgentUntil = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {},
+    .blockAgent = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {},
     .yield = [](basic_executor* exec_, agent_self* agent) {},
     .acquireMessage = [](basic_executor* exec, const acquire_message_info& msgInfo, message& msg) -> agt_status_t {},
     .releaseMessage = [](basic_executor* exec, message msg) {},
@@ -541,8 +593,7 @@ namespace {
     .detachAgentDirect = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {
 
     },
-    .blockAgent = [](basic_executor* exec_, agent_self* agent, async& async) -> agt_status_t {},
-    .blockAgentUntil = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {},
+    .blockAgent = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {},
     .yield = [](basic_executor* exec_, agent_self* agent) {},
     .acquireMessage = [](basic_executor* exec, const acquire_message_info& msgInfo, message& msg) -> agt_status_t {},
     .releaseMessage = [](basic_executor* exec, message msg) {},
@@ -555,8 +606,7 @@ namespace {
     .detachAgentDirect = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {
 
     },
-    .blockAgent = [](basic_executor* exec_, agent_self* agent, async& async) -> agt_status_t {},
-    .blockAgentUntil = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {},
+    .blockAgent = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {},
     .yield = [](basic_executor* exec_, agent_self* agent) {},
     .acquireMessage = [](basic_executor* exec, const acquire_message_info& msgInfo, message& msg) -> agt_status_t {},
     .releaseMessage = [](basic_executor* exec, message msg) {},
@@ -564,14 +614,7 @@ namespace {
   };
 
 
-  agt::message try_get_message(local_event_executor* localExec) noexcept {
-    return try_receive(&localExec->receiver);
-  }
 
-
-  void dispatch_message(local_event_executor* localExec, agent_self* self, message msg) noexcept {
-
-  }
 
   agt_status_t start(local_event_executor* exec, bool startOnNewThread) noexcept {
     auto ctx = get_ctx();
@@ -606,29 +649,137 @@ namespace {
     return AGT_SUCCESS;
   }
 
-  void yield(local_event_executor* localExec, agent_self* self) noexcept {
-    const auto ctx = localExec->ctx;
-    auto selfEAgent = static_cast<local_event_eagent*>(self->execAgentTag);
+
+  agt_status_t block(local_event_executor* localExec, agent_self* self, async& async, agt_timestamp_t deadline) noexcept {
+    const auto ctx  = localExec->ctx;
+    auto eagent = static_cast<local_event_eagent*>(self->execAgentTag);
+    const auto flags = eagent->fiberFlags;
+
+    struct data_t {
+      agent_self*         pSelf;
+      local_event_eagent* eagent;
+      agt::async*         pAsync;
+      agt_timestamp_t     deadline;
+    } data { self, eagent, &async, deadline };
 
 
-    make_timed_out_agents_ready(localExec);
+    const auto message = ctx->currentMessage;
 
-    if (local_event_eagent* readyAgent = get_ready_agent(localExec)) {
+
+    auto [ sourceFiber, forkAction ] = AGT_ctx_api(fiber_fork, ctx)(
+      [](agt_fiber_t thisFiber, agt_fiber_param_t param, void* userData) -> agt_fiber_param_t {
+        const auto data = reinterpret_cast<const data_t*>(param);
+        const auto exec = static_cast<local_event_executor*>(userData);
+
+        const auto ctx  = exec->ctx;
+
+        auto& async = *data->pAsync;
+
+        fiber_proc_state state{};
+        state.receiveTimeout = exec->receiveTimeout;
+
+        auto eagent = data->eagent;
+
+        eagent->deadline   = data->deadline;
+        eagent->boundFiber = thisFiber;
+        eagent->isReady    = false;
+
+        do {
+          make_timed_out_agents_ready(exec);
+
+          if (auto readyAgent = get_ready_agent(exec)) {
+            if (readyAgent == eagent) { // This happens if the block's timeout has passed, in which case, return as though it timed out (cause it did lol)
+              return FiberActionResumeTimedOut;
+            }
+            block_eagent(exec, data->eagent);
+            continue_ready_agent(exec, readyAgent);
+          }
+
+          try_poll_message(exec, state, data->eagent);
+
+        } while (!async_is_complete(async));
+
+        return FiberActionFallthrough;
+
+      }, reinterpret_cast<agt_fiber_param_t>(&data), flags);
+
+
+    agt_status_t returnStatus = async.status;
+
+    switch (forkAction) {
+      case FiberActionResumeTimedOut:
+        returnStatus = AGT_TIMED_OUT;
+        [[fallthrough]];
+      case FiberActionResumeSuccess:
+        ctx->currentMessage = message;
+        ctx->boundAgent     = self;
+        eagent->isBlocked   = false;
+        eagent->boundFiber  = nullptr;
+        [[fallthrough]];
+      case FiberActionFallthrough:
+        break;
+      default:
+        std::unreachable();
+    }
+
+    return returnStatus;
+  }
+
+
+  void         yield(local_event_executor* exec, agent_self* self) noexcept {
+    const auto ctx = exec->ctx;
+    auto eagent = static_cast<local_event_eagent*>(self->execAgentTag);
+
+
+    make_timed_out_agents_ready(exec);
+
+    if (local_event_eagent* readyAgent = get_ready_agent(exec)) {
       fiber_action_t action;
       if (readyAgent->timedOut)
         action = FiberActionResumeTimedOut;
       else
         action = FiberActionResumeSuccess;
-      localExec->readyAgents.push_front(selfEAgent);
-      const auto message = ctx->currentMessage;
-      auto [ sourceFiber, switchParam ] = AGT_ctx_api(fiber_switch, ctx)(readyAgent->boundFiber, action, AGT_FIBER_SAVE_EXTENDED_STATE);
+      exec->readyAgents.push_front(eagent);
+      eagent->boundFiber = agt::current_fiber();
+      const auto message = ctx->currentMessage; // Save current message, either on the stack, or in registers or smth. Full state will be restored, so it works either way :)
+      auto [ sourceFiber, switchParam ] = AGT_ctx_api(fiber_switch, ctx)(readyAgent->boundFiber, action, eagent->fiberFlags);
       (void) sourceFiber;
       (void) switchParam;
       ctx->boundAgent = self;
       ctx->currentMessage = message;
     }
-    else if (auto msg = try_get_message(localExec)) {
-      dispatch_message(localExec, self, msg);
+    else {
+      if (auto msg = try_receive(&exec->receiver)) {
+        eagent->isReady = true;
+        struct data_t {
+          fiber_proc_state    state;
+          message             msg;
+          local_event_eagent* eagent;
+        } data{ { }, msg, eagent };
+
+        const auto message = ctx->currentMessage;
+
+        auto [forkSource, forkParam] = AGT_ctx_api(fiber_fork, ctx)([](agt_fiber_t thisFiber, agt_fiber_param_t param, void* userData) -> agt_fiber_param_t {
+
+          const auto exec = static_cast<local_event_executor*>(userData);
+          const auto data = reinterpret_cast<data_t*>(param);
+
+          data->eagent->boundFiber = thisFiber;
+
+          execute_message(exec, data->state, data->msg, data->eagent);
+          return FiberActionFallthrough;
+
+        }, reinterpret_cast<agt_fiber_param_t>(&data), eagent->fiberFlags);
+
+        if (forkParam == FiberActionResumeSuccess) {
+          // the fiber was actually jumped from in this case, and a little bit of state must be restored.
+          ctx->currentMessage = message;
+          ctx->boundAgent = self;
+
+        }
+
+        eagent->boundFiber = nullptr;
+      }
     }
   }
 
@@ -639,7 +790,19 @@ namespace {
 
 
 
-agt_status_t agt::executor_start(executor* exec) noexcept {
+
+agt_status_t  agt::executor_wait(basic_executor* executor, agent_self* self, async& async, agt_timestamp_t deadline) noexcept {
+  if (auto status = async_status(async); status != AGT_NOT_READY)
+    return status;
+
+  AGT_assert_is_a(executor, local_event_executor);
+
+  return block(static_cast<local_event_executor*>(executor), self, async, deadline);
+}
+
+
+
+/*agt_status_t agt::executor_start(executor* exec) noexcept {
 
 }
 
@@ -650,6 +813,7 @@ bool         agt::executor_has_started(executor* exec) noexcept {
 agt_status_t agt::executor_block_agent(executor* exec, agt_agent_t agent, async& async) noexcept {
 
 }
+
 agt_status_t agt::executor_block_agent_until(executor* exec, agt_agent_t agent, async& async, agt_timestamp_t deadline) noexcept {
 
 }
@@ -695,4 +859,4 @@ void         agt::executor_drop_message(executor* exec, message* msg) noexcept {
 
 agt_status_t agt::executor_commit_message(executor* exec, message* msg) noexcept {
 
-}
+}*/

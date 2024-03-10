@@ -38,6 +38,7 @@ namespace agt {
     agt_agent_dtor_t  dtor;
     void*             state;
     agt_executor_t    executor;
+    agt_message_t     currentMessage;
     agt_u32_t         agentEpoch;
     agt_u32_t         padding;    // ???
     agt_handle_t      selfHandle; // Exporting and such

@@ -242,9 +242,22 @@ namespace agt {
 
   agt_status_t                         async_wait(agt_async_t& async, agt_timeout_t timeout) noexcept;
 
+  using enter_wait_callback_t = void(*)(agt_ctx_t ctx, void* userData);
+
+
+
+
+  agt_status_t                         async_wait(async&                async,
+                                                  enter_wait_callback_t enterWait,
+                                                  void*                 enterWaitUserData,
+                                                  async_callback_t      wakeCallback,
+                                                  void*                 wakeData) noexcept;
+
   // Functionally equivalent to calling "asyncWait" with a timeout of 0, but slightly optimized
   // TODO: Benchmark to see whether or not there is actually any speedup from this, or if the gains are outweighed by the optimized instruction caching
-  agt_status_t async_status(agt_async_t& async) noexcept;
+  agt_status_t async_status(async& async) noexcept;
+
+  bool         async_is_complete(async& async) noexcept;
 
   void         init_async(agt_ctx_t ctx, agt_async_t& async, agt_async_flags_t flags) noexcept;
 

@@ -497,9 +497,7 @@ agt_status_t agt::async_wait(agt_async_t& async_, agt_timeout_t timeout) noexcep
   return status;
 }
 
-agt_status_t agt::async_status(agt_async_t& async_) noexcept {
-  auto& async = (agt::async&)async_;
-
+agt_status_t agt::async_status(async& async) noexcept {
   if (async.status != AGT_NOT_READY)
     return async.status;
 
@@ -512,6 +510,15 @@ agt_status_t agt::async_status(agt_async_t& async_) noexcept {
 
   async.status = status;
   return status;
+}
+
+bool         agt::async_is_complete(async& async) noexcept {
+  if (async.flags & ASYNC_IS_COMPLETE)
+    return true;
+  bool isComplete = ;
+  if (isComplete)
+    async.flags |= ASYNC_IS_COMPLETE;
+  return isComplete;
 }
 
 void         agt::init_async(agt_ctx_t context, agt_async_t& async_, agt_async_flags_t flags) noexcept {

@@ -124,6 +124,23 @@ typedef struct agt_executor_desc_t {
   const void*          params; // type depends on value of agt_executor_desc_t::kind
 } agt_executor_desc_t;
 
+
+typedef struct agt_event_executor_desc_t {
+  agt_executor_flags_t flags;
+  agt_u32_t            stackSize;
+  agt_name_t           name;
+  agt_u32_t            initialFiberCount;
+  agt_u32_t            maxBoundAgents;
+} agt_event_executor_desc_t;
+
+typedef struct agt_busy_executor_desc_t {
+  agt_executor_flags_t flags;
+  agt_u32_t            stackSize;
+  agt_name_t           name;
+  agt_u32_t            initialFiberCount;
+  agt_u32_t            maxBoundAgents;
+} agt_busy_executor_desc_t;
+
 typedef struct agt_custom_executor_params_t {
   const agt_executor_vtable_t* vtable;
   agt_executor_proc_t          proc;
@@ -137,6 +154,17 @@ typedef struct agt_custom_executor_params_t {
 
 
 AGT_exec_api agt_status_t AGT_stdcall agt_new_executor(agt_ctx_t ctx, agt_executor_t* pExecutor, const agt_executor_desc_t* pExecutorDesc) AGT_noexcept;
+
+
+AGT_exec_api agt_status_t AGT_stdcall agt_new_event_executor(agt_ctx_t ctx) AGT_noexcept;
+
+AGT_exec_api agt_status_t AGT_stdcall agt_new_busy_executor() AGT_noexcept;
+
+AGT_exec_api agt_status_t AGT_stdcall agt_new_parallel_executor() AGT_noexcept;
+
+AGT_exec_api agt_status_t AGT_stdcall agt_new_proxy_executor() AGT_noexcept;
+
+AGT_exec_api agt_status_t AGT_stdcall agt_new_user_executor() AGT_noexcept;
 
 
 AGT_exec_api agt_status_t AGT_stdcall agt_executor_start(agt_executor_t executor) AGT_noexcept;

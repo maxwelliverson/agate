@@ -7,7 +7,12 @@
 
 #include "config.hpp"
 
+#include "vector.hpp"
+
 #include <string_view>
+
+
+#include <Zydis/Encoder.h>
 
 namespace agt::dc {
 
@@ -126,10 +131,90 @@ namespace agt::dc {
     cmpNotEq     = 0x6
   };
 
+  namespace x64 {
+    enum gp_reg {
+      al,
+      bl,
+      cl,
+      dl,
+      sil,
+      dil,
+      bpl,
+      spl,
+      r9b,
+      r10b,
+      r11b,
+      r12b,
+      r13b,
+      r14b,
+      r15b,
+
+      ax,
+      bx,
+      cx,
+      dx,
+      si,
+      di,
+      bp,
+      sp,
+      r9w,
+      r10w,
+      r11w,
+      r12w,
+      r13w,
+      r14w,
+      r15w,
+
+      eax,
+      ebx,
+      ecx,
+      edx,
+      esi,
+      edi,
+      ebp,
+      esp,
+      r9d,
+      r10d,
+      r11d,
+      r12d,
+      r13d,
+      r14d,
+      r15d,
+
+      rax,
+      rbx,
+      rcx,
+      rdx,
+      rsi,
+      rdi,
+      rbp,
+      rsp,
+      r9,
+      r10,
+      r11,
+      r12,
+      r13,
+      r14,
+      r15,
+    };
+
+    enum avx_reg {
+
+    };
+
+  }
+
+
+  class module;
+  class function;
+  class label;
+  class module_builder;
+  class function_builder;
 
 
 
   class module {
+    friend class module_builder;
     class impl;
   public:
 
@@ -138,9 +223,20 @@ namespace agt::dc {
     impl* pImpl;
   };
 
-  class function {};
+  class label{ };
+
+  class function {
+    friend class module;
+    class impl;
+  public:
+
+
+  private:
+  };
 
   class function_builder {
+    friend class module_builder;
+    class impl;
   public:
 
     function_builder& load(reg dst, const void* address) noexcept {}
@@ -242,7 +338,14 @@ namespace agt::dc {
 
   };
 
-  void test() {
+  class asm_func {
+  public:
+
+  private:
+    vector<ZyanU8, 0> m_buffer;
+  };
+
+  /*void test() {
 
     function_builder b;
 
@@ -252,9 +355,15 @@ namespace agt::dc {
      .putFramePointer(r8_64);
 
     b.call(r1_64);
-  }
+  }*/
 
-  class module_builder {};
+  class module_builder {
+    class impl;
+  public:
+
+  private:
+    impl* pImpl;
+  };
 
 
 

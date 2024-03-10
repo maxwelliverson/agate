@@ -39,7 +39,7 @@ namespace {
   };
 
 
-#if (_MSC_VER)
+#if (_MSC_VER) && !defined(__clang__)
 # define AGT_constinit_tls inline [[msvc::no_tls_guard]] thread_local
 #else
 # define AGT_constinit_tls inline constinit thread_local

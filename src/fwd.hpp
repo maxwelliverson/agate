@@ -64,6 +64,10 @@ namespace agt {
 
   using message_block_t = struct message_pool_block*;
 
+  struct executor_vtable;
+
+  using  executor_vptr_t = const executor_vtable*;
+
 
   struct object;
   struct rc_object;

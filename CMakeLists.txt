@@ -105,6 +105,10 @@ print_value(AGATE_ASM_FILE_EXTENSION CACHE)
 
 
 
+add_library(agate-common INTERFACE)
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    target_compile_options(agate-common INTERFACE -march=native $<$<CONFIG:Release>:-O3 -flto> -fno-rtti)
+endif()
 
 
 
@@ -225,6 +229,8 @@ function(add_agate_module target_)
         target_link_libraries(agate.${target_}        PRIVATE agate-support)
     endif()
 
+    target_link_libraries(agate.${target_} PRIVATE $<COMPILE_ONLY:agate-common>)
+
     set_target_properties(agate.${target_} PROPERTIES OUTPUT_NAME agate-${target_})
 
     target_link_options(agate.${target_} PRIVATE
@@ -312,6 +318,7 @@ add_library(agate-support
             src/agate/thread.cpp
             src/agate/vector.cpp)
 target_include_directories(agate-support PRIVATE include src)
+target_link_libraries(agate-support PRIVATE $<COMPILE_ONLY:agate-common>)
 
 
 add_agate_module(
@@ -321,6 +328,12 @@ add_agate_module(
                 async.cpp
                 ctx.cpp
                 error.cpp
+                exec.hpp
+                exec/local_event_executor.cpp
+                exec/local_busy_executor.cpp
+                exec/local_proxy_executor.cpp
+                exec/local_parallel_executor.cpp
+                exec/local_user_executor.cpp
                 fiber.cpp
                 instance.cpp
                 # object_allocator.cpp
@@ -412,6 +425,7 @@ add_agate_module(
 add_library(agate STATIC src/agate.cpp src/config.cpp)
 target_include_directories(agate PRIVATE src include src/modules)
 target_link_libraries(agate PUBLIC agate-support)
+target_link_libraries(agate PRIVATE $<COMPILE_ONLY:agate-common>)
 target_compile_definitions(agate PRIVATE AGT_BUILDING_CORE_LIBRARY)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
@@ -545,7 +559,7 @@ add_executable(gbenchmarks
         test/benchmark/googleMain.cpp
 )
 target_include_directories(gbenchmarks PRIVATE include)
-target_link_libraries(gbenchmarks PRIVATE agate benchmark::benchmark)
+target_link_libraries(gbenchmarks PRIVATE agate $<COMPILE_ONLY:agate-common> benchmark::benchmark)
 add_dependencies(gbenchmarks agate.core)
 target_link_options(gbenchmarks PRIVATE $<$<CONFIG:Release>:/LTCG>)
 
@@ -554,6 +568,8 @@ target_link_options(gbenchmarks PRIVATE $<$<CONFIG:Release>:/LTCG>)
 
 
 add_executable(scratch test/scratch.cpp)
+target_link_libraries(scratch PRIVATE agate)
+target_include_directories(scratch PRIVATE include )
 
 
 
