@@ -7,6 +7,9 @@
 
 #include "config.hpp"
 
+
+#include "ctrie.hpp"
+
 #include "agate/atomic.hpp"
 #include "../object.hpp"
 

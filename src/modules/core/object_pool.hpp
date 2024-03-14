@@ -387,17 +387,45 @@ namespace agt {
   template <typename ObjectType,
             std::derived_from<object_pool> PoolType>
   [[nodiscard]] AGT_forceinline ObjectType*  pool_alloc(PoolType& pool) noexcept {
+    static_assert(std::default_initializable<ObjectType>);
+
     object* obj = impl::raw_pool_alloc(pool.pool, pool.instance);
-    obj->type = AGT_type_id_of(ObjectType);
-    return static_cast<ObjectType*>(obj);
+
+    if constexpr (std::is_trivially_default_constructible_v<ObjectType>) {
+      obj->type = AGT_type_id_of(ObjectType);
+      return std::launder(static_cast<ObjectType*>(obj));
+    }
+    else {
+      const auto offset = obj->poolChunkOffset;
+      const auto newObj = new (obj) ObjectType;
+      newObj->type = AGT_type_id_of(ObjectType);
+      newObj->poolChunkOffset = offset; // This is just to ensure that the compiler doesn't modify this field when the object is constructed...
+      return newObj;
+    }
   }
 
   template <typename ObjectType>
   [[nodiscard]] AGT_forceinline ObjectType*  pool_alloc(impl::ctx_pool& ctxPool, agt_instance_t instance) noexcept {
+    static_assert(std::default_initializable<ObjectType>);
+
     object* obj = impl::raw_pool_alloc(ctxPool, instance);
-    obj->type = AGT_type_id_of(ObjectType);
-    return static_cast<ObjectType*>(obj);
+
+    if constexpr (std::is_trivially_default_constructible_v<ObjectType>) {
+      obj->type = AGT_type_id_of(ObjectType);
+      return std::launder(static_cast<ObjectType*>(obj));
+    }
+    else {
+      const auto offset = obj->poolChunkOffset;
+      const auto newObj = new (obj) ObjectType;
+      newObj->type = AGT_type_id_of(ObjectType);
+      newObj->poolChunkOffset = offset; // This is just to ensure that the compiler doesn't modify this field when the object is constructed...
+      return newObj;
+    }
+
+
+
   }
+
 
   template <std::derived_from<object_pool> PoolType>
   AGT_forceinline static void pool_release(PoolType&, object* obj) noexcept {

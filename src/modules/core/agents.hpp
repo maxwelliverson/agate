@@ -11,8 +11,6 @@
 #include "channels/channel.hpp"
 #include "core/object.hpp"
 
-#include <csetjmp>
-
 
 
 namespace agt {
@@ -21,6 +19,8 @@ namespace agt {
 
   struct agent_properties;
   struct agent_methods;
+
+  struct basic_executor;
 
   AGT_BITFLAG_ENUM(agent_flags, uint32_t) {
       isProxy    = 0x1,
@@ -38,14 +38,15 @@ namespace agt {
     agt_agent_dtor_t  dtor;
     void*             state;
     agt_executor_t    executor;
-    agt_message_t     currentMessage;
+    // agt_message_t     currentMessage;
     agt_u32_t         agentEpoch;
     agt_u32_t         padding;    // ???
     agt_handle_t      selfHandle; // Exporting and such
-    agt_fiber_t       boundFiber;
+    // agt_fiber_t       boundFiber;
     agt_eagent_t      execAgentTag;
-    agent_properties* properties;
-    agent_methods*    methods;
+    agt_name_t        name;
+    // agent_properties* properties;
+    // agent_methods*    methods;
   };
 
   AGT_ref_counted_dtor(agent_self, value) {
@@ -56,9 +57,10 @@ namespace agt {
     agent_flags      flags;
     agent_self*      self;
     agent_self*      refOwner;
+    basic_executor*  executor;
     sender_t         sender;
-    const agt_u32_t* pAgentEpoch; // points to self->agentEpoch; compare against value of cached agentEpoch to check if the cached epoch is out of date
-    agt_u32_t        agentEpoch;
+    // const agt_u32_t* pAgentEpoch; // points to self->agentEpoch; compare against value of cached agentEpoch to check if the cached epoch is out of date
+    // agt_u32_t        agentEpoch;
   };
 
 
@@ -91,17 +93,11 @@ namespace agt {
     agt_u32_t        blockedManyFinishedCount;
     agt_u32_t*       asyncOpIndices;
     size_t*          anyIndexPtr;
-    std::jmp_buf     contextStorage;
+    // std::jmp_buf     contextStorage;
   };
 
 
   bool is_blocked(agt_agent_t agent) noexcept;
-
-
-
-  bool processMessage(agt::agent_instance* receiver, agt_agent_t sender, agt_agent_t realSender, agt_message_t message) noexcept;
-
-  bool dequeueAndProcessMessage(message_queue_t messageQueue, agt_timeout_t timeout) noexcept;
 
 
   shared_handle agentGetSharedHandle(agt_agent_t agent) noexcept;
@@ -111,7 +107,7 @@ namespace agt {
 
 
 
-  agt_agent_t   importAgent(agt_ctx_t ctx, shared_handle handle) noexcept;
+  agt_agent_t  importAgent(agt_ctx_t ctx, shared_handle handle) noexcept;
 
 
   agt_status_t wait(blocked_queue& queue, agt_async_t* async, agt_timeout_t timeout) noexcept;

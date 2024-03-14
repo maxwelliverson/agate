@@ -489,7 +489,7 @@ namespace {
 
       return AGT_SUCCESS;
     },
-    .attachAgentDirect = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {
+    .bindAgent = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {
       const auto exec = static_cast<local_event_executor*>(exec_);
       assert( agent->executor == nullptr );
       assert( exec->attachedAgents <= exec->maxAgentCount ); // attachedAgents should never be greater than maxAgentCount
@@ -511,7 +511,7 @@ namespace {
       agent->execAgentTag = eagent;
       return AGT_SUCCESS;
     },
-    .detachAgentDirect = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {
+    .unbindAgent = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {
       assert( exec_ != nullptr );
       assert( agent != nullptr );
       assert( agent->execAgentTag != nullptr );
@@ -526,7 +526,7 @@ namespace {
       release(eagent);
       return AGT_SUCCESS;
     },
-    .blockAgent = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {
+    .block = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {
       assert( exec_ != nullptr );
       assert( agent != nullptr );
       assert( agent->execAgentTag != nullptr );
@@ -564,11 +564,11 @@ namespace {
   };
   inline constexpr agt::executor_vtable local_busy_executor_vtable {
     .start = [](basic_executor* exec_, bool startOnCurrentThread) -> agt_status_t {},
-    .attachAgentDirect = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {},
-    .detachAgentDirect = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {
+    .bindAgent = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {},
+    .unbindAgent = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {
 
     },
-    .blockAgent = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {},
+    .block = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {},
     .yield = [](basic_executor* exec_, agent_self* agent) {},
     .acquireMessage = [](basic_executor* exec, const acquire_message_info& msgInfo, message& msg) -> agt_status_t {},
     .releaseMessage = [](basic_executor* exec, message msg) {},
@@ -576,11 +576,11 @@ namespace {
   };
   inline constexpr agt::executor_vtable local_user_executor_vtable {
     .start = [](basic_executor* exec_, bool startOnCurrentThread) -> agt_status_t {},
-    .attachAgentDirect = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {},
-    .detachAgentDirect = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {
+    .bindAgent = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {},
+    .unbindAgent = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {
 
     },
-    .blockAgent = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {},
+    .block = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {},
     .yield = [](basic_executor* exec_, agent_self* agent) {},
     .acquireMessage = [](basic_executor* exec, const acquire_message_info& msgInfo, message& msg) -> agt_status_t {},
     .releaseMessage = [](basic_executor* exec, message msg) {},
@@ -589,11 +589,11 @@ namespace {
 
   inline constexpr agt::executor_vtable local_parallel_executor_vtable {
     .start = [](basic_executor* exec_, bool startOnCurrentThread) -> agt_status_t {},
-    .attachAgentDirect = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {},
-    .detachAgentDirect = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {
+    .bindAgent = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {},
+    .unbindAgent = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {
 
     },
-    .blockAgent = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {},
+    .block = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {},
     .yield = [](basic_executor* exec_, agent_self* agent) {},
     .acquireMessage = [](basic_executor* exec, const acquire_message_info& msgInfo, message& msg) -> agt_status_t {},
     .releaseMessage = [](basic_executor* exec, message msg) {},
@@ -602,11 +602,11 @@ namespace {
 
   inline constexpr agt::executor_vtable local_proxy_executor_vtable {
     .start = [](basic_executor* exec_, bool startOnCurrentThread) -> agt_status_t {},
-    .attachAgentDirect = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {},
-    .detachAgentDirect = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {
+    .bindAgent = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {},
+    .unbindAgent = [](basic_executor* exec_, agent_self* agent) -> agt_status_t {
 
     },
-    .blockAgent = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {},
+    .block = [](basic_executor* exec_, agent_self* agent, async& async, agt_timestamp_t deadline) -> agt_status_t {},
     .yield = [](basic_executor* exec_, agent_self* agent) {},
     .acquireMessage = [](basic_executor* exec, const acquire_message_info& msgInfo, message& msg) -> agt_status_t {},
     .releaseMessage = [](basic_executor* exec, message msg) {},

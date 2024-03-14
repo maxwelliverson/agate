@@ -6,4 +6,7 @@
 
 
 #include "agate/set.hpp"
-#include "core/shared_cache.hpp"
+#include "modules/core/shared_cache.hpp"
+#include "modules/core/impl/ctrie.hpp"
+
+

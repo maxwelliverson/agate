@@ -137,7 +137,6 @@ namespace agt {
     impl::rcpool_chunk_t* stackFullHead;
     impl::rcpool_chunk_t* stackEmptyTail;
     impl::rcpool_chunk_t  purgatoryChunk;
-
   };
 
 
@@ -505,6 +504,8 @@ namespace agt {
 
       return shrunkStack;
     }
+
+
 
 
 

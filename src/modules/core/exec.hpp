@@ -11,9 +11,9 @@
 #include "agate/list.hpp"
 #include "agate/set.hpp"
 #include "agate/vector.hpp"
-#include "agents/agents.hpp"
-#include "channels/message_pool.hpp"
-#include "channels/message_queue.hpp"
+#include "core/agents.hpp"
+#include "core/msg/message_pool.hpp"
+#include "core/msg/message_queue.hpp"
 
 
 #include "core/object.hpp"
@@ -39,6 +39,7 @@ namespace agt {
     agt_send_flags_t flags;
     agt_u32_t        bufferSize;
     agent_self*      sender;
+    async*           async;
   };
 
 
@@ -46,10 +47,12 @@ namespace agt {
 
   struct executor_vtable {
     agt_status_t (* AGT_stdcall start)(basic_executor* exec, bool startOnCurrentThread);
-    agt_status_t (* AGT_stdcall attachAgentDirect)(basic_executor* exec, agent_self* agent);
-    agt_status_t (* AGT_stdcall detachAgentDirect)(basic_executor* exec, agent_self* agent);
-    agt_status_t (* AGT_stdcall blockAgent)(basic_executor* exec, agent_self* agent, async& async, agt_timestamp_t deadline);
+    agt_status_t (* AGT_stdcall bindAgent)(basic_executor* exec, agent_self* agent);
+    agt_status_t (* AGT_stdcall unbindAgent)(basic_executor* exec, agent_self* agent);
+    agt_status_t (* AGT_stdcall block)(basic_executor* exec, agent_self* agent, async& async, agt_timestamp_t deadline);
     void         (* AGT_stdcall yield)(basic_executor* exec, agent_self* agent);
+    // agt_status_t (* AGT_stdcall processMsg)(basic_executor* exec, message msg);
+    // agt_status_t (* AGT_stdcall attachSender)(basic_executor* exec, );
     agt_status_t (* AGT_stdcall acquireMessage)(basic_executor* exec, const acquire_message_info& msgInfo, message& msg);
     void         (* AGT_stdcall releaseMessage)(basic_executor* exec, message msg);
     agt_status_t (* AGT_stdcall commitMessage)(basic_executor* exec, message msg);
@@ -115,7 +118,7 @@ namespace agt {
         return agentExec.rebind_agent(agent, *this, optionalAsync);
 
       if (may_execute_direct())
-        return exec->vptr->attachAgentDirect(exec, agent);
+        return exec->vptr->bindAgent(exec, agent);
 
       message msg;
       acquire_message_info msgInfo;
@@ -142,7 +145,7 @@ namespace agt {
       assert( executor(agent->executor) == *this );
 
       if (may_execute_direct())
-        return exec->vptr->detachAgentDirect(exec, agent);
+        return exec->vptr->unbindAgent(exec, agent);
 
       message msg;
       acquire_message_info msgInfo;
@@ -173,7 +176,7 @@ namespace agt {
       assert( executor(agent->executor) == *this );
 
       if (may_execute_direct()) {
-        if (auto status = exec->vptr->detachAgentDirect(exec, agent); status != AGT_SUCCESS)
+        if (auto status = exec->vptr->unbindAgent(exec, agent); status != AGT_SUCCESS)
           return status;
         assert( agent->executor == nullptr ); // detachAgentDirect *should* set this field to null, and if it does not, an infinite loop would occur, so make sure this doesn't happen...
         return targetExec.attach_agent(agent, optionalAsync);
@@ -190,7 +193,7 @@ namespace agt {
       auto agentMsg = msg.get_as<agent_binding_message>();
       agentMsg->agent = agent;
       agentMsg->targetExecutor = targetExec.c_type();
-      msg.get_as<agent_binding_message>()->agent = agent;
+      // msg.get_as<agent_binding_message>()->agent = agent;
       if (optionalAsync)
         msg.bind_async_local(*optionalAsync);
       msg.write_send_time();
@@ -201,11 +204,11 @@ namespace agt {
     }
 
     agt_status_t block_agent(agent_self* agent, async& async) noexcept {
-      return exec->vptr->blockAgent(exec, agent, async, 0);
+      return exec->vptr->block(exec, agent, async, 0);
     }
 
     agt_status_t block_agent_until(agent_self* agent, async& async, agt_timestamp_t deadline) noexcept {
-      return exec->vptr->blockAgent(exec, agent, async, deadline);
+      return exec->vptr->block(exec, agent, async, deadline);
     }
 
     void         yield(agent_self* agent) noexcept {
@@ -240,9 +243,10 @@ namespace agt {
 
 
   struct event_executor_create_info {
-    agt_u32_t maxAgentCount;
-    agt_u32_t maxFiberCount;
-    agt_u32_t initialFiberCount;
+    agt_timeout_t timeout;
+    agt_u32_t     maxAgentCount;
+    agt_u32_t     maxFiberCount;
+    agt_u32_t     initialFiberCount;
   };
 
 

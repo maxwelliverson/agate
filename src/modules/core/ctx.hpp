@@ -64,6 +64,7 @@ struct agt_ctx_st {
   agt::fctx*                     fctx; // null if this thread isn't using fibers
   agt_instance_t                 instance;
   uintptr_t                      threadId;
+  bool                           fibersAreLocked;
   agt_ctx_t*                     pLocalCtxAddress;
   const agt::export_table*       exports;
   agt::integer_divisor           timestampFrequencyRatio; //

@@ -78,7 +78,8 @@ typedef struct agt_name_filter_info_t {
 *                            which will reattempt the reservation if the name is released, or will
 *                            return the binding info the bound object upon binding. \n
 *              AGT_ERROR_INVALID_ARGUMENT: Indicates either pReservationDesc or pResult was null,
-*                                          which ideally, shouldn't ever be the case. \n
+*                                          which ideally, shouldn't ever be the case. Is also
+*                                          returned if pReservationDesc->name.data is null. \n
 *              AGT_ERROR_NAME_ALREADY_IN_USE: The requested name has already been bound within the
 *                                             specified scope, and a pointer to a struct containing
 *                                             information about the bound object has been written to
@@ -114,6 +115,7 @@ AGT_core_api agt_status_t AGT_stdcall agt_reserve_name(agt_ctx_t ctx, const agt_
  *       has not yet been bound to anything.
  * */
 AGT_core_api void         AGT_stdcall agt_release_name(agt_ctx_t ctx, agt_name_t name) AGT_noexcept;
+
 
 /**
  * \brief Binds an object to a previously reserved name.

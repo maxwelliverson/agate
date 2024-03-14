@@ -54,14 +54,10 @@ namespace agt {
 #define AGT_status_info(infoStruct, statusValue) template <> struct status_value<infoStruct> { inline constexpr static agt_status_t value = statusValue; }
 
       AGT_status_info(overflow_info, AGT_ERROR_INTERNAL_OVERFLOW);
+
+      AGT_status_info(fiber_exit_info, AGT_ERROR_FCTX_EXCEPTION);
       // AGT_status_info(attribute_info, );
     }
-
-
-
-
-
-
 
     struct internal_info_header {
       agt_status_t status;
@@ -85,5 +81,8 @@ namespace agt {
   }
 
 }
+
+
+#define AGT_raise(ctx, info) AGT_ctx_api(raise, ctx)(ctx, ::agt::err::impl::status_value<std::remove_cvref_t<decltype(info)>>::value, &info)
 
 #endif//AGATE_CONTEXT_ERROR_HPP

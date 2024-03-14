@@ -2,15 +2,12 @@
 // Created by maxwe on 2022-05-27.
 //
 
-#include "agents.hpp"
-#include "executor.hpp"
+#include "core/agents.hpp"
+#include "core/exec.hpp"
 
-#include "modules/async/async.hpp"
-#include "modules/channels/message_queue.hpp"
-#include "modules/core/error.hpp"
-
-#include "state.hpp"
-
+#include "async.hpp"
+#include "error.hpp"
+#include "msg/message_queue.hpp"
 
 #include "agate/vector.hpp"
 
@@ -104,6 +101,7 @@ agt_status_t agt::waitAny(blocked_queue& queue, agt_async_t* const * ppAsyncs, s
 agt_status_t agt::waitMany(blocked_queue& queue, agt_async_t* const * ppAsyncs, size_t asyncCount, size_t waitForCount, size_t& index, agt_timeout_t timeout) noexcept {}
 */
 
+/*
 typedef void(* agt_send_callback_t)(void* userData, agt_agent_t receiver, agt_agent_t sender, const agt_send_info_t* sendInfo);
 typedef void(* agt_receive_callback_t)(void* userData, agt_agent_t receiver, agt_agent_t sender, agt_message_id_t id, const void* message, agt_size_t msgSize);
 
@@ -135,7 +133,7 @@ struct agt_agent_st {
   agt_agent_dtor_t     destructor;
   agt_agent_proc_t     proc;
   void*                state;
-  agt::blocked_queue   blockedQueue;*/
+  agt::blocked_queue   blockedQueue;#1#
 };
 
 struct agt_local_agent_st : agt_agent_st {
@@ -441,5 +439,134 @@ AGT_agent_api void         AGT_stdcall agt_delegate(agt_agent_t recipient) AGT_n
 
 
 
+
+}*/
+
+
+
+
+namespace agt {
+  agt_status_t AGT_stdcall agent_send_local(agt_self_t self_, agt_agent_t recipient_, const agt_send_info_t* pSendInfo) noexcept {
+    if (!self_ || !pSendInfo || !recipient_) [[unlikely]]
+      return AGT_ERROR_INVALID_ARGUMENT;
+
+    agt_inline_async_t inlineAsync;
+
+    const auto self = reinterpret_cast<agent_self*>(self_);
+    const auto recipient = reinterpret_cast<agent*>(recipient_);
+
+    acquire_message_info msgInfo{
+      .cmd        = AGT_ECMD_AGENT_MESSAGE,
+      .layout     = AGT_MSG_LAYOUT_AGENT_CMD,
+      .flags      = pSendInfo->flags,
+      .bufferSize = static_cast<agt_u32_t>(pSendInfo->size),
+      .sender     = self
+    };
+
+    if (pSendInfo->async == AGT_SYNCHRONIZE) {
+      const auto ctx = get_ctx();
+      msgInfo.async = init_inline_async_local(ctx, inlineAsync, AGT_ONE_AND_DONE);
+    }
+    else
+      msgInfo.async = static_cast<agt::async*>(pSendInfo->async);
+
+    assert( recipient->executor != nullptr );
+
+    executor receiverExec = recipient->executor;
+
+    message msg;
+    auto status = receiverExec.acquire_message(msgInfo, msg);
+
+    if (status != AGT_SUCCESS)
+      return status;
+
+    auto agentMsg = msg.get_as<agent_message>();
+
+    // agentMsg->sender   = self;
+    agentMsg->receiver = recipient->self;
+    std::memcpy(agentMsg->buffer, pSendInfo->buffer, pSendInfo->size);
+
+    msg.write_send_time();
+
+    status = receiverExec.commit_message(msg);
+
+    if (pSendInfo->async == AGT_SYNCHRONIZE && status == AGT_SUCCESS) {
+
+      auto async = msgInfo.async;
+
+      status = async_status(*async); // Try getting status before blocking, in case it is able to complete right away.
+
+      if (status == AGT_NOT_READY) {
+        executor exec = self->executor;
+        status = exec.block_agent(self, *async);
+      }
+    }
+
+    return status;
+  }
+
+
+  agt_status_t AGT_stdcall agent_send_as_local(agt_self_t self, agt_agent_t spoofSender, agt_agent_t recipient, const agt_send_info_t* pSendInfo) noexcept {
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
+  }
+  agt_status_t AGT_stdcall agent_send_many_local(agt_self_t self, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) noexcept {
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
+  }
+  agt_status_t AGT_stdcall agent_send_many_as_local(agt_self_t self, agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) noexcept  {
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
+  }
+  agt_status_t AGT_stdcall agent_reply_local(agt_self_t self, const agt_send_info_t* pSendInfo) noexcept {
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
+  }
+  agt_status_t AGT_stdcall agent_reply_as_local(agt_self_t self, agt_agent_t spoofReplier, const agt_send_info_t* pSendInfo) noexcept {
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
+  }
+
+
+  agt_status_t AGT_stdcall agent_raw_acquire_local(agt_self_t self, agt_agent_t recipient, size_t desiredMessageSize, agt_raw_send_info_t* pRawSendInfo, void** ppRawBuffer) noexcept {
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
+  }
+  agt_status_t AGT_stdcall agent_raw_send_local(agt_self_t self, agt_agent_t recipient, const agt_raw_send_info_t* pRawSendInfo) noexcept {
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
+  }
+  agt_status_t AGT_stdcall agent_raw_send_as_local(agt_self_t self, agt_agent_t spoofSender, agt_agent_t recipient, const agt_raw_send_info_t* pRawSendInfo) noexcept {
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
+  }
+  agt_status_t AGT_stdcall agent_raw_send_many_local(agt_self_t self, const agt_agent_t* recipients, agt_size_t agentCount, const agt_raw_send_info_t* pRawSendInfo) noexcept {
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
+  }
+  agt_status_t AGT_stdcall agent_raw_send_many_as_local(agt_self_t self, agt_agent_t spoofSender, const agt_agent_t* recipients, agt_size_t agentCount, const agt_raw_send_info_t* pRawSendInfo) noexcept {
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
+  }
+  agt_status_t AGT_stdcall agent_raw_reply_local(agt_self_t self, const agt_raw_send_info_t* pRawSendInfo) noexcept {
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
+  }
+  agt_status_t AGT_stdcall agent_raw_reply_as_local(agt_self_t self, agt_agent_t spoofSender, const agt_raw_send_info_t* pRawSendInfo) noexcept {
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
+  }
+
+
+  void AGT_stdcall agent_delegate_local(agt_self_t self, agt_agent_t recipient) noexcept {
+
+  }
+
+  void AGT_stdcall agent_return_local(agt_self_t self, agt_u64_t value) noexcept {
+
+  }
+  void AGT_stdcall agent_release_local(agt_self_t self, agt_agent_t agent) noexcept {
+
+  }
+
+
+  void AGT_stdcall agent_exit_local(agt_self_t self, int exitCode) noexcept {
+
+  }
+  void AGT_stdcall agent_abort_local(agt_self_t self) noexcept {
+
+  }
+
+  void AGT_stdcall agent_resume_coroutine_local(agt_self_t self, agt_agent_t receiver, void* coroutine, agt_async_t* asyncHandle) noexcept {
+
+  }
 
 }

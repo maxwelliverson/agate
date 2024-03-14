@@ -229,7 +229,7 @@ AGT_core_api agt_fiber_transfer_t AGT_stdcall agt_fiber_fork(agt_fiber_proc_t pr
 /// If this context is jumped to, it simply calls @param proc again with the passed parameter
 /// The difference between agt_fiber_fork and agt_fiber_loop is essentially that,
 ///   when restored, the fctx saved by agt_fiber_fork returns from agt_fiber_fork, whereas
-///   the fctx saved by agt_fiber_loop again calls @param proc.
+///   the fctx saved by agt_fiber_loop again calls @param proc
 /// Returns the value returned by proc. Unlike agt_fiber_fork, this does not need to be an
 ///   agt_fiber_transfer_t, because control can only ever return from the current fiber.
 AGT_core_api agt_fiber_param_t    AGT_stdcall agt_fiber_loop(agt_fiber_proc_t proc, agt_fiber_param_t param, agt_fiber_flags_t flags) AGT_noexcept;

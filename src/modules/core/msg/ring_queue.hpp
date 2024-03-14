@@ -2,8 +2,8 @@
 // Created by maxwe on 2023-01-13.
 //
 
-#ifndef AGATE_CHANNELS_MODULE_RING_QUEUE_HPP
-#define AGATE_CHANNELS_MODULE_RING_QUEUE_HPP
+#ifndef AGATE_CORE_MSG_RING_QUEUE_HPP
+#define AGATE_CORE_MSG_RING_QUEUE_HPP
 
 
 #include "core/object.hpp"
@@ -135,4 +135,4 @@ namespace agt {
   }
 }
 
-#endif//AGATE_CHANNELS_MODULE_RING_QUEUE_HPP
+#endif//AGATE_CORE_MSG_RING_QUEUE_HPP

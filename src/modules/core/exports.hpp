@@ -75,6 +75,17 @@ namespace agt {
 
   async_data_t AGT_stdcall async_attach_local(async* async, agt_u32_t expectedCount, agt_u32_t attachedCount, async_key_t& key);
   async_data_t AGT_stdcall async_attach_shared(async* async, agt_u32_t expectedCount, agt_u32_t attachedCount, async_key_t& key);
+
+
+  agt_status_t AGT_stdcall reserve_name_local(agt_ctx_t ctx, const agt_name_desc_t* pNameDesc, agt_name_result_t* pResult);
+  agt_status_t AGT_stdcall reserve_name_shared(agt_ctx_t ctx, const agt_name_desc_t* pNameDesc, agt_name_result_t* pResult);
+
+  void         AGT_stdcall release_name_local(agt_ctx_t ctx, agt_name_t name);
+  void         AGT_stdcall release_name_shared(agt_ctx_t ctx, agt_name_t name);
+
+  agt_status_t AGT_stdcall bind_name_local(agt_ctx_t ctx, agt_name_t name, agt_object_t object);
+  agt_status_t AGT_stdcall bind_name_shared(agt_ctx_t ctx, agt_name_t name, agt_object_t object);
+
 }
 
 #endif//AGATE_CORE_EXPORTS_HPP

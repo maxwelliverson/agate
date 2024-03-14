@@ -480,8 +480,9 @@ namespace agtxx {
 #define AGT_INVALID_OBJECT_ID ((agt_object_id_t)-1)
 
 
-#define AGT_SYNCHRONIZE ((agt_async_t)AGT_NULL_HANDLE)
-#define AGT_ASYNC_FORGET ((agt_async_t)-1)
+#define AGT_FORGET ((agt_async_t)AGT_NULL_HANDLE)
+#define AGT_SYNCHRONIZE ((agt_async_t)-1)
+
 
 #define AGT_INVALID_INSTANCE ((agt_instance_t)AGT_NULL_HANDLE)
 
@@ -796,6 +797,7 @@ typedef enum agt_attr_id_t {
   AGT_ATTR_DEFAULT_FIBER_STACK_SIZE,       ///< type: UINT64
   AGT_ATTR_FULL_STATE_SAVE_MASK,           ///< type: UINT64
   AGT_ATTR_MAX_STATE_SAVE_SIZE,            ///< type: UINT32
+  AGT_ATTR_MAX_NAME_LENGTH,                ///< type: UINT64
 } agt_attr_id_t;
 
 typedef struct agt_attr_t {

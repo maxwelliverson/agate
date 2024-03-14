@@ -9,7 +9,6 @@
 
 #include "agate/atomic.hpp"
 #include "agate/flags.hpp"
-#include "channel.hpp"
 #include "modules/core/instance.hpp"
 
 #include <tuple>

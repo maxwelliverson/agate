@@ -2,8 +2,8 @@
 // Created by maxwe on 2022-05-27.
 //
 
-#ifndef AGATE_MESSAGE_QUEUE_HPP
-#define AGATE_MESSAGE_QUEUE_HPP
+#ifndef AGATE_CORE_MSG_MESSAGE_QUEUE_HPP
+#define AGATE_CORE_MSG_MESSAGE_QUEUE_HPP
 
 #include "config.hpp"
 
@@ -67,8 +67,6 @@ namespace agt {
 
 
 
-
-
   AGT_final_object_type(local_spsc_sender, extends(sender)) {
     message**                      tail;
     maybe_ref<local_spsc_receiver> receiver;
@@ -94,6 +92,8 @@ namespace agt {
   AGT_final_object_type(local_mpsc_sender, extends(sender)) {
     local_mpsc_receiver* receiver;
   };
+
+
 
   struct local_spmc_sender   : sender {
     agt_message_st*  head;
@@ -245,4 +245,4 @@ namespace agt {
   }
 }
 
-#endif//AGATE_MESSAGE_QUEUE_HPP
+#endif//AGATE_CORE_MSG_MESSAGE_QUEUE_HPP

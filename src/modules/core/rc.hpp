@@ -57,7 +57,7 @@ namespace agt {
       return obj.type == object_type::user_rc_allocation;
     }
     AGT_forceinline bool           _is_user_rc_alloc(void* ptr) noexcept {
-      return _is_user_rc_alloc(*((const rc_object*)(static_cast<char*>(ptr) - offsetof(user_rc_allocation, buffer))));
+      return _is_user_rc_alloc(*reinterpret_cast<const rc_object*>(static_cast<char*>(ptr) - sizeof(rc_object)));
     }
 
 
@@ -376,6 +376,9 @@ namespace agt {
     }
 
   }
+
+
+
 
 
 

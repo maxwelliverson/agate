@@ -335,8 +335,16 @@ add_agate_module(
                 exec/local_parallel_executor.cpp
                 exec/local_user_executor.cpp
                 fiber.cpp
+                impl/ctrie.cpp
                 instance.cpp
                 # object_allocator.cpp
+                msg/message_queue.cpp
+                msg/broadcast_queue.cpp
+                msg/sender.cpp
+                msg/receiver.cpp
+                msg/message.cpp
+                msg/message_pool.cpp
+                msg/ring_queue.cpp
                 random.cpp
                 segment.cpp
                 shared.cpp
@@ -369,13 +377,13 @@ add_agate_module(
             PRIVATE
             SOURCES
                 channels.cpp
-                message_queue.cpp
-                broadcast_queue.cpp
-                sender.cpp
-                receiver.cpp
-                message.cpp
-                message_pool.cpp
-                ring_queue.cpp
+                # message_queue.cpp
+                #broadcast_queue.cpp
+                #sender.cpp
+                #receiver.cpp
+                #message.cpp
+                #message_pool.cpp
+                #ring_queue.cpp
 )
 
 add_agate_module(

@@ -26,6 +26,7 @@ namespace agt {
     eReady         = 0x2000,
     eWaiting       = 0x4000,
     eMemoryIsOwned = 0x8000,
+    eIsComplete    = 0x10000
 };
 
 
@@ -35,6 +36,7 @@ namespace agt {
   inline constexpr async_flags eAsyncReady   = async_flags::eBound | async_flags::eReady;
   inline constexpr async_flags eAsyncWaiting = async_flags::eBound | async_flags::eWaiting;
   inline constexpr async_flags eAsyncMemoryIsOwned = async_flags::eMemoryIsOwned;
+  inline constexpr async_flags eAsyncIsComplete = async_flags::eIsComplete;
 
 
   struct async {
@@ -242,9 +244,9 @@ namespace agt {
 
   agt_status_t                         async_wait(agt_async_t& async, agt_timeout_t timeout) noexcept;
 
+
+
   using enter_wait_callback_t = void(*)(agt_ctx_t ctx, void* userData);
-
-
 
 
   agt_status_t                         async_wait(async&                async,
@@ -260,6 +262,8 @@ namespace agt {
   bool         async_is_complete(async& async) noexcept;
 
   void         init_async(agt_ctx_t ctx, agt_async_t& async, agt_async_flags_t flags) noexcept;
+
+  async*  init_inline_async_local(agt_ctx_t ctx, agt_inline_async_t& async, agt_async_flags_t flags) noexcept;
 
 }
 

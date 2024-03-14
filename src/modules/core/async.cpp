@@ -512,12 +512,13 @@ agt_status_t agt::async_status(async& async) noexcept {
   return status;
 }
 
+
 bool         agt::async_is_complete(async& async) noexcept {
-  if (async.flags & ASYNC_IS_COMPLETE)
+  if (test(async.flags, eAsyncIsComplete))
     return true;
-  bool isComplete = ;
+  bool isComplete = true; /// TODO: implement
   if (isComplete)
-    async.flags |= ASYNC_IS_COMPLETE;
+    async.flags |= eAsyncIsComplete;
   return isComplete;
 }
 

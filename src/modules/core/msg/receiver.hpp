@@ -2,8 +2,8 @@
 // Created by maxwe on 2022-12-02.
 //
 
-#ifndef AGATE_RECEIVER_HPP
-#define AGATE_RECEIVER_HPP
+#ifndef AGATE_CORE_MSG_RECEIVER_HPP
+#define AGATE_CORE_MSG_RECEIVER_HPP
 
 #include "config.hpp"
 #include "core/object.hpp"
@@ -80,4 +80,4 @@ namespace agt {
   }
 }
 
-#endif//AGATE_RECEIVER_HPP
+#endif//AGATE_CORE_MSG_RECEIVER_HPP

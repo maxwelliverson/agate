@@ -2,8 +2,8 @@
 // Created by maxwe on 2021-11-28.
 //
 
-#ifndef JEMSYS_AGATE2_MESSAGE_HPP
-#define JEMSYS_AGATE2_MESSAGE_HPP
+#ifndef AGATE_CORE_MSG_MESSAGE_HPP
+#define AGATE_CORE_MSG_MESSAGE_HPP
 
 // #include "agate/epoch_ptr.hpp"
 
@@ -96,13 +96,6 @@ namespace agt {
     AGT_MSG_STATE_PINNED,
     AGT_MSG_STATE_COMPLETE
   };
-
-
-  struct message_header_common {
-    agt_u64_t    padding;
-    msg_layout_t layout;
-  };
-
 
 
   struct AGT_cache_aligned inline_buffer {};
@@ -437,4 +430,4 @@ namespace agt {
 
 
 
-#endif//JEMSYS_AGATE2_MESSAGE_HPP
+#endif//AGATE_CORE_MSG_MESSAGE_HPP

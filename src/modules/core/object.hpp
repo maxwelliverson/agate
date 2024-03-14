@@ -127,6 +127,8 @@ namespace agt {
     unsafe_fiber_pool,
     safe_fiber_pool,
 
+    local_event_eagent,
+
 
     agent_begin    = local_agent,
     agent_end      = imported_agent,
@@ -187,6 +189,21 @@ namespace agt {
   [[nodiscard]] AGT_forceinline ObjectType* dyn_alloc(size_t size, agt_ctx_t ctx = get_ctx()) noexcept;
 
   AGT_forceinline void                      release(object* pObject) noexcept;
+
+  template <std::derived_from<object> ObjectType>
+  AGT_forceinline void                      destroy(ObjectType* pObject) noexcept {
+    if constexpr (!std::is_trivially_destructible_v<ObjectType>) {
+      if (pObject) {
+        const auto offset = pObject->poolChunkOffset;
+        pObject->~ObjectType();
+        pObject->poolChunkOffset = offset; // some fucky shit, yes, but the ensures the compiler doesn't clear this field in the destructor
+        release(static_cast<object*>(pObject));
+      }
+    }
+    else {
+      release(static_cast<object*>(pObject));
+    }
+  }
 
 
 

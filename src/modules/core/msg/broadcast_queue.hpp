@@ -67,11 +67,11 @@ namespace agt {
   using bqueue_listener_t    = void*;
 
 
-  struct  sp_local_bqueue_broadcaster : bqueue_broadcaster_header {
+  struct sp_local_bqueue_broadcaster : bqueue_broadcaster_header {
     agt_u32_t          consumerCount;
     broadcast_message* head;
   };
-  struct  mp_local_bqueue_broadcaster : bqueue_broadcaster_header {
+  struct mp_local_bqueue_broadcaster : bqueue_broadcaster_header {
     agt_u32_t          consumerCount;
     broadcast_message* head;
     agt_u32_t          producerCount;

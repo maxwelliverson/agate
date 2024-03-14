@@ -75,6 +75,10 @@ namespace agt::attr {
     return instance->attrValues[AGT_ATTR_MAX_STATE_SAVE_SIZE].uint32;
   }
 
+  static agt_u64_t max_name_length(agt_instance_t instance) noexcept {
+    return instance->attrValues[AGT_ATTR_MAX_NAME_LENGTH].uint64;
+  }
+
   // Returns AGT_ATTR_LIBRARY_PATH if stored value is of type STRING, otherwise returns nullopt
   static std::optional<const char*>    library_path(agt_instance_t instance) noexcept {
     if (instance->attrTypes[AGT_ATTR_LIBRARY_PATH] == AGT_TYPE_STRING)

@@ -6,9 +6,11 @@
 #define JEMSYS_AGATE2_CHANNEL_HPP
 
 #include "config.hpp"
-#include "message.hpp"
-#include "message_pool.hpp"
-#include "modules/core/object.hpp"
+#include "core/msg/message.hpp"
+#include "core/msg/message_pool.hpp"
+#include "core/object.hpp"
+
+#include "core/impl/ctrie.hpp"
 
 // #include <ipc/offset_ptr.hpp>
 

@@ -147,7 +147,6 @@ namespace agt {
     pooled_fctx*           pooledFctx;
   };
 
-
   AGT_final_object_type(fiber) {
     agt_u32_t         saveRegionSize;
     uint64_t          storeStateFlags;

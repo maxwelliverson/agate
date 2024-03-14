@@ -14,6 +14,7 @@
 
 
 #include <Windows.h>
+#include <intrin.h>
 
 #pragma comment(lib, "mincore")
 

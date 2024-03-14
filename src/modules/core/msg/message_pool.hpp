@@ -2,8 +2,8 @@
 // Created by maxwe on 2022-05-27.
 //
 
-#ifndef AGATE_MESSAGE_POOL_HPP
-#define AGATE_MESSAGE_POOL_HPP
+#ifndef AGATE_CORE_MSG_MESSAGE_POOL_HPP
+#define AGATE_CORE_MSG_MESSAGE_POOL_HPP
 
 #include "config.hpp"
 
@@ -119,25 +119,25 @@ namespace agt {
 
 
 
-  agt_status_t createInstance(private_sized_message_pool*& poolRef,    agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
-  agt_status_t createInstance(private_message_pool*& poolRef,          agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
-  agt_status_t createInstance(local_mpsc_sized_message_pool*& poolRef, agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
-  agt_status_t createInstance(local_mpsc_message_pool*& poolRef,       agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
-  agt_status_t createInstance(local_spsc_sized_message_pool*& poolRef, agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
-  agt_status_t createInstance(local_spsc_message_pool*& poolRef,       agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
-  agt_status_t createInstance(local_mpmc_sized_message_pool*& poolRef, agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
-  agt_status_t createInstance(local_mpmc_message_pool*& poolRef,       agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
-  agt_status_t createInstance(local_spmc_sized_message_pool*& poolRef, agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
-  agt_status_t createInstance(local_spmc_message_pool*& poolRef,       agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
+  agt_status_t createInstance(private_sized_message_pool& poolRef,    agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
+  agt_status_t createInstance(private_message_pool& poolRef,          agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
+  agt_status_t createInstance(local_mpsc_sized_message_pool& poolRef, agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
+  agt_status_t createInstance(local_mpsc_message_pool& poolRef,       agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
+  agt_status_t createInstance(local_spsc_sized_message_pool& poolRef, agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
+  agt_status_t createInstance(local_spsc_message_pool& poolRef,       agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
+  agt_status_t createInstance(local_mpmc_sized_message_pool& poolRef, agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
+  agt_status_t createInstance(local_mpmc_message_pool& poolRef,       agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
+  agt_status_t createInstance(local_spmc_sized_message_pool& poolRef, agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
+  agt_status_t createInstance(local_spmc_message_pool& poolRef,       agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
 
-  agt_status_t createInstance(shared_mpsc_sized_message_pool*& poolRef, agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
-  agt_status_t createInstance(shared_mpsc_message_pool*& poolRef,       agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
-  agt_status_t createInstance(shared_spsc_sized_message_pool*& poolRef, agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
-  agt_status_t createInstance(shared_spsc_message_pool*& poolRef,       agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
-  agt_status_t createInstance(shared_mpmc_sized_message_pool*& poolRef, agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
-  agt_status_t createInstance(shared_mpmc_message_pool*& poolRef,       agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
-  agt_status_t createInstance(shared_spmc_sized_message_pool*& poolRef, agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
-  agt_status_t createInstance(shared_spmc_message_pool*& poolRef,       agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
+  agt_status_t createInstance(shared_mpsc_sized_message_pool& poolRef, agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
+  agt_status_t createInstance(shared_mpsc_message_pool& poolRef,       agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
+  agt_status_t createInstance(shared_spsc_sized_message_pool& poolRef, agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
+  agt_status_t createInstance(shared_spsc_message_pool& poolRef,       agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
+  agt_status_t createInstance(shared_mpmc_sized_message_pool& poolRef, agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
+  agt_status_t createInstance(shared_mpmc_message_pool& poolRef,       agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
+  agt_status_t createInstance(shared_spmc_sized_message_pool& poolRef, agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
+  agt_status_t createInstance(shared_spmc_message_pool& poolRef,       agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept;
 
   message* acquire_message(agt_ctx_t ctx, private_sized_message_pool* pool) noexcept;
   void     release_message(agt_ctx_t ctx, private_sized_message_pool* pool, message* message) noexcept;
@@ -152,4 +152,4 @@ namespace agt {
   static_assert(sizeof(private_message_pool) == (AGT_CACHE_LINE / 2));
 }
 
-#endif//AGATE_MESSAGE_POOL_HPP
+#endif//AGATE_CORE_MSG_MESSAGE_POOL_HPP
