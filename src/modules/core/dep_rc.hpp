@@ -17,13 +17,7 @@ namespace agt {
 
   struct rcpool;
 
-  struct rc_object : object {
-    agt_u32_t flags;
-    agt_u32_t refCount;
-    agt_u32_t epoch;
-  };
 
-  static_assert(sizeof(rc_object) == 16);
   // static_assert(alignof(rc_object) == 8);
 
   namespace impl {
@@ -43,7 +37,7 @@ namespace agt {
       return *_aligned(&obj);
     }
 
-    AGT_final_object_type(user_rc_allocation, extends(rc_object)) {
+    AGT_object(user_rc_allocation, extends(rc_object)) {
       agt_u8_t buffer[];
     };
 

@@ -183,7 +183,7 @@ namespace agt {
       object_pool* smallPool;
       object_pool* largePool;
     };*/
-  /*AGT_object_type(object_pool) {
+  /*AGT_virtual_object(object_pool) {
     agt_u32_t                   flags;
     impl::pool_chunk_allocator* chunkAllocator;
     size_t                      slotSize;
@@ -365,21 +365,21 @@ namespace agt {
   }
 
 
-  AGT_virtual_object_type(object_pool) {
+  AGT_abstract_object(object_pool) {
     agt_flags32_t  flags;
     agt_instance_t instance;
   };
 
 
-  AGT_final_object_type(user_object_pool, extends(object_pool)) {
+  AGT_object(user_object_pool, extends(object_pool)) {
     impl::user_pool pool;
   };
 
-  AGT_final_object_type(locked_object_pool, extends(object_pool)) {
+  AGT_object(locked_object_pool, extends(object_pool)) {
     impl::locked_pool pool;
   };
 
-  AGT_final_object_type(private_object_pool, extends(object_pool)) {
+  AGT_object(private_object_pool, extends(object_pool)) {
     impl::private_pool pool;
   };
 

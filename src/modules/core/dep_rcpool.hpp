@@ -9,7 +9,7 @@
 #include "impl/pool.hpp"
 #include "instance.hpp"
 #include "object.hpp"
-#include "rc.hpp"
+// #include "rc.hpp"
 
 #include "agate/thread_id.hpp"
 
