@@ -5,6 +5,37 @@
 #ifndef JEMSYS_AGATE2_INTERNAL_FLAGS_HPP
 #define JEMSYS_AGATE2_INTERNAL_FLAGS_HPP
 
+
+#define AGT_DECL_BITFLAG_ENUM(EnumType, UnderlyingType) \
+  enum class EnumType : UnderlyingType;            \
+  template <> struct ::agt::impl::is_bitflag_enum_st<EnumType>{}; \
+  AGT_forceinline constexpr EnumType operator~(EnumType a) noexcept { \
+    return static_cast<EnumType>(~static_cast<UnderlyingType>(a)); \
+  }                                                  \
+  AGT_forceinline constexpr EnumType operator&(EnumType a, EnumType b) noexcept { \
+    return static_cast<EnumType>(static_cast<UnderlyingType>(a) & static_cast<UnderlyingType>(b)); \
+  }                                                  \
+  AGT_forceinline constexpr EnumType operator|(EnumType a, EnumType b) noexcept { \
+    return static_cast<EnumType>(static_cast<UnderlyingType>(a) | static_cast<UnderlyingType>(b)); \
+  }                                                  \
+  AGT_forceinline constexpr EnumType operator^(EnumType a, EnumType b) noexcept { \
+    return static_cast<EnumType>(static_cast<UnderlyingType>(a) ^ static_cast<UnderlyingType>(b)); \
+  }                                                  \
+  AGT_forceinline constexpr EnumType& operator&=(EnumType& a, EnumType b) noexcept { \
+    return (a = a & b); \
+  }                                                  \
+  AGT_forceinline constexpr EnumType& operator|=(EnumType& a, EnumType b) noexcept { \
+    return (a = a | b); \
+  }                                                  \
+  AGT_forceinline constexpr EnumType& operator^=(EnumType& a, EnumType b) noexcept { \
+    return (a = a ^ b); \
+  }
+
+#define AGT_DEFINE_BITFLAG_ENUM(EnumType, UnderlyingType) \
+  enum class EnumType : UnderlyingType
+
+
+
 #define AGT_BITFLAG_ENUM(EnumType, UnderlyingType) \
   enum class EnumType : UnderlyingType;            \
   template <> struct ::agt::impl::is_bitflag_enum_st<EnumType>{}; \
@@ -103,7 +134,7 @@ namespace agt {
   }
   template <impl::bitflag_enum E, std::convertible_to<E> F>
   AGT_forceinline constexpr static void set_flags(E& value, F&& setFlags) noexcept {
-    set(value, static_cast<E>(std::forward<F>(setFlags)));
+    set_flags(value, static_cast<E>(std::forward<F>(setFlags)));
   }
   template <impl::bitflag_enum E>
   AGT_forceinline constexpr static void reset(E& value, const E resetFlags) noexcept {
