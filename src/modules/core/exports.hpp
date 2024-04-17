@@ -55,23 +55,19 @@ namespace agt {
   agt_fiber_transfer_t AGT_stdcall fiber_switch_except(agt_fiber_t fiber, agt_fiber_param_t param, agt_fiber_flags_t flags) noexcept;
 
 
-  async*       AGT_stdcall alloc_async(agt_ctx_t ctx);
-  void         AGT_stdcall free_async(async* async);
-
-  void         AGT_stdcall init_async_private(async* pAsyncBuffer);
-  void         AGT_stdcall init_async_shared(async* pAsyncBuffer);
+  agt_async_t  AGT_stdcall make_new_async(agt_ctx_t ctx, agt_async_flags_t flags);
   void         AGT_stdcall copy_async_private(const async* from, async* to);
   void         AGT_stdcall copy_async_shared(const async* from, async* to);
   void         AGT_stdcall move_async(async* from, async* to);
-  void         AGT_stdcall clear_async(async* async);
-  void         AGT_stdcall destroy_async(async* async);
+  void         AGT_stdcall clear_async(agt_async_t async);
+  void         AGT_stdcall destroy_async(agt_async_t async);
 
-  agt_status_t AGT_stdcall async_get_status_private(async* async, agt_u64_t* pResult);
-  agt_status_t AGT_stdcall async_get_status_shared(async* async, agt_u64_t* pResult);
-  agt_status_t AGT_stdcall async_wait_native_unit_private(async* async, agt_u64_t* pResult, agt_timeout_t timeout);
-  agt_status_t AGT_stdcall async_wait_foreign_unit_private(async* async, agt_u64_t* pResult, agt_timeout_t timeout);
-  agt_status_t AGT_stdcall async_wait_native_unit_shared(async* async, agt_u64_t* pResult, agt_timeout_t timeout);
-  agt_status_t AGT_stdcall async_wait_foreign_unit_shared(async* async, agt_u64_t* pResult, agt_timeout_t timeout);
+  agt_status_t AGT_stdcall async_get_status_private(agt_async_t async, agt_u64_t* pResult);
+  agt_status_t AGT_stdcall async_get_status_shared(agt_async_t async, agt_u64_t* pResult);
+  agt_status_t AGT_stdcall async_wait_native_unit_private(agt_async_t async, agt_u64_t* pResult, agt_timeout_t timeout);
+  agt_status_t AGT_stdcall async_wait_foreign_unit_private(agt_async_t async, agt_u64_t* pResult, agt_timeout_t timeout);
+  agt_status_t AGT_stdcall async_wait_native_unit_shared(agt_async_t async, agt_u64_t* pResult, agt_timeout_t timeout);
+  agt_status_t AGT_stdcall async_wait_foreign_unit_shared(agt_async_t async, agt_u64_t* pResult, agt_timeout_t timeout);
 
   async_data_t AGT_stdcall async_attach_local(async* async, agt_u32_t expectedCount, agt_u32_t attachedCount, async_key_t& key);
   async_data_t AGT_stdcall async_attach_shared(async* async, agt_u32_t expectedCount, agt_u32_t attachedCount, async_key_t& key);
@@ -85,6 +81,24 @@ namespace agt {
 
   agt_status_t AGT_stdcall bind_name_local(agt_ctx_t ctx, agt_name_t name, agt_object_t object);
   agt_status_t AGT_stdcall bind_name_shared(agt_ctx_t ctx, agt_name_t name, agt_object_t object);
+
+
+  agt_status_t AGT_stdcall open_channel(agt_ctx_t ctx, agt_sender_t* pSender, agt_receiver_t* pReceiver, const agt_channel_desc_t* pChannelDesc) noexcept;
+  agt_status_t AGT_stdcall acquire_msg_local(agt_sender_t sender, size_t desiredMessageSize, void** ppMsgBuffer) noexcept;
+  agt_status_t AGT_stdcall send_msg_local(agt_sender_t sender, void* msgBuffer, size_t size, agt_async_t async) noexcept;
+  agt_status_t AGT_stdcall receive_msg_local(agt_receiver_t receiver, void** pMsgBuffer, size_t* pMsgSize, agt_timeout_t timeout) noexcept;
+  void         AGT_stdcall retire_msg_local(agt_receiver_t receiver, void* msgBuffer, agt_u64_t response) noexcept;
+
+
+  void         AGT_stdcall close_local(agt_object_t object) noexcept;
+  void         AGT_stdcall close_shared(agt_object_t object) noexcept;
+
+
+  agt_status_t AGT_stdcall new_user_uexec(agt_ctx_t ctx, agt_uexec_t* pExec, const agt_uexec_desc_t* pExecDesc) noexcept;
+
+  void         AGT_stdcall destroy_user_uexec(agt_ctx_t ctx, agt_uexec_t exec) noexcept;
+
+  agt_status_t AGT_stdcall bind_uexec_to_ctx(agt_ctx_t ctx, agt_uexec_t exec, void* execCtxData) noexcept;
 
 }
 

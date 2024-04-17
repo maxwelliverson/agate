@@ -7,12 +7,13 @@
 
 
 #include "config.hpp"
-#include "../object_pool.hpp"
+#include "sized_pool.hpp"
 
 
 
-
+#include <algorithm>
 #include <span>
+#include <ranges>
 
 #include <unordered_map>
 
@@ -263,12 +264,12 @@ namespace agt {
 
     struct ctx_allocator   {
       agt_flags32_t   flags;
-      impl::ctx_pool* pPools;
+      ctx_sized_pool* pPools;
       agt_u32_t       poolCount;
       agt_u32_t       maxAllocSize;
       agt_u32_t       maxChunkSize;
       agt_u32_t       poolLookupTableSize;
-      impl::ctx_pool* poolLookupTable[];
+      ctx_sized_pool* poolLookupTable[];
     };
 
 
@@ -316,7 +317,7 @@ namespace agt {
       std::span<const size_t[2]> partnerSizes{ params.partneredBlockSizes, params.partneredBlockSizeCount };
       std::span<const size_t>    soloSizes{ params.soloBlockSizes, params.soloBlockSizeCount };
 
-      const auto poolTable = (impl::ctx_pool*)std::calloc(params.blockSizeCount, sizeof(impl::ctx_pool));
+      const auto poolTable = static_cast<ctx_sized_pool*>(std::calloc(params.blockSizeCount, sizeof(ctx_sized_pool)));
 
       const size_t maxAllocSize     = std::ranges::max(blockSizes);
       const size_t indexTableLength = (maxAllocSize / impl::PoolBasicUnitSize) + 1;
@@ -325,6 +326,7 @@ namespace agt {
 
       _make_index_map(indexTable, blockSizes);
 
+      // The following loop converts an table of indices into the pool table into a table of pointers directly to each pool object.
       // Bit of a roundabout way of accomplishing this but whatever, it's sound, and this isn't along a performance critical codepath
       for (size_t& index : indexTable) {
         index *= sizeof(void*);
@@ -337,7 +339,7 @@ namespace agt {
 
         auto& pool = poolTable[i];
 
-        impl::_init_basic_pool(pool, blockSize, blocksPerChunk[i]);
+        impl::_init_sized_pool(pool, blockSize, blocksPerChunk[i]);
 
         auto partnerIndex = static_cast<size_t>(-1);
         bool isBig = false;
@@ -357,12 +359,12 @@ namespace agt {
         }
 
         if (partnerIndex != static_cast<size_t>(-1)) {
-          pool.partnerPoolOffset = static_cast<agt_i32_t>(partnerIndex) - static_cast<agt_i32_t>(i);
-          pool.flags = impl::IS_DUAL_FLAG | (isBig ? impl::IS_BIG_FLAG : impl::IS_SMALL_FLAG);
+          pool.pairedPoolOffset = static_cast<agt_i16_t>(partnerIndex) - static_cast<agt_i16_t>(i);
+          // pool.flags = impl::IS_DUAL_FLAG | (isBig ? impl::IS_BIG_FLAG : impl::IS_SMALL_FLAG);
         }
         else {
-          pool.partnerPoolOffset = 0;
-          pool.flags = 0;
+          pool.pairedPoolOffset = 0;
+          // pool.flags = 0;
         }
       }
 
@@ -381,11 +383,11 @@ namespace agt {
     }
 
     AGT_noinline inline static void      destroy_ctx_allocator(agt_instance_t instance, ctx_allocator& allocator) noexcept {
-      std::for_each_n(allocator.pPools, allocator.poolCount, impl::_destroy_pool);
+      std::for_each_n(allocator.pPools, allocator.poolCount, impl::destroy_pool);
       std::free(allocator.pPools);
     }
 
-    AGT_forceinline static impl::ctx_pool* get_ctx_pool_unchecked(ctx_allocator& alloc, size_t size) noexcept {
+    AGT_forceinline static ctx_sized_pool* get_ctx_pool_unchecked(ctx_allocator& alloc, size_t size) noexcept {
       return alloc.poolLookupTable[ size / CtxAllocatorGranularity ];
     }
 
@@ -523,7 +525,7 @@ namespace agt {
     AGT_forceinline static get_default_allocator_params_return_type get_default_allocator_params(agt_instance_t instance) noexcept;
 
     inline static void _init_default_ctx_allocator(ctx_allocator& allocator, const instance_default_allocator_params& params) noexcept {
-      const auto poolTable = (impl::ctx_pool*)std::calloc(params.paramCount, sizeof(impl::ctx_pool));
+      const auto poolTable = static_cast<ctx_sized_pool*>(std::calloc(params.paramCount, sizeof(ctx_sized_pool)));
 
       allocator.maxAllocSize        = params.maxAllocSize;
       allocator.maxChunkSize        = params.maxChunkSize;
@@ -535,9 +537,9 @@ namespace agt {
       for (size_t i = 0; i < params.paramCount; ++i) {
         auto& pool = poolTable[i];
         auto  poolParams = params.pParams[i];
-        impl::_init_basic_pool(pool, poolParams.blockSize, poolParams.blocksPerChunk);
-        pool.flags = poolParams.flags;
-        pool.partnerPoolOffset = poolParams.partnerOffset;
+        impl::_init_sized_pool(pool, poolParams.blockSize, poolParams.blocksPerChunk);
+        // pool.flags = poolParams.flags;
+        pool.pairedPoolOffset = poolParams.partnerOffset;
       }
 
       for (size_t i = 0; i < params.poolLookupTableSize; ++i)

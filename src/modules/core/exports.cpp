@@ -867,8 +867,21 @@ extern "C" AGT_export void agatelib_get_exports(agt::init::module_exports& modul
   AGT_add_public_export(fiber_loop, agt::impl::assembly::afiber_loop);
   AGT_add_public_export(fiber_switch, agt::impl::assembly::afiber_switch);
 
-  /*if (isShared) {
-    AGT_add_private_export(initialize_async, agt::init_async_shared);
+  if (isShared) {
+    AGT_add_public_export(reserve_name, reserve_name_shared);
+    AGT_add_public_export(release_name, release_name_shared);
+    AGT_add_public_export(bind_name,    bind_name_shared);
+  }
+  else {
+    AGT_add_public_export(reserve_name, reserve_name_local);
+    AGT_add_public_export(release_name, release_name_local);
+    AGT_add_public_export(bind_name,    bind_name_local);
+  }
+
+
+  AGT_add_public_export(new_async, agt::make_new_async);
+  if (isShared) {
+    AGT_add_public_export(async_status, agt::async_get_status_shared);
     AGT_add_public_export(copy_async, agt::copy_async_shared);
     if (usingNativeUnit)
       AGT_add_public_export(wait, agt::async_wait_native_unit_shared);
@@ -876,12 +889,34 @@ extern "C" AGT_export void agatelib_get_exports(agt::init::module_exports& modul
       AGT_add_public_export(wait, agt::async_wait_foreign_unit_shared);
   }
   else {
+    AGT_add_public_export(async_status, agt::async_get_status_private);
     if (usingNativeUnit)
       AGT_add_public_export(wait, agt::async_wait_native_unit_private);
     else
       AGT_add_public_export(wait, agt::async_wait_foreign_unit_private);
-  }*/
+  }
 
+
+  AGT_add_public_export(open_channel, agt::open_channel);
+
+  if (!isShared) {
+    AGT_add_public_export(acquire_msg, agt::acquire_msg_local);
+    AGT_add_public_export(send_msg, agt::send_msg_local);
+    AGT_add_public_export(receive_msg, agt::receive_msg_local);
+    AGT_add_public_export(retire_msg, agt::retire_msg_local);
+  }
+
+
+
+  if (isShared)
+    AGT_add_public_export(close, agt::close_local);
+  else
+    AGT_add_public_export(close, agt::close_shared);
+
+
+  AGT_add_public_export(new_uexec, agt::new_user_uexec);
+  AGT_add_public_export(destroy_uexec, agt::destroy_user_uexec);
+  AGT_add_public_export(bind_uexec, agt::bind_uexec_to_ctx);
 }
 
 

@@ -125,9 +125,9 @@ namespace agt {
 
 
 
-    agt_status_t (* AGT_stdcall _pfn_reserve_name)(agt_ctx_t ctx, const agt_name_desc_t* pNameDesc, agt_name_t* pResult);
+    agt_status_t (* AGT_stdcall _pfn_reserve_name)(agt_ctx_t ctx, const agt_name_desc_t* pNameDesc, agt_name_result_t* pResult);
     void         (* AGT_stdcall _pfn_release_name)(agt_ctx_t ctx, agt_name_t name);
-    agt_status_t (* AGT_stdcall _pfn_bind_name)(agt_ctx_t ctx, agt_name_t name, void* object);
+    agt_status_t (* AGT_stdcall _pfn_bind_name)(agt_ctx_t ctx, agt_name_t name, agt_object_t object);
 
 
     async*       (* AGT_stdcall _pfn_alloc_async)(agt_ctx_t ctx);
@@ -136,10 +136,17 @@ namespace agt {
 
     void         (* AGT_stdcall _pfn_raise)(agt_ctx_t ctx, agt_status_t errorCode, void* errorInfo);
 
+    void         (* AGT_stdcall _pfn_close)(agt_object_t object) AGT_noexcept;
+
+
+    agt_status_t (* AGT_stdcall _pfn_new_uexec)(agt_ctx_t ctx, agt_uexec_t* pExec, const agt_uexec_desc_t* pExecDesc) noexcept;
+    void         (* AGT_stdcall _pfn_destroy_uexec)(agt_ctx_t ctx, agt_uexec_t exec) noexcept;
+
+    agt_status_t (* AGT_stdcall _pfn_bind_uexec)(agt_ctx_t ctx, agt_uexec_t exec, agt_ctxexec_t ctxexec) noexcept;
 
     /* ========================= [ Async 0.01 ] ========================= */
 
-    void         (* AGT_stdcall _pfn_initialize_async)(async* pAsyncBuffer);
+    agt_async_t  (* AGT_stdcall _pfn_new_async)(agt_ctx_t ctx, agt_async_flags_t flags);
 
     void         (* AGT_stdcall _pfn_copy_async)(const async* from, async* to);
     void         (* AGT_stdcall _pfn_move_async)(async* from, async* to);
@@ -147,9 +154,9 @@ namespace agt {
     void         (* AGT_stdcall _pfn_clear_async)(agt_async_t async);
     void         (* AGT_stdcall _pfn_destroy_async)(agt_async_t async);
 
-    agt_status_t (* AGT_stdcall _pfn_async_get_status)(async* async, agt_u64_t* pResult);
+    agt_status_t (* AGT_stdcall _pfn_async_status)(agt_async_t async, agt_u64_t* pResult);
 
-    agt_status_t (* AGT_stdcall _pfn_wait)(async* async, agt_u64_t* pResult, agt_timeout_t timeout);
+    agt_status_t (* AGT_stdcall _pfn_wait)(agt_async_t async, agt_u64_t* pResult, agt_timeout_t timeout);
     agt_status_t (* AGT_stdcall _pfn_wait_all)(const agt_async_t*, agt_size_t, agt_timeout_t);
     agt_status_t (* AGT_stdcall _pfn_wait_any)(const agt_async_t*, agt_size_t, agt_size_t*, agt_timeout_t);
 
@@ -159,6 +166,13 @@ namespace agt {
     void         (* AGT_stdcall _pfn_raise_signal)(agt_signal_t* signal);
     void         (* AGT_stdcall _pfn_raise_many_signals)(agt_signal_t* const * pSignals, agt_size_t signalCount);
     void         (* AGT_stdcall _pfn_destroy_signal)(agt_signal_t* signal);
+
+
+    agt_status_t (* AGT_stdcall _pfn_open_channel)(agt_ctx_t ctx, agt_sender_t* pSender, agt_receiver_t* pReceiver, const agt_channel_desc_t* pChannelDesc) AGT_noexcept;
+    agt_status_t (* AGT_stdcall _pfn_acquire_msg)(agt_sender_t sender, size_t desiredMessageSize, void** ppMsgBuffer) AGT_noexcept;
+    agt_status_t (* AGT_stdcall _pfn_send_msg)(agt_sender_t sender, void* msgBuffer, size_t size, agt_async_t async) AGT_noexcept;
+    agt_status_t (* AGT_stdcall _pfn_receive_msg)(agt_receiver_t receiver, void** pMsgBuffer, size_t* pMsgSize, agt_timeout_t timeout) AGT_noexcept;
+    void         (* AGT_stdcall _pfn_retire_msg)(agt_receiver_t receiver, void* msgBuffer, agt_u64_t response) AGT_noexcept;
 
 
     /* ========================= [ Agents 0.01 ] ========================= */

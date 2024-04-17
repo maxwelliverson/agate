@@ -137,6 +137,8 @@
 #define AGT_network_api
 #define AGT_pool_api
 
+
+
 #if defined(_MSC_VER) || defined(__MINGW32__)
 # if defined(__MINGW32__)
 #  define AGT_restricted
@@ -144,6 +146,7 @@
 #  define AGT_restricted __declspec(restrict)
 # endif
 # pragma warning(disable:4127)   // suppress constant conditional warning
+
 # define AGT_noinline          __declspec(noinline)
 # define AGT_forceinline       __forceinline
 # define AGT_noalias           __declspec(noalias)
@@ -164,6 +167,12 @@
 # define AGT_assert(expr) assert(expr)
 # define AGT_unreachable AGT_assert(false); AGT_assume(false)
 #
+# if defined(__clang__)
+#  define AGT_callback_param(...) [[clang::callback(__VA_ARGS__)]]
+# else
+#  define AGT_callback_param(...)
+# endif
+#
 # if !defined(AGT_noreturn)
 #  define AGT_noreturn __declspec(noreturn)
 # endif
@@ -178,6 +187,7 @@
 # define AGT_cdecl                      // leads to warnings... __attribute__((cdecl))
 # define AGT_stdcall
 # define AGT_vectorcall
+# define AGT_callback_param(...) __attribute__((callback(__VA_ARGS__)))
 # define AGT_may_alias    __attribute__((may_alias))
 # define AGT_restricted
 # define AGT_malloc       __attribute__((malloc))
@@ -220,6 +230,7 @@
 # define AGT_malloc
 # define AGT_alloc_size(...)
 # define AGT_alloc_align(p)
+# define AGT_callback_param(...)
 # define AGT_noinline
 # define AGT_noalias
 # define AGT_forceinline
@@ -467,8 +478,8 @@ namespace agtxx {
 
 
 #if !defined(AGT_DISABLE_STATIC_STRUCT_SIZES)
-# define AGT_ASYNC_STRUCT_SIZE 40
-# define AGT_ASYNC_STRUCT_ALIGNMENT 8
+# define AGT_ASYNC_STRUCT_SIZE 48
+# define AGT_ASYNC_STRUCT_ALIGNMENT 16
 # define AGT_SIGNAL_STRUCT_SIZE 24
 # define AGT_SIGNAL_STRUCT_ALIGNMENT 8
 #endif
@@ -488,7 +499,7 @@ namespace agtxx {
 
 
 #define AGT_INVALID_CTX ((agt_ctx_t)AGT_NULL_HANDLE)
-#define AGT_DEFAULT_CTX ((agt_ctx_t)AGT_NULL_HANDLE)
+#define AGT_CURRENT_CTX ((agt_ctx_t)AGT_NULL_HANDLE)
 
 
 #define AGT_NO_EXECUTOR      ((agt_executor_t)AGT_NULL_HANDLE)
@@ -606,6 +617,7 @@ typedef enum agt_status_t {
   AGT_ERROR_UNKNOWN,
   AGT_ERROR_ALREADY_EXISTS,
   AGT_ERROR_CTX_NOT_ACQUIRED,
+  AGT_ERROR_ALREADY_BOUND,
   AGT_ERROR_UNKNOWN_FOREIGN_OBJECT,
   AGT_ERROR_INVALID_OBJECT_ID,
   AGT_ERROR_EXPIRED_OBJECT_ID,
@@ -634,7 +646,7 @@ typedef enum agt_status_t {
   AGT_ERROR_BAD_DISPATCH_KIND,
   AGT_ERROR_BAD_ALLOC,
   AGT_ERROR_MAILBOX_IS_FULL,
-  AGT_ERROR_MAILBOX_IS_EMPTY,
+  AGT_ERROR_NO_MESSAGES,
   AGT_ERROR_TOO_MANY_SENDERS,
   AGT_ERROR_NO_SENDERS,
   AGT_ERROR_PARTNER_DISCONNECTED,
@@ -974,7 +986,7 @@ AGT_core_api agt_ctx_t AGT_stdcall agt_acquire_ctx(const agt_allocator_params_t*
  * */
 AGT_core_api agt_status_t AGT_stdcall agt_dup(agt_object_t srcObject, agt_object_t* pDstObject, size_t dstObjectCount) AGT_noexcept;
 
-AGT_core_api void         AGT_stdcall agt_close(void* object) AGT_noexcept;
+AGT_core_api void         AGT_stdcall agt_close(agt_object_t object) AGT_noexcept;
 
 
 

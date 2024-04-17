@@ -4,6 +4,7 @@
 
 #include "config.hpp"
 #include "ctrie.hpp"
+#include "core/ctx.hpp"
 
 #include "agate/atomic.hpp"
 
@@ -81,7 +82,7 @@ namespace agt::impl {
   class ctrie {
 
     uint64_t hash_string(agt_ctx_t ctx, agt_u32_t length, const char* val) noexcept {
-
+      return 0;
     }
 
     struct inode;
@@ -117,7 +118,7 @@ namespace agt::impl {
     }
 
     static bool try_insert(inode& in, agt_ctx_t ctx, agt_u64_t hash, size_t depth, insert_state& state) noexcept {
-
+      return true;
     }
 
     static agt_status_t do_insert(inode& root, agt_ctx_t ctx, agt_u64_t hash, size_t length, const char* val, snode*& result) noexcept {
@@ -129,15 +130,17 @@ namespace agt::impl {
         },
         .pResult = &result
       };
-      if (!try_insert(root, ctx, hash, 0, state))
+      if (!try_insert(root, ctx, hash, 0, state)) {
 
+      }
+      return AGT_ERROR_NOT_YET_IMPLEMENTED;
     }
 
 
 
   public:
 
-    agt_status_t reserve(agt_ctx_t ctx, const agt_name_desc_t& nameDesc, agt_name_result_t& result) noexcept {
+    agt_status_t reserve(agt_ctx_t ctx, const agt_name_desc_t& nameDesc, agt_name_result_t& nameResult) noexcept {
       const auto nameData = nameDesc.name.data;
       if (!nameData)
         return AGT_ERROR_INVALID_ARGUMENT;
@@ -168,11 +171,27 @@ namespace agt::impl {
 
 namespace agt {
 
-  impl::ctrie& get_ctrie(agt_ctx_t ctx) noexcept;
+  impl::ctrie& get_ctrie(agt_ctx_t ctx) noexcept {
+    assert(false && "Not implemented");
+    std::unreachable();
+  }
 
   agt_status_t AGT_stdcall reserve_name_local(agt_ctx_t ctx, const agt_name_desc_t* pNameDesc, agt_name_result_t* pResult) {
     if (!pNameDesc || !pResult || !pNameDesc->name.data)
       return AGT_ERROR_INVALID_ARGUMENT;
     return get_ctrie(ctx).reserve(ctx, *pNameDesc, *pResult);
+  }
+  agt_status_t AGT_stdcall reserve_name_shared(agt_ctx_t ctx, const agt_name_desc_t* pNameDesc, agt_name_result_t* pResult) {
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
+  }
+
+  void         AGT_stdcall release_name_local(agt_ctx_t ctx, agt_name_t name) {}
+  void         AGT_stdcall release_name_shared(agt_ctx_t ctx, agt_name_t name) {}
+
+  agt_status_t AGT_stdcall bind_name_local(agt_ctx_t ctx, agt_name_t name, agt_object_t object) {
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
+  }
+  agt_status_t AGT_stdcall bind_name_shared(agt_ctx_t ctx, agt_name_t name, agt_object_t object) {
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
   }
 }

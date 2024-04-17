@@ -16,21 +16,21 @@
 // #include "agate/module.hpp"
 #include "agate/sys_string.hpp"
 
-#include "agate/priority_queue.hpp"
+// #include "agate/priority_queue.hpp"
 
 #include "core/async.hpp"
 #include "core/attr.hpp"
 #include "core/signal.hpp"
-#include "channels/message.hpp"
+#include "core/msg/message.hpp"
 #include "core/instance.hpp"
 #include "core/object.hpp"
 #include "core/ctx.hpp"
 #include "core/fiber.hpp"
 
-#include "agents/agents.hpp"
+#include "core/agents.hpp"
 
-#include "channels/message_pool.hpp"
-#include "channels/message_queue.hpp"
+#include "core/msg/message_pool.hpp"
+#include "core/msg/message_queue.hpp"
 
 
 
@@ -321,7 +321,28 @@ AGT_core_api void            AGT_stdcall agt_get_timespec(agt_ctx_t ctx, agt_tim
 }
 
 
+AGT_core_api void         AGT_stdcall agt_close(agt_object_t object) AGT_noexcept {
+  g_lib._pfn_close(object);
+}
 
+
+/** ==========================[ UExec  API ]=========================== **/
+
+AGT_exec_api agt_status_t AGT_stdcall agt_new_uexec(agt_ctx_t ctx, agt_uexec_t* pExec, const agt_uexec_desc_t* pExecDesc) AGT_noexcept {
+  return g_lib._pfn_new_uexec(ctx, pExec, pExecDesc);
+}
+
+AGT_exec_api void         AGT_stdcall agt_destroy_uexec(agt_ctx_t ctx, agt_uexec_t exec) AGT_noexcept {
+  return g_lib._pfn_destroy_uexec(ctx, exec);
+}
+
+AGT_exec_api agt_status_t AGT_stdcall agt_bind_uexec_to_ctx(agt_ctx_t ctx, agt_uexec_t exec, agt_ctxexec_t ctxexec) AGT_noexcept {
+  return g_lib._pfn_bind_uexec(ctx, exec, ctxexec);
+}
+
+AGT_exec_api agt_uexec_t  AGT_stdcall agt_get_current_uexec(agt_ctx_t ctx) AGT_noexcept {
+  return ctx->uexec;
+}
 
 /** ==========================[ Agents API ]=========================== **/
 
@@ -411,6 +432,18 @@ AGT_core_api agt_status_t AGT_stdcall agt_raw_reply_as(agt_self_t self, agt_agen
 
 #define AGT_ASYNC_MEMORY_IS_OWNED 0x8000
 
+
+AGT_async_api agt_async_t  AGT_stdcall agt_new_async(agt_ctx_t ctx, agt_async_flags_t flags) AGT_noexcept {
+  return g_lib._pfn_new_async(ctx, flags);
+}
+
+AGT_async_api void         AGT_stdcall agt_destroy_async(agt_async_t async) AGT_noexcept {
+  g_lib._pfn_destroy_async(async);
+}
+
+AGT_async_api agt_status_t AGT_stdcall agt_async_status(agt_async_t async, agt_u64_t* pResult) AGT_noexcept {
+  return g_lib._pfn_async_status(async, pResult);
+}
 
 /*
 AGT_core_api agt_async_t  AGT_stdcall agt_new_async(agt_ctx_t ctx, agt_async_flags_t flags) AGT_noexcept {
@@ -573,6 +606,8 @@ AGT_core_api agt_status_t AGT_stdcall agt_wait_any(const agt_async_t* pAsyncs, a
 */
 
 
+
+
 /** ========================= [ Signal ] ========================= **/
 
 
@@ -591,6 +626,43 @@ AGT_core_api void         AGT_stdcall agt_raise_signal(agt_signal_t signal) AGT_
 }
 
 
+/** ========== [ Naming ] ========== **/
+
+AGT_core_api agt_status_t AGT_stdcall agt_reserve_name(agt_ctx_t ctx, const agt_name_desc_t* pNameDesc, agt_name_result_t* pResult) AGT_noexcept {
+  return g_lib._pfn_reserve_name(ctx, pNameDesc, pResult);
+}
+
+AGT_core_api void         AGT_stdcall agt_release_name(agt_ctx_t ctx, agt_name_t name) AGT_noexcept {
+  g_lib._pfn_release_name(ctx, name);
+}
+
+AGT_core_api agt_status_t AGT_stdcall agt_bind_name(agt_ctx_t ctx, agt_name_t name, agt_object_t object) AGT_noexcept {
+  return g_lib._pfn_bind_name(ctx, name, object);
+}
+
+
+
+/** ========== [ Channels ] ========== **/
+
+AGT_core_api agt_status_t AGT_stdcall agt_open_channel(agt_ctx_t ctx, agt_sender_t* pSender, agt_receiver_t* pReceiver, const agt_channel_desc_t* pChannelDesc) AGT_noexcept {
+  return g_lib._pfn_open_channel(ctx, pSender, pReceiver, pChannelDesc);
+}
+
+AGT_core_api agt_status_t AGT_stdcall agt_acquire_msg(agt_sender_t sender, size_t desiredMessageSize, void** ppMsgBuffer, agt_timeout_t timeout) AGT_noexcept {
+  return g_lib._pfn_acquire_msg(sender, desiredMessageSize, ppMsgBuffer, timeout);
+}
+
+AGT_core_api agt_status_t AGT_stdcall agt_send_msg(agt_sender_t sender, void* msgBuffer, size_t size, agt_async_t async) AGT_noexcept {
+  return g_lib._pfn_send_msg(sender, msgBuffer, size, async);
+}
+
+AGT_core_api agt_status_t AGT_stdcall agt_receive_msg(agt_receiver_t receiver, void** pMsgBuffer, size_t* pMsgSize, agt_timeout_t timeout) AGT_noexcept {
+  return g_lib._pfn_receive_msg(receiver, pMsgBuffer, pMsgSize, timeout);
+}
+
+AGT_core_api void         AGT_stdcall agt_retire_msg(agt_receiver_t receiver, void* msgBuffer, agt_u64_t response) AGT_noexcept {
+  g_lib._pfn_retire_msg(receiver, msgBuffer, response);
+}
 
 
 
@@ -708,7 +780,7 @@ AGT_exec_api agt_fiber_t  AGT_stdcall agt_get_current_fiber(agt_ctx_t ctx) AGT_n
   (void)ctx;
   return static_cast<agt_fiber_t>(reinterpret_cast<PNT_TIB>(NtCurrentTeb())->ArbitraryUserPointer);
   // return static_cast<agt_fiber_t>(GetCurrentFiber());
-  /*if (ctx == AGT_DEFAULT_CTX)
+  /*if (ctx == AGT_CURRENT_CTX)
     ctx = g_lib._pfn_acquire_ctx(g_lib.instance);
 
   AGT_assert( ctx != AGT_INVALID_CTX );
