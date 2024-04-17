@@ -330,7 +330,7 @@ template <>
 agt_status_t object_info<private_channel>::popQueue(handle_header* object, agt_message_info_t* pMessageInfo, agt_timeout_t timeout) noexcept {
   auto channel = static_cast<private_channel*>(object);
   if ( channel->queuedMessageCount == 0 )
-    return AGT_ERROR_MAILBOX_IS_EMPTY;
+    return AGT_ERROR_NO_MESSAGES;
   auto next = channel->prevReceivedMessage->next;
   privateReleaseHold(channel, channel->prevReceivedMessage);
   channel->prevReceivedMessage = next;
@@ -454,7 +454,7 @@ void      object_info<local_spsc_channel>::pushQueue(handle_header* object, agt_
 template <>
 agt_status_t object_info<local_spsc_channel>::popQueue(handle_header* object, agt_message_info_t* pMessageInfo, agt_timeout_t timeout) noexcept {
   auto channel = static_cast<local_spsc_channel*>(object);
-  AGT_acquire_semaphore(channel->queuedMessages, timeout, AGT_ERROR_MAILBOX_IS_EMPTY);
+  AGT_acquire_semaphore(channel->queuedMessages, timeout, AGT_ERROR_NO_MESSAGES);
   auto previousMsg = channel->consumerPreviousMsg;
   auto message = previousMsg->next;
   channel->consumerPreviousMsg = message;
@@ -572,7 +572,7 @@ void      object_info<local_spmc_channel>::pushQueue(handle_header* object, agt_
 template <>
 agt_status_t object_info<local_spmc_channel>::popQueue(handle_header* object, agt_message_info_t* pMessageInfo, agt_timeout_t timeout) noexcept {
   auto channel = static_cast<local_spmc_channel*>(object);
-  AGT_acquire_semaphore(channel->queuedMessages, timeout, AGT_ERROR_MAILBOX_IS_EMPTY);
+  AGT_acquire_semaphore(channel->queuedMessages, timeout, AGT_ERROR_NO_MESSAGES);
 
   auto prevReceivedMsg = channel->previousReceivedMessage.load(std::memory_order_acquire);
   agt_message_t message;
@@ -699,7 +699,7 @@ void      object_info<local_mpmc_channel>::pushQueue(handle_header* object, agt_
 template <>
 agt_status_t object_info<local_mpmc_channel>::popQueue(handle_header* object, agt_message_info_t* pMessageInfo, agt_timeout_t timeout) noexcept {
   auto channel = static_cast<handle_type*>(object);
-  AGT_acquire_semaphore(channel->queuedMessages, timeout, AGT_ERROR_MAILBOX_IS_EMPTY);
+  AGT_acquire_semaphore(channel->queuedMessages, timeout, AGT_ERROR_NO_MESSAGES);
 
   auto prevReceivedMsg = channel->previousReceivedMessage.load(std::memory_order_acquire);
   agt_message_t message;
@@ -836,11 +836,11 @@ agt_status_t object_info<local_mpsc_channel>::popQueue(handle_header* object, ag
       break;
     case AGT_DO_NOT_WAIT:
       if ( !channel->queuedMessageCount.try_decrease(1) )
-        return AGT_ERROR_MAILBOX_IS_EMPTY;
+        return AGT_ERROR_NO_MESSAGES;
       break;
     default:
       if ( !channel->queuedMessageCount.try_decrease_for(1, timeout) )
-        return AGT_ERROR_MAILBOX_IS_EMPTY;
+        return AGT_ERROR_NO_MESSAGES;
   }
   auto previousMsg = channel->previousReceivedMessage;
   auto message = previousMsg->next;

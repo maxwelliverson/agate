@@ -7,6 +7,12 @@
 
 #include <agate/core.h>
 
+
+
+#define AGT_NO_LIMIT 0
+
+#define AGT_DEFAULT_MSG_POOL ((agt_msg_pool_t)AGT_NULL_HANDLE)
+
 AGT_begin_c_namespace
 
 
@@ -20,11 +26,15 @@ AGT_begin_c_namespace
 typedef struct agt_msg_pool_st*   agt_msg_pool_t;
 typedef struct agt_sender_st*     agt_sender_t;
 typedef struct agt_receiver_st*   agt_receiver_t;
+typedef struct agt_channel_st*    agt_channel_t;
 
-typedef struct agt_channel_t {
+/*typedef struct agt_channel_t {
   agt_sender_t   sender;
   agt_receiver_t receiver;
-} agt_channel_t;
+} agt_channel_t;*/
+
+
+typedef agt_flags32_t agt_channel_flags_t;
 
 
 
@@ -46,18 +56,36 @@ typedef struct agt_ring_queue_desc_t {
 } agt_ring_queue_desc_t;
 
 
+typedef struct agt_channel_desc_t {
+  agt_async_t         async;             ///<
+  agt_name_t          name;              ///<
+  agt_scope_t         scope;             ///<
+  agt_channel_flags_t flags;             ///< For now, must be 0.
+  agt_msg_pool_t      messagePool;       ///< The message pool from which this channel allocates messages. May be AGT_DEFAULT_MSG_POOL, in which case a default message pool is used.
+  agt_u32_t           maxSenders;
+  agt_u32_t           maxReceivers;
+} agt_channel_desc_t;
 
-AGT_core_api agt_status_t agt_create_broadcast_queue(agt_ctx_t ctx, agt_sender_t* pSender, const agt_broadcast_queue_desc_t* pBQueue) AGT_noexcept;
+
+AGT_core_api agt_status_t AGT_stdcall agt_open_channel(agt_ctx_t ctx, agt_sender_t* pSender, agt_receiver_t* pReceiver, const agt_channel_desc_t* pChannelDesc) AGT_noexcept;
+
+
+AGT_core_api agt_status_t AGT_stdcall agt_create_broadcast_queue(agt_ctx_t ctx, agt_sender_t* pSender, const agt_broadcast_queue_desc_t* pBQueue) AGT_noexcept;
 
 // Only a receiver is returned, given that only
-AGT_core_api agt_status_t agt_create_ring_queue(agt_ctx_t ctx, agt_receiver_t* pReceiver, const agt_ring_queue_desc_t* pRingQueue) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_create_ring_queue(agt_ctx_t ctx, agt_receiver_t* pReceiver, const agt_ring_queue_desc_t* pRingQueue) AGT_noexcept;
 
 
-AGT_core_api agt_status_t agt_open_senders(agt_receiver_t toReceiver, agt_sender_t* pSender, size_t senderCount) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_open_senders(agt_ctx_t ctx, agt_receiver_t toReceiver, agt_sender_t* pSender, size_t senderCount) AGT_noexcept;
 
-AGT_core_api agt_status_t agt_open_receivers(agt_sender_t toSender, agt_receiver_t* pReceiver, size_t receiverCount) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_open_receivers(agt_ctx_t ctx, agt_sender_t toSender, agt_receiver_t* pReceiver, size_t receiverCount) AGT_noexcept;
 
 
+
+/**
+ *
+ * Come up with a decent API for testing connectivity so that it doesn't have to be done for every send operation.
+ */
 
 
 /**
@@ -82,16 +110,19 @@ AGT_core_api agt_status_t agt_open_receivers(agt_sender_t toSender, agt_receiver
  * */
 
 
-AGT_core_api agt_status_t agt_acquire_msg(agt_sender_t sender, size_t desiredMessageSize, void** ppMsgBuffer, agt_timeout_t timeout) AGT_noexcept;
+
+
+
+AGT_core_api agt_status_t AGT_stdcall agt_acquire_msg(agt_sender_t sender, size_t desiredMessageSize, void** ppMsgBuffer) AGT_noexcept;
 
 /**
  *
  * */
-AGT_core_api agt_status_t agt_send_msg(agt_sender_t sender, void* msgBuffer, size_t size, agt_async_t async) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_send_msg(agt_sender_t sender, void* msgBuffer, size_t size, agt_async_t async) AGT_noexcept;
 
-AGT_core_api agt_status_t agt_receive_msg(agt_receiver_t receiver, void** pMsgBuffer, size_t* pMsgSize, agt_timeout_t timeout) AGT_noexcept;
+AGT_core_api agt_status_t AGT_stdcall agt_receive_msg(agt_receiver_t receiver, void** pMsgBuffer, size_t* pMsgSize, agt_timeout_t timeout) AGT_noexcept;
 
-
+AGT_core_api void         AGT_stdcall agt_retire_msg(agt_receiver_t receiver, void* msgBuffer, agt_u64_t response) AGT_noexcept;
 
 
 
