@@ -8,10 +8,12 @@
 
 extern "C" {
 
-typedef struct agt_async_data_st*   agt_async_data_t;
-typedef struct agt_message_data_st* agt_message_data_t;
+typedef struct agt_async_data_st*     agt_async_data_t;
+typedef struct agt_message_data_st*   agt_message_data_t;
 
-typedef struct agt_message_st*      agt_message_t;
+typedef struct agt_message_st*        agt_message_t;
+
+typedef struct agt_agent_instance_st* agt_agent_instance_t;
 
 }
 
@@ -38,6 +40,8 @@ namespace agt {
    *
    * */
 
+
+  enum class hwtime : uint64_t;
 
   enum class object_type : agt_u16_t;
 
@@ -88,11 +92,8 @@ namespace agt {
   struct local_mpsc_channel;
   struct local_mpmc_channel;
 
-  struct sender;
-  struct receiver;
-
-  using sender_t   = sender*;
-  using receiver_t = receiver*;
+  using sender_t   = void*;
+  using receiver_t = void*;
 
 
 
@@ -128,6 +129,14 @@ namespace agt {
 
   struct async_data;
   struct imported_async_data;
+  struct shared_async_data;
+
+
+  AGT_DECL_BITFLAG_ENUM(executor_flags, agt_u32_t);
+
+  AGT_DECL_BITFLAG_ENUM(agent_flags, uint32_t);
+
+  AGT_DECL_BITFLAG_ENUM(self_flags, uint32_t);
 
 
   AGT_BITFLAG_ENUM(thread_safety, agt_u32_t) {
@@ -150,8 +159,11 @@ namespace agt {
   }
 
 
+  // If returns true, data should be dropped.
+  using resolve_async_callback_t = agt_status_t(*)(void* obj, agt_u64_t* pResult, void* callbackData);
 
 
+  using shared_async_callback_t = void(*)(agt_ctx_t ctx, shared_async_data* asyncData, agt_status_t result, agt_u64_t value);
 
 
   namespace impl {

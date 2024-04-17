@@ -25,7 +25,7 @@ namespace agt {
 
   struct local_sp_ring_queue_sender;
 
-  AGT_final_object_type(local_sp_ring_queue_receiver) {
+  AGT_object(local_sp_ring_queue_receiver) {
     agt_u32_t                   bufferLength;
     std::byte*                  messageBuffer;
     local_sp_ring_queue_sender* sender;
@@ -35,7 +35,7 @@ namespace agt {
     agt_u32_t*                  pEnqueuedMessageCount;
   };
 
-  AGT_final_object_type(local_sp_ring_queue_sender) {
+  AGT_object(local_sp_ring_queue_sender) {
     agt_u32_t                     bufferLength;
     std::byte*                    messageBuffer;
     local_sp_ring_queue_receiver* receiver;
@@ -47,7 +47,7 @@ namespace agt {
     agt_ctx_t                     ctx;
   };
 
-  AGT_final_object_type(local_mp_ring_queue_receiver) {
+  AGT_object(local_mp_ring_queue_receiver) {
     agt_u32_t  bufferLength;
     std::byte* messageBuffer;
     agt_u32_t  cachedQueuedSize;
@@ -58,7 +58,7 @@ namespace agt {
     agt_u32_t  attachedSenders;
   };
 
-  AGT_final_object_type(local_mp_ring_queue_sender) {
+  AGT_object(local_mp_ring_queue_sender) {
     std::byte* messageBuffer;
     agt_u32_t* pAvailableSize;
     agt_u32_t* pTailOffset;
@@ -81,7 +81,7 @@ namespace agt {
     return reinterpret_cast<std::byte*>(msg) + sizeof(ring_buffer_msg);
   }
 
-  agt_status_t _acquire_msg(local_sp_ring_queue_sender* sender, size_t size, void** pMsg, agt_timeout_t timeout) noexcept {
+  inline static agt_status_t _acquire_msg(local_sp_ring_queue_sender* sender, size_t size, void** pMsg, agt_timeout_t timeout) noexcept {
     AGT_invariant( pMsg != nullptr );
 
     std::atomic_thread_fence(std::memory_order_acquire);
@@ -128,10 +128,10 @@ namespace agt {
     return AGT_SUCCESS;
   }
 
-  void         _send_msg(local_sp_ring_queue_sender* sender, void* msgBuffer, agt_async_t* async) noexcept {
+  inline static void         _send_msg(local_sp_ring_queue_sender* sender, void* msgBuffer, agt_async_t* async) noexcept {
     AGT_invariant(msgBuffer != nullptr);
 
-    AGT_api(async_attach, sender->ctx)();
+    // AGT_ctx_api(async_attach, sender->ctx)();
   }
 }
 

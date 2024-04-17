@@ -4,8 +4,8 @@
 
 #include "message.hpp"
 
-#include "modules/agents/agents.hpp"
-#include "modules/core/async.hpp"
+#include "core/agents.hpp"
+#include "core/async.hpp"
 
 #include "agate/atomic.hpp"
 #include "agate/flags.hpp"
@@ -14,8 +14,73 @@
 #include <tuple>
 #include <utility>
 
-using namespace agt;
 
+
+
+void* agt::try_message_get_async_local(agt_message_t message, bool& refCountIsZero) noexcept {
+  if (test(message->flags, message_flags::asyncIsBound)) {
+    return try_acquire_local_async(message->asyncData, message->asyncKey, refCountIsZero);
+  }
+
+  // In the case that there's no bound async, we use the extraData field as a reference count instead.
+  refCountIsZero = atomicDecrement(message->extraData) == 0;
+
+  return nullptr;
+}
+
+void* agt::try_message_get_async_local(agt_message_t message) noexcept {
+  if (test(message->flags, message_flags::asyncIsBound))
+    return try_acquire_local_async(message->asyncData, message->asyncKey);
+  return nullptr;
+}
+
+void  agt::message_release_async_local(agt_message_t message, bool shouldWakeWaiters) noexcept {
+  AGT_invariant( test(message->flags, message_flags::asyncIsBound) );
+  if (shouldWakeWaiters)
+    wake_local_async(message->asyncData);
+  release_local_async(message->asyncData, false);
+  reset(message->flags, message_flags::asyncIsBound);
+}
+
+void  agt::free_message(agt_message_t message) noexcept {
+
+  AGT_invariant( !test(message->flags, message_flags::asyncIsBound) );
+
+  // TODO: Implement message freeing
+}
+
+
+void agt::complete_agent_message(agt_message_t message, agt_status_t status, agt_u64_t value) noexcept {
+  AGT_invariant( message->layout == AGT_MSG_LAYOUT_AGENT_CMD );
+  AGT_invariant( !test(message->flags, message_flags::isComplete) );
+  // TODO: Implement indirect message stuff, but for now, just assert that it's direct.
+
+  if (auto asyncData = try_message_get_async_local(message)) {
+    const auto agentData = static_cast<local_agent_message_async_data*>(asyncData);
+    agentData->responseValue = value;
+    agentData->status = status;
+    atomicStore(agentData->isComplete, AGT_TRUE);
+    message_release_async_local(message, true);
+  }
+
+  set_flags(message->flags, message_flags::isComplete);
+  reset(message->flags, message_flags::isPinned);
+}
+
+void agt::finalize_agent_message(agt_message_t message, agt_u64_t value) noexcept {
+
+  AGT_invariant( message->layout == AGT_MSG_LAYOUT_AGENT_CMD );
+
+  if ( !test(message->flags, message_flags::isPinned)) [[likely]] {
+    if ( !test(message->flags, message_flags::isComplete) )
+      complete_agent_message(message, AGT_SUCCESS, value);
+    // TODO: free message here
+    free_message(message);
+  }
+}
+
+
+/*
 namespace {
   bool messageIsShared(agt_message_t message) noexcept {
     return test(message->flags & agt::message_flags::isShared);
@@ -24,14 +89,6 @@ namespace {
 
 extern "C" {
 
-
-
-/*struct AGT_cache_aligned AgtQueuedMessage_st {
-  union {
-    size_t       index;
-    agt_queued_message_t address;
-  } next;
-};*/
 
 struct AGT_cache_aligned agt_shared_message_st {
   size_t             nextIndex;
@@ -169,4 +226,5 @@ void agt::writeIndirectUserMessage(agt_message_t message, agt_message_t indirect
     message->indirectMsg = indirectMsg;
   }
 }
+*/
 

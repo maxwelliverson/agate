@@ -10,16 +10,158 @@
 #include "config.hpp"
 #include "agate/flags.hpp"
 #include "agate/time.hpp"
-#include "core/async.hpp"
+// #include "core/async.hpp"
 #include "core/ctx.hpp"
 
 
 #include <utility>
 
+
 namespace agt {
+  /**
+  * AGT_MSG_LAYOUT_BASIC {
+  *   agt_message_t   next;
+  *   msg_state_t     state;
+  *   msg_layout_t    layout;
+  *   message_flags   flags;
+  *   agt_ecmd_t      cmd;
+  *   async_data_t    asyncData;
+  *   async_key_t     asyncKey;
+  *   agt_u32_t       extraData;
+  *   agt_timestamp_t sendTime;
+  * }
+  * Size: 40
+  *
+  * AGT_MSG_LAYOUT_SIGNAL {
+  *   agt_message_t next;
+  *   msg_state_t   state;
+  *   msg_layout_t  layout;
+  *   message_flags flags;
+  *   agt_ecmd_t    cmd;
+  * }
+  * Size: 16
+  *
+  * AGT_MSG_LAYOUT_EXTENDED {
+  *   agt_message_t   next;
+  *   msg_state_t     state;
+  *   msg_layout_t    layout;
+  *   message_flags   flags;
+  *   agt_ecmd_t      cmd;
+  *   async_data_t    asyncData;
+  *   async_key_t     asyncKey;
+  *   agt_u32_t       extraData;
+  *   agt_timestamp_t sendTime;
+  *   agt_self_t      agent;
+  *   agt_executor_t  targetExecutor;
+  * }
+  * Size: 56
+  *
+  * AGT_MSG_LAYOUT_CHANNEL {
+  *   agt_message_t   next;
+  *   msg_state_t     state;
+  *   msg_layout_t    layout;
+  *   message_flags   flags;
+  *   agt_ecmd_t      cmd;
+  *   async_data_t    asyncData;
+  *   async_key_t     asyncKey;
+  *   agt_u32_t       extraData; // channel message payload size.
+  * }
+  * Size: 32 + extraData
+  *
+  * AGT_MSG_LAYOUT_INDIRECT {
+  *   agt_message_t   next;
+  *   msg_state_t     state;
+  *   msg_layout_t    layout;
+  *   message_flags   flags;
+  *   agt_ecmd_t      cmd;
+  *   agt_message_t   indirectMsg;
+  * }
+  * Size: 24
+  *
+  * AGT_MSG_LAYOUT_AGENT_CMD {
+  *   agt_message_t   next;
+  *   msg_state_t     state;
+  *   msg_layout_t    layout;
+  *   message_flags   flags;
+  *   agt_ecmd_t      cmd;
+  *   async_data_t    asyncData;
+  *   async_key_t     asyncKey;
+  *   agt_u32_t       extraData; // Maybe priority??
+  *   agt_timestamp_t sendTime;  // ??
+  *   agt_self_t      agent;
+  *   agt_self_t      sender;
+  *   uint32_t        userDataOffset;
+  *   uint32_t        payloadSize;
+  * }
+  * Size: 64 + userDataOffset + payloadSize
+  *
+  * AGT_MSG_LAYOUT_AGENT_INDIRECT_CMD {
+  *   agt_message_t   next;
+  *   msg_state_t     state;
+  *   msg_layout_t    layout;
+  *   message_flags   flags;
+  *   agt_ecmd_t      cmd;
+  *   agt_message_t   indirectMsg;
+  *   agt_self_t      indirectAgent;
+  * }
+  * Size: 32
+  *
+  */
+  enum msg_layout_t : agt_u8_t {
+    AGT_MSG_LAYOUT_BASIC,              ///< Basic layout that contains standard info, but minimal slots for arbitrary data (Eg. PING)
+    AGT_MSG_LAYOUT_SIGNAL,             ///< A barebones layout that contains no info or data other than the cmd code (Eg. NOOP, KILL, etc.)
+    AGT_MSG_LAYOUT_EXTENDED,           ///< Like the basic layout, but with a couple additional arbitrary data slots. (Eg. ATTACH_AGENT, DETACH_AGENT)
+    AGT_MSG_LAYOUT_INDIRECT,           ///< Used when broadcasting a message to multiple receivers; contains little more than a reference to a shared broadcast message
+    AGT_MSG_LAYOUT_AGENT_CMD,          ///< Used by the agent invocation commands; allows for arbitrary amounts of extra data to be sent, depending on the specific command (Eg. SEND, SEND_AS)
+    AGT_MSG_LAYOUT_AGENT_INDIRECT_CMD, ///< Almost the exact same as LAYOUT_INDIRECT, except has an extra data slot to hold the receiving agent
+    AGT_MSG_LAYOUT_RPC_INVOCATION,     ///< Contains all the necessarily data to invoke an RPC. Not yet implemented
+    AGT_MSG_LAYOUT_PACKET              ///< Contains an IP packet. Subject to change, not yet implemented.
+  };
 
 
-  struct agent_self;
+
+
+  enum msg_state_t : agt_u8_t {
+    AGT_MSG_STATE_INITIAL,
+    AGT_MSG_STATE_QUEUED,
+    AGT_MSG_STATE_ACTIVE,
+    AGT_MSG_STATE_PINNED,
+    AGT_MSG_STATE_COMPLETE
+  };
+
+  AGT_DECL_BITFLAG_ENUM(message_flags, agt_u16_t);
+
+}
+
+
+extern "C" struct agt_message_st {
+  agt_message_t          next;
+  agt::msg_state_t       state;
+  agt::msg_layout_t      layout;
+  agt::message_flags     flags;
+  agt_ecmd_t             cmd;
+  union {
+    agt_message_t        indirectMsg;
+    async_data_t         asyncData;
+  };
+  union {
+    struct {
+      async_key_t        asyncKey;
+      agt_u32_t          extraData;
+    };
+    agt_agent_instance_t indirectAgent;
+  };
+  agt_timestamp_t        sendTime;
+  agt_agent_instance_t   agent;
+  union {
+    agt_agent_instance_t sender;
+    agt_executor_t       targetExecutor;
+  };
+  uint32_t               userDataOffset;
+  uint32_t               payloadSize;
+};
+
+namespace agt {
 
   // enum class agent_handle : agt_u64_t;
 
@@ -78,26 +220,6 @@ namespace agt {
   };
 
 
-  enum msg_layout_t : agt_u8_t {
-    AGT_MSG_LAYOUT_BASIC,              ///< Basic layout that contains standard info, but minimal slots for arbitrary data (Eg. PING)
-    AGT_MSG_LAYOUT_SIGNAL,             ///< A barebones layout that contains no info or data other than the cmd code (Eg. NOOP, KILL, etc.)
-    AGT_MSG_LAYOUT_EXTENDED,           ///< Like the basic layout, but with a couple additional arbitrary data slots. (Eg. ATTACH_AGENT, DETACH_AGENT)
-    AGT_MSG_LAYOUT_INDIRECT,           ///< Used when broadcasting a message to multiple receivers; contains little more than a reference to a shared broadcast message
-    AGT_MSG_LAYOUT_AGENT_CMD,          ///< Used by the agent invocation commands; allows for arbitrary amounts of extra data to be sent, depending on the specific command (Eg. SEND, SEND_AS)
-    AGT_MSG_LAYOUT_AGENT_INDIRECT_CMD, ///< Almost the exact same as LAYOUT_INDIRECT, except has an extra data slot to hold the receiving agent
-    AGT_MSG_LAYOUT_RPC_INVOCATION,     ///< Contains all the necessarily data to invoke an RPC. Not yet implemented
-    AGT_MSG_LAYOUT_PACKET              ///< Contains an IP packet. Subject to change, not yet implemented.
-  };
-
-  enum msg_state_t : agt_u8_t {
-    AGT_MSG_STATE_INITIAL,
-    AGT_MSG_STATE_QUEUED,
-    AGT_MSG_STATE_ACTIVE,
-    AGT_MSG_STATE_PINNED,
-    AGT_MSG_STATE_COMPLETE
-  };
-
-
   struct AGT_cache_aligned inline_buffer {};
 
   /*struct StagedMessage {
@@ -110,9 +232,12 @@ namespace agt {
     void*         payload;
   };*/
 
-  AGT_BITFLAG_ENUM(message_flags, agt_u16_t) {
+  AGT_DEFINE_BITFLAG_ENUM(message_flags, agt_u16_t) {
     // dispatchKindById    = AGT_DISPATCH_BY_ID,
     // dispatchKindByName  = AGT_DISPATCH_BY_NAME,
+
+    isComplete          = 0x01,
+    isPinned            = 0x02,
 
     isOutOfLine         = 0x04,
     isMultiFrame        = 0x08,
@@ -125,76 +250,9 @@ namespace agt {
     asyncIsBound        = 0x800,
   };
 
-  AGT_BITFLAG_ENUM(message_state, agt_u32_t) {
-    isQueued    = 0x1,
-    isOnHold    = 0x2,
-    isCondemned = 0x4
-  };
-
-  inline constexpr static message_state default_message_state = {};
-
-
-  struct message_header {
-    message_header* next;
-    msg_state_t     state;
-    msg_layout_t    layout;
-    message_flags   flags;
-    agt_ecmd_t      cmd;
-  };
-
-  struct basic_message : message_header {
-    agt_timestamp_t sendTime;
-    async_data_t    asyncData;
-    async_key_t     asyncKey;
-  };
-
-  struct agent_binding_message : message_header {
-    agt_timestamp_t sendTime;
-    async_data_t    asyncData;
-    async_key_t     asyncKey;
-    agent_self*     agent;
-    agt_executor_t  targetExecutor;
-  };
-
-  struct agent_message : message_header {
-    agt_timestamp_t sendTime;
-    async_data_t    asyncData;
-    async_key_t     asyncKey;
-    agt_u32_t       extraData;
-    agent_self*     sender;
-    agent_self*     receiver;
-    uint32_t        userDataOffset;
-    uint32_t        payloadSize;
-    inline_buffer   buffer[];
-  };
-
-  struct indirect_message;
-  struct broadcast_message;
-
-  struct broadcast_agent_message;
-
-  struct indirect_message : message_header {
-    broadcast_message* msg;
-  };
-
-  struct indirect_agent_message : indirect_message {
-    agent_self* receiver;
-  };
-
-  struct broadcast_message : message_header {
-    agt_timestamp_t          sendTime;
-    async_data_t             asyncData;
-    async_key_t              asyncKey;
-    agt_u32_t                extraData;
-  };
-
-  struct broadcast_agent_message : broadcast_message {
-    agent_self*              sender;
-    agt_u64_t                extraData2;
-    uint32_t                 userDataOffset;
-    uint32_t                 payloadSize;
-    inline_buffer            buffer[];
-  };
+  AGT_forceinline void* message_payload(agt_message_t msg) noexcept {
+    return reinterpret_cast<std::byte*>(msg) + AGT_CACHE_LINE;
+  }
 
   /*struct message {
     message*        next;
@@ -212,8 +270,62 @@ namespace agt {
   };*/
 
 
-  class message {
-    message_header* pMsg;
+  inline static void init_message(agt_message_t message, msg_layout_t layout, agt_ecmd_t cmd, message_flags flags = {}) noexcept {
+    message->layout = layout;
+    message->state  = AGT_MSG_STATE_INITIAL;
+    message->flags  = flags;
+    message->cmd    = cmd;
+  }
+
+  inline static void message_bind_async(agt_message_t message, async_data_t asyncData, async_key_t key) noexcept {
+    message->asyncData = asyncData;
+    message->asyncKey  = key;
+    message->flags    |= message_flags::asyncIsBound;
+  }
+
+  inline static void message_write_send_time(agt_message_t message) noexcept {
+    message->sendTime = now();
+  }
+
+
+    /**
+   * @note Semantics of this function mirror that of try_acquire_local_async,
+   *       which this basically just wraps. This overload does a little extra work
+   *       to determine whether or not the ref count dropped to zero, and is intended
+   *       for indirect messages.
+   *
+   *
+   * @param message
+   * @param refCountIsZero
+   * @return
+   *
+   */
+  void* try_message_get_async_local(agt_message_t message, bool& refCountIsZero) noexcept;
+
+  void* try_message_get_async_local(agt_message_t message) noexcept;
+
+  // Should only be called if try_message_get_async_local was called and returned a nonnull value.
+  void  message_release_async_local(agt_message_t message, bool shouldWakeWaiters) noexcept;
+
+  // NOTE: This does NOT signal the async object, if bound.
+  void free_message(agt_message_t message) noexcept;
+
+  void complete_agent_message(agt_message_t message, agt_status_t status, agt_u64_t value) noexcept;
+
+  void finalize_agent_message(agt_message_t message, agt_u64_t value) noexcept;
+
+  AGT_forceinline static void pin_message(agt_message_t message) noexcept {
+    set_flags(message->flags, message_flags::isPinned);
+  }
+
+  AGT_forceinline static void unpin_message(agt_message_t message) noexcept {
+    reset(message->flags, message_flags::isPinned);
+  }
+
+
+
+  /*class message {
+    message_header* pMsg = nullptr;
 
     template <typename T>
     static void destroy_message(T* msg) noexcept {}
@@ -223,6 +335,8 @@ namespace agt {
 
     message() = default;
     message(message_header* header) noexcept : pMsg(header) { }
+    message(agt_message_t message) noexcept : pMsg(reinterpret_cast<message_header *>(message)) { }
+    message(std::nullptr_t) noexcept : pMsg(nullptr) { }
 
     void init(msg_layout_t layout, agt_ecmd_t cmd, message_flags flags = {}) const noexcept {
       pMsg->layout = layout;
@@ -321,6 +435,10 @@ namespace agt {
     }
 
 
+    [[nodiscard]] message&     next() const noexcept {
+      return *reinterpret_cast<message *>(&pMsg->next);
+    }
+
     template <typename T>
     [[nodiscard]] T* get_as() const noexcept {
       return static_cast<T*>(pMsg);
@@ -333,7 +451,15 @@ namespace agt {
     [[nodiscard]] bool operator==(std::nullptr_t) const noexcept {
       return pMsg == nullptr;
     }
-  };
+
+    [[nodiscard]] inline agt_message_t c_type() const noexcept {
+      return reinterpret_cast<agt_message_t>(pMsg);
+    }
+
+    [[nodiscard]] inline agt_message_t& c_ref() noexcept {
+      return *reinterpret_cast<agt_message_t*>(&pMsg);
+    }
+  };*/
 
 
   // static_assert(sizeof(message) == AGT_CACHE_LINE);

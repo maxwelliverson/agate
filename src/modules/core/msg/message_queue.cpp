@@ -10,7 +10,7 @@
 #include <atomic>
 
 
-struct agt::basic_message {
+/*struct agt::basic_message {
   union {
     struct {
       basic_message*   next;
@@ -20,7 +20,7 @@ struct agt::basic_message {
     agt::atomic_epoch_ptr<basic_message> epochNext;
   };
 
-};
+};*/
 
 
 
@@ -28,58 +28,17 @@ struct agt::basic_message {
 
 
 
-agt_status_t agt::sendLocalSPSCQueue(sender_t sender,  agt_message_t message) noexcept {
-  AGT_assert_is_a(sender, local_spsc_queue_sender);
-  // AGT_assert( AGT_queue_kind(queue) == local_spsc_queue_kind );
-  auto s = static_cast<agt::local_spsc_sender*>(sender);
 
-  std::atomic_thread_fence(std::memory_order_acquire);
-
-
-  message->next = nullptr;
-
-  basic_message** tail = s->tail;
-  s->tail = &message->next;
-  std::atomic_thread_fence(std::memory_order_acq_rel);
-  atomicStore(*tail, message);
-
-  return AGT_SUCCESS;
-}
-agt_status_t agt::sendLocalMPSCQueue(sender_t sender,  agt_message_t message) noexcept;
-agt_status_t agt::sendLocalSPMCQueue(sender_t sender,  agt_message_t message) noexcept;
-agt_status_t agt::sendLocalMPMCQueue(sender_t sender,  agt_message_t message) noexcept;
-agt_status_t agt::sendSharedSPSCQueue(sender_t sender, agt_message_t message) noexcept;
-agt_status_t agt::sendSharedMPSCQueue(sender_t sender, agt_message_t message) noexcept;
-agt_status_t agt::sendSharedSPMCQueue(sender_t sender, agt_message_t message) noexcept;
-agt_status_t agt::sendSharedMPMCQueue(sender_t sender, agt_message_t message) noexcept;
-
-
-agt_status_t agt::sendPrivateQueue(sender_t sender,    agt_message_t message) noexcept {
-  AGT_assert_is_a( sender, private_queue_sender );
-  auto s = static_cast<agt::private_sender*>(sender);
-  // message->next = nullptr;
-
-  if (s->)
-
-  message->next.ptr() = nullptr;
-
-  *q->tail = message;
-  q->tail  = &message->next;
-  return AGT_SUCCESS;
-}
 
 message agt::try_receive(private_receiver* receiver) noexcept {
-
+  return nullptr;
 }
 message agt::try_receive(local_mpsc_receiver* receiver) noexcept {
-
+  return nullptr;
 }
 
 
-
-agt_status_t        agt::enqueueLocalSPSC(message_queue_t queue, basic_message* message) noexcept {
-
-}
+#if 0
 agt::basic_message* agt::dequeueLocalSPSC(message_queue_t queue, agt_timeout_t  timeout) noexcept {
   AGT_assert( AGT_queue_kind(queue) == local_spsc_queue_kind );
   auto q = static_cast<agt::local_spsc_queue*>(queue);
@@ -316,3 +275,5 @@ agt::basic_message* agt::dequeuePrivate(message_queue_t queue, agt_timeout_t tim
   }
   return msg;
 }
+
+#endif

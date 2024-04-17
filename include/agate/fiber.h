@@ -219,7 +219,9 @@ AGT_core_api AGT_noreturn void    AGT_stdcall agt_fiber_jump(agt_fiber_t fiber, 
 // After saving, calls @param proc with @param param
 // Expectation is that proc does not return, and later calls agt_fiber_jump
 // Return value is the param argument passed to the call to agt_fiber_jump/agt_fiber_switch used to jump back to this save point
-// If @param proc DOES return, the value that is returned by this call is equal to @param param
+// If @param proc DOES return, the value that is returned by this call is equal to @param param.
+/// The expected benefit of this over agt_fiber_switch is that with agt_fiber_fork, the switch may be
+/// abandonned early if it is determined that it is not necessary.
 AGT_core_api agt_fiber_transfer_t AGT_stdcall agt_fiber_fork(agt_fiber_proc_t proc, agt_fiber_param_t param, agt_fiber_flags_t flags) AGT_noexcept;
 
 

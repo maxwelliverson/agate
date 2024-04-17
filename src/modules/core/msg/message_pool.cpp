@@ -40,12 +40,10 @@ namespace {
   }
 
 
-
-
   agt::message_pool_block* create_local_block(agt_ctx_t ctx, agt::message_pool_t pool, size_t slotSize, size_t slotCount) noexcept {
     const size_t blockSize = slotSize * slotCount;
     const size_t blockAlignment = std::bit_ceil(blockSize);
-    void* mem = agt::ctxLocalAlloc(ctx, blockSize, blockAlignment);
+    void* mem = agt::instance_mem_alloc(ctx->instance, blockSize, blockAlignment);
     const auto block = new (mem) agt::message_pool_block;
     block->nextAvailableSlot  = (agt_message_t)(((char*)mem) + slotSize);
     block->availableSlotCount = slotCount - 1;
@@ -58,7 +56,7 @@ namespace {
 
     while (message != lastMessage) {
       message->next = nextMessage;
-      message->pool = pool;
+      // message->pool = pool;
       message = nextMessage;
       nextMessage = (agt_message_t)(((char*)nextMessage) + slotSize);
     }
@@ -71,7 +69,8 @@ namespace {
     // assert(block->availableSlotCount == block->totalSlots);
     const size_t blockSize = block->slotSize * (block->totalSlots + 1);
     const size_t blockAlignment = std::bit_ceil(blockSize);
-    agt::ctxLocalFree(ctx, block, blockSize, blockAlignment);
+    agt::instance_mem_free(ctx->instance, block, blockSize, blockAlignment);
+    // agt::ctxLocalFree(ctx, block, blockSize, blockAlignment);
   }
 
 
@@ -196,13 +195,22 @@ namespace {
         pop_block_from_stack(ctx, pool);
     }
     std::free(pool->blockStackBase);
-    ctxLocalFree(ctx, pool, sizeof(agt::private_sized_message_pool), alignof(agt::private_sized_message_pool));
+    instance_mem_free(get_instance(ctx), pool, sizeof(agt::private_sized_message_pool), alignof(agt::private_sized_message_pool));
   }
 }
 
 
+agt_status_t agt::createInstance(local_spmc_message_pool& poolRef,       agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept {
+  return AGT_ERROR_NOT_YET_IMPLEMENTED;
+}
+
+agt_status_t agt::createInstance(private_sized_message_pool& poolRef,       agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept {
+  return AGT_ERROR_NOT_YET_IMPLEMENTED;
+}
+
+/*
 agt_status_t agt::createInstance(private_sized_message_pool *&poolRef, agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept {
-  auto mem = ctxLocalAlloc(ctx, sizeof(private_sized_message_pool), alignof(private_sized_message_pool));
+  auto mem = instance_mem_alloc(get_instance(ctx), sizeof(private_sized_message_pool), alignof(private_sized_message_pool));
   if (!mem) [[unlikely]]
     return AGT_ERROR_BAD_ALLOC;
 
@@ -483,4 +491,4 @@ void          agt::release_message_pool(agt_ctx_t ctx, message_pool_t pool_) noe
         break;
     }
   }
-}
+}*/

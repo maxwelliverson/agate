@@ -7,12 +7,12 @@
 
 #include "config.hpp"
 #include "core/object.hpp"
-#include "core/rc.hpp"
+// #include "core/rc.hpp"
 
 
 namespace agt {
 
-  struct message;
+  /*struct message;
 
   enum sender_kind_t : agt_u32_t {
     local_spsc_sender_kind,
@@ -29,12 +29,12 @@ namespace agt {
     shared_sp_bqueue_sender_kind,
     shared_mp_bqueue_sender_kind,
     sender_kind_max_enum
-  };
+  };*/
 
 
-  AGT_virtual_object_type(sender, ref_counted) {
+  /*AGT_abstract_object(sender, ref_counted) {
 
-  };
+  };*/
 
   /*struct sender : object {
     // sender_kind_t kind;
@@ -42,40 +42,97 @@ namespace agt {
   };*/
 
 
+  // For any of the basic senders, acquire should rather be 'take the msgPool at an offset of 16, and acquire from that'
 
-  agt_status_t sendLocalSPSCQueue(sender_t sender,  message* message) noexcept;
-  agt_status_t sendLocalMPSCQueue(sender_t sender,  message* message) noexcept;
-  agt_status_t sendLocalSPMCQueue(sender_t sender,  message* message) noexcept;
-  agt_status_t sendLocalMPMCQueue(sender_t sender,  message* message) noexcept;
-  agt_status_t sendSharedSPSCQueue(sender_t sender, message* message) noexcept;
-  agt_status_t sendSharedMPSCQueue(sender_t sender, message* message) noexcept;
-  agt_status_t sendSharedSPMCQueue(sender_t sender, message* message) noexcept;
-  agt_status_t sendSharedMPMCQueue(sender_t sender, message* message) noexcept;
-  agt_status_t sendPrivateQueue(sender_t sender,    message* message) noexcept;
-  agt_status_t sendLocalSpBQueue(sender_t sender,   message* message) noexcept;
-  agt_status_t sendLocalMpBQueue(sender_t sender,   message* message) noexcept;
-  agt_status_t sendSharedSpBQueue(sender_t sender,  message* message) noexcept;
-  agt_status_t sendSharedMpBQueue(sender_t sender,  message* message) noexcept;
+  agt_status_t acquire_local_spsc(sender_t sender, size_t messageSize, agt_message_t& message) noexcept;
+  agt_status_t acquire_local_mpsc(sender_t sender, size_t messageSize, agt_message_t& message) noexcept;
+  agt_status_t acquire_local_spmc(sender_t sender, size_t messageSize, agt_message_t& message) noexcept;
+  agt_status_t acquire_local_mpmc(sender_t sender, size_t messageSize, agt_message_t& message) noexcept;
+  agt_status_t acquire_shared_spsc(sender_t sender, size_t messageSize, agt_message_t& message) noexcept;
+  agt_status_t acquire_shared_mpsc(sender_t sender, size_t messageSize, agt_message_t& message) noexcept;
+  agt_status_t acquire_shared_spmc(sender_t sender, size_t messageSize, agt_message_t& message) noexcept;
+  agt_status_t acquire_shared_mpmc(sender_t sender, size_t messageSize, agt_message_t& message) noexcept;
+  agt_status_t acquire_private_queue(sender_t sender, size_t messageSize, agt_message_t& message) noexcept;
+  agt_status_t acquire_local_sp_broadcast(sender_t sender, size_t messageSize, agt_message_t& message) noexcept;
+  agt_status_t acquire_local_mp_broadcast(sender_t sender, size_t messageSize, agt_message_t& message) noexcept;
+  agt_status_t acquire_shared_sp_broadcast(sender_t sender, size_t messageSize, agt_message_t& message) noexcept;
+  agt_status_t acquire_shared_mp_broadcast(sender_t sender, size_t messageSize, agt_message_t& message) noexcept;
+  agt_status_t acquire_local_sp_ring(sender_t sender, size_t messageSize, agt_message_t& message) noexcept;
+  agt_status_t acquire_local_mp_ring(sender_t sender, size_t messageSize, agt_message_t& message) noexcept;
+  agt_status_t acquire_shared_sp_ring(sender_t sender, size_t messageSize, agt_message_t& message) noexcept;
+  agt_status_t acquire_shared_mp_ring(sender_t sender, size_t messageSize, agt_message_t& message) noexcept;
 
-  inline agt_status_t send(sender_t s, message* message) noexcept {
-    using send_pfn = agt_status_t(*)(sender_t, agt::message*);
-    constexpr static send_pfn jmp_table[] = {
-        sendLocalSPSCQueue,
-        sendLocalMPSCQueue,
-        sendLocalSPMCQueue,
-        sendLocalMPMCQueue,
-        sendSharedSPSCQueue,
-        sendSharedMPSCQueue,
-        sendSharedSPMCQueue,
-        sendSharedMPMCQueue,
-        sendPrivateQueue,
-        sendLocalSpBQueue,
-        sendLocalMpBQueue,
-        sendSharedSpBQueue,
-        sendSharedMpBQueue
+
+
+  agt_status_t send_local_spsc(sender_t sender,     agt_message_t message) noexcept;
+  agt_status_t send_local_mpsc(sender_t sender,     agt_message_t message) noexcept;
+  agt_status_t send_local_spmc(sender_t sender,     agt_message_t message) noexcept;
+  agt_status_t send_local_mpmc(sender_t sender,     agt_message_t message) noexcept;
+  agt_status_t send_shared_spsc(sender_t sender,    agt_message_t message) noexcept;
+  agt_status_t send_shared_mpsc(sender_t sender,    agt_message_t message) noexcept;
+  agt_status_t send_shared_spmc(sender_t sender,    agt_message_t message) noexcept;
+  agt_status_t send_shared_mpmc(sender_t sender,    agt_message_t message) noexcept;
+  agt_status_t send_private_queue(sender_t sender,  agt_message_t message) noexcept;
+  agt_status_t send_local_sp_broadcast(sender_t sender,  agt_message_t message) noexcept;
+  agt_status_t send_local_mp_broadcast(sender_t sender,  agt_message_t message) noexcept;
+  agt_status_t send_shared_sp_broadcast(sender_t sender, agt_message_t message) noexcept;
+  agt_status_t send_shared_mp_broadcast(sender_t sender, agt_message_t message) noexcept;
+  agt_status_t send_local_sp_ring(sender_t sender,  agt_message_t message) noexcept;
+  agt_status_t send_local_mp_ring(sender_t sender,  agt_message_t message) noexcept;
+  agt_status_t send_shared_sp_ring(sender_t sender, agt_message_t message) noexcept;
+  agt_status_t send_shared_mp_ring(sender_t sender, agt_message_t message) noexcept;
+
+
+  inline agt_status_t acquire(sender_t s, size_t messageSize, agt_message_t& message) noexcept {
+    using acquire_pfn = agt_status_t(*)(sender_t, size_t, agt_message_t&);
+    constexpr static acquire_pfn jmp_table[] = {
+        acquire_local_spsc,
+        acquire_local_mpsc,
+        acquire_local_spmc,
+        acquire_local_mpmc,
+        acquire_shared_spsc,
+        acquire_shared_mpsc,
+        acquire_shared_spmc,
+        acquire_shared_mpmc,
+        acquire_private_queue,
+        acquire_local_sp_broadcast,
+        acquire_local_mp_broadcast,
+        acquire_shared_sp_broadcast,
+        acquire_shared_mp_broadcast,
+        acquire_local_sp_ring,
+        acquire_local_mp_ring,
+        acquire_shared_sp_ring,
+        acquire_shared_mp_ring,
     };
-    AGT_assert_is_type(s, sender);
-    return (jmp_table[AGT_get_type_index(s, sender)])(s, message);
+    const auto obj = reinterpret_cast<object*>(s);
+    AGT_assert_is_type(obj, sender);
+    return (jmp_table[AGT_get_type_index(obj, sender)])(s, messageSize, message);
+  }
+
+  inline agt_status_t send(sender_t s, agt_message_t message) noexcept {
+    using send_pfn = agt_status_t(*)(sender_t, agt_message_t);
+    constexpr static send_pfn jmp_table[] = {
+        send_local_spsc,
+        send_local_mpsc,
+        send_local_spmc,
+        send_local_mpmc,
+        send_shared_spsc,
+        send_shared_mpsc,
+        send_shared_spmc,
+        send_shared_mpmc,
+        send_private_queue,
+        send_local_sp_broadcast,
+        send_local_mp_broadcast,
+        send_shared_sp_broadcast,
+        send_shared_mp_broadcast,
+        send_local_sp_ring,
+        send_local_mp_ring,
+        send_shared_sp_ring,
+        send_shared_mp_ring,
+    };
+    const auto obj = reinterpret_cast<object*>(s);
+    AGT_assert_is_type(obj, sender);
+    return (jmp_table[AGT_get_type_index(obj, sender)])(s, message);
   }
 }
 

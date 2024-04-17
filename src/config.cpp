@@ -300,6 +300,17 @@ namespace {
     freeModules(modules);
   }
 
+  void CALLBACK freeModuleCallback(PTP_CALLBACK_INSTANCE instance, PVOID context) {
+    struct callback_data {
+      HANDLE  thread;
+      HMODULE library;
+    };
+    const auto data = static_cast<callback_data*>(context);
+    WaitForSingleObject(data->thread, INFINITE); // The thread was in the process of closing, so this shouldn't be long.
+    FreeLibraryWhenCallbackReturns(instance, data->library);
+    delete data;
+  }
+
   void freeModulesOnThreadExit(module_table* pTable) {
     module_info coreModuleInfo{};
 
@@ -334,12 +345,7 @@ namespace {
         assert ( data->thread != INVALID_HANDLE_VALUE );
         data->library = static_cast<HMODULE>(coreModuleInfo.handle);
 
-        auto result = TrySubmitThreadpoolCallback([](PTP_CALLBACK_INSTANCE instance, PVOID context) {
-          const auto data = static_cast<callback_data*>(context);
-          WaitForSingleObject(data->thread, INFINITE); // The thread was in the process of closing, so this shouldn't be long.
-          FreeLibraryWhenCallbackReturns(instance, data->library);
-          delete data;
-        }, data, nullptr);
+        auto result = TrySubmitThreadpoolCallback(freeModuleCallback, data, nullptr);
         if (result == FALSE) {
           // idk fuckin die I guess
           abort();

@@ -7,76 +7,101 @@
 
 #include "config.hpp"
 #include "core/object.hpp"
-#include "core/rc.hpp"
+// #include "core/rc.hpp"
 
 namespace agt {
 
-  struct receiver;
-  struct message;
-
-  enum receiver_kind_t {
-    local_spsc_receiver_kind,
-    local_mpsc_receiver_kind,
-    local_spmc_receiver_kind,
-    local_mpmc_receiver_kind,
-    shared_spsc_receiver_kind,
-    shared_mpsc_receiver_kind,
-    shared_spmc_receiver_kind,
-    shared_mpmc_receiver_kind,
-    private_receiver_kind,
-    local_sp_bqueue_receiver_kind,
-    local_mp_bqueue_receiver_kind,
-    shared_sp_bqueue_receiver_kind,
-    shared_mp_bqueue_receiver_kind,
-    receiver_kind_max_enum
-  };
+  agt_status_t receive_local_spsc(receiver_t receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receive_local_mpsc(receiver_t receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receive_local_spmc(receiver_t receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receive_local_mpmc(receiver_t receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receive_shared_spsc(receiver_t receiver, agt_message_t& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receive_shared_mpsc(receiver_t receiver, agt_message_t& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receive_shared_spmc(receiver_t receiver, agt_message_t& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receive_shared_mpmc(receiver_t receiver, agt_message_t& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receive_private_queue(receiver_t receiver,    agt_message_t& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receive_local_sp_broadcast(receiver_t receiver,   agt_message_t& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receive_local_mp_broadcast(receiver_t receiver,   agt_message_t& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receive_shared_sp_broadcast(receiver_t receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receive_shared_mp_broadcast(receiver_t receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receive_local_sp_ring(receiver_t receiver,   agt_message_t& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receive_local_mp_ring(receiver_t receiver,   agt_message_t& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receive_shared_sp_ring(receiver_t receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept;
+  agt_status_t receive_shared_mp_ring(receiver_t receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept;
 
 
-  AGT_virtual_object_type(receiver, ref_counted) {
-
-  };
-
-  /*struct receiver : object {
-    /*receiver_kind_t kind;
-    agt_u32_t       flags;#1#
-  };*/
-
-
-  agt_status_t receiveLocalSPSCQueue(receiver_t receiver,  message*& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receiveLocalMPSCQueue(receiver_t receiver,  message*& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receiveLocalSPMCQueue(receiver_t receiver,  message*& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receiveLocalMPMCQueue(receiver_t receiver,  message*& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receiveSharedSPSCQueue(receiver_t receiver, message*& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receiveSharedMPSCQueue(receiver_t receiver, message*& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receiveSharedSPMCQueue(receiver_t receiver, message*& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receiveSharedMPMCQueue(receiver_t receiver, message*& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receivePrivateQueue(receiver_t receiver,    message*& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receiveSpLocalBQueue(receiver_t receiver,   message*& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receiveMpLocalBQueue(receiver_t receiver,   message*& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receiveSpSharedBQueue(receiver_t receiver,  message*& message, agt_timeout_t timeout) noexcept;
-  agt_status_t receiveMpSharedBQueue(receiver_t receiver,  message*& message, agt_timeout_t timeout) noexcept;
+  // IMPORTANT: Unlike the public API call agt_retire_msg, this does *not* signal the sender. That must be done explicitly.
+  void         retire_local_spsc(receiver_t receiver, agt_message_t message) noexcept;
+  void         retire_local_mpsc(receiver_t receiver, agt_message_t message) noexcept;
+  void         retire_local_spmc(receiver_t receiver, agt_message_t message) noexcept;
+  void         retire_local_mpmc(receiver_t receiver, agt_message_t message) noexcept;
+  void         retire_shared_spsc(receiver_t receiver, agt_message_t message) noexcept;
+  void         retire_shared_mpsc(receiver_t receiver, agt_message_t message) noexcept;
+  void         retire_shared_spmc(receiver_t receiver, agt_message_t message) noexcept;
+  void         retire_shared_mpmc(receiver_t receiver, agt_message_t message) noexcept;
+  void         retire_private_queue(receiver_t receiver, agt_message_t message) noexcept;
+  void         retire_local_sp_broadcast(receiver_t receiver, agt_message_t message) noexcept;
+  void         retire_local_mp_broadcast(receiver_t receiver, agt_message_t message) noexcept;
+  void         retire_shared_sp_broadcast(receiver_t receiver, agt_message_t message) noexcept;
+  void         retire_shared_mp_broadcast(receiver_t receiver, agt_message_t message) noexcept;
+  void         retire_local_sp_ring(receiver_t receiver, agt_message_t message) noexcept;
+  void         retire_local_mp_ring(receiver_t receiver, agt_message_t message) noexcept;
+  void         retire_shared_sp_ring(receiver_t receiver, agt_message_t message) noexcept;
+  void         retire_shared_mp_ring(receiver_t receiver, agt_message_t message) noexcept;
 
 
   
-  inline agt_status_t receive(receiver_t r, message*& message, agt_timeout_t timeout) noexcept {
-    using receive_pfn = agt_status_t(*)(receiver_t, agt::message*&, agt_timeout_t);
+  inline agt_status_t receive(receiver_t r, agt_message_t& message, agt_timeout_t timeout) noexcept {
+    using receive_pfn = agt_status_t(*)(receiver_t, agt_message_t&, agt_timeout_t);
     constexpr static receive_pfn jmp_table[] = {
-        receiveLocalSPSCQueue,
-        receiveLocalMPSCQueue,
-        receiveLocalSPMCQueue,
-        receiveLocalMPMCQueue,
-        receiveSharedSPSCQueue,
-        receiveSharedMPSCQueue,
-        receiveSharedSPMCQueue,
-        receiveSharedMPMCQueue,
-        receivePrivateQueue,
-        receiveSpLocalBQueue,
-        receiveMpLocalBQueue,
-        receiveSpSharedBQueue,
-        receiveMpSharedBQueue
+        receive_local_spsc,
+        receive_local_mpsc,
+        receive_local_spmc,
+        receive_local_mpmc,
+        receive_shared_spsc,
+        receive_shared_mpsc,
+        receive_shared_spmc,
+        receive_shared_mpmc,
+        receive_private_queue,
+        receive_local_sp_broadcast,
+        receive_local_mp_broadcast,
+        receive_shared_sp_broadcast,
+        receive_shared_mp_broadcast,
+        receive_local_sp_ring,
+        receive_local_mp_ring,
+        receive_shared_sp_ring,
+        receive_shared_mp_ring,
     };
-    AGT_assert_is_type(r, receiver);
-    return (jmp_table[AGT_get_type_index(r, receiver)])(r, message, timeout);
+    const auto obj = reinterpret_cast<object*>(r);
+    AGT_assert_is_type(obj, receiver);
+    return (jmp_table[AGT_get_type_index(obj, receiver)])(r, message, timeout);
+  }
+
+
+  inline static void retire(receiver_t r, agt_message_t message) noexcept {
+    using retire_pfn = void(*)(receiver_t, agt_message_t);
+    constexpr static retire_pfn jmp_table[] = {
+        retire_local_spsc,
+        retire_local_mpsc,
+        retire_local_spmc,
+        retire_local_mpmc,
+        retire_shared_spsc,
+        retire_shared_mpsc,
+        retire_shared_spmc,
+        retire_shared_mpmc,
+        retire_private_queue,
+        retire_local_sp_broadcast,
+        retire_local_mp_broadcast,
+        retire_shared_sp_broadcast,
+        retire_shared_mp_broadcast,
+        retire_local_sp_ring,
+        retire_local_mp_ring,
+        retire_shared_sp_ring,
+        retire_shared_mp_ring,
+    };
+    const auto obj = reinterpret_cast<object*>(r);
+    AGT_assert_is_type(obj, receiver);
+    return (jmp_table[AGT_get_type_index(obj, receiver)])(r, message);
   }
 }
 

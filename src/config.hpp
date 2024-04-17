@@ -72,6 +72,19 @@ using agt_char_t = char;
 
 
 
+#if defined(__GNUC__)
+# define AGT_counted_by(name) __attribute__((counted_by(name)))
+# define AGT_use_only_gprs __attribute((target("general-regs-only")))
+#else
+# define AGT_counted_by(name)
+# define AGT_use_only_gprs
+#endif
+
+
+
+
+
+
 #define AGT_export_family extern "C"
 
 #define AGT_function_entry(dispatch) AGT_module_export AGT_return_type AGT_stdcall AGT_concat2(AGT_concat(_agate_api_, AGT_exported_function_name), __##dispatch)
@@ -102,35 +115,85 @@ using agt_char_t = char;
 
 
 
+#define PP_AGT_impl_TAKE_8TH(a, b, c, d, e, f, g, h, ...) h
+#define PP_AGT_impl_COUNT_ARGS6_indirect(...) PP_AGT_impl_TAKE_8TH(,##__VA_ARGS__, 6, 5, 4, 3, 2, 1, 0)
+#define PP_AGT_impl_COUNT_ARGS6 PP_AGT_impl_COUNT_ARGS6_indirect
 
+
+
+#define PP_AGT_impl_FOREACH_iter6(macro, emptyMacro, a, ...) macro(a) PP_AGT_impl_FOREACH_iter5(macro, emptyMacro, __VA_ARGS__)
+#define PP_AGT_impl_FOREACH_iter5(macro, emptyMacro, a, ...) macro(a) PP_AGT_impl_FOREACH_iter4(macro, emptyMacro, __VA_ARGS__)
+#define PP_AGT_impl_FOREACH_iter4(macro, emptyMacro, a, ...) macro(a) PP_AGT_impl_FOREACH_iter3(macro, emptyMacro, __VA_ARGS__)
+#define PP_AGT_impl_FOREACH_iter3(macro, emptyMacro, a, ...) macro(a) PP_AGT_impl_FOREACH_iter2(macro, emptyMacro, __VA_ARGS__)
+#define PP_AGT_impl_FOREACH_iter2(macro, emptyMacro, a, ...) macro(a) PP_AGT_impl_FOREACH_iter1(macro, emptyMacro, __VA_ARGS__)
+#define PP_AGT_impl_FOREACH_iter1(macro, emptyMacro, a) macro(a)
+#define PP_AGT_impl_FOREACH_iter0(macro, emptyMacro) emptyMacro()
+
+
+#define PP_AGT_impl_FOREACH_LAZY_CONCAT2(a, b) a##b
+#define PP_AGT_impl_FOREACH_LAZY_CONCAT(...) PP_AGT_impl_FOREACH_LAZY_CONCAT2(__VA_ARGS__)
+#define PP_AGT_impl_FOREACH_indirect2(macro, emptyMacro, count, ...) PP_AGT_impl_FOREACH_LAZY_CONCAT(PP_AGT_impl_FOREACH_iter, count)(macro, emptyMacro, ##__VA_ARGS__)
+#define PP_AGT_impl_FOREACH_indirect PP_AGT_impl_FOREACH_indirect2
+#define PP_AGT_impl_FOREACH(macro, emptyMacro, ...) PP_AGT_impl_FOREACH_indirect(macro, emptyMacro, PP_AGT_impl_COUNT_ARGS6(__VA_ARGS__), ##__VA_ARGS__)
 
 
 
 // Macro commands/helpers
 
-#define PP_AGT_impl_VIRTUAL_OBJECT_TYPE_ object
+// #define PP_AGT_impl_VIRTUAL_OBJECT_TYPE_ object
 
-#define PP_AGT_impl_VIRTUAL_OBJECT_TYPE_ref_counted rc_object
+#define PP_AGT_impl_VIRTUAL_OBJECT_TYPE_ref_counted agt::rc_object
 
 #define PP_AGT_impl_VIRTUAL_OBJECT_TYPE_extends_indirect(type) type
 #define PP_AGT_impl_VIRTUAL_OBJECT_TYPE_extends PP_AGT_impl_VIRTUAL_OBJECT_TYPE_extends_indirect
 
-#define PP_AGT_impl_VIRTUAL_OBJECT_TYPE_aligned_indirect(val)
-#define PP_AGT_impl_VIRTUAL_OBJECT_TYPE_aligned
+#define PP_AGT_impl_VIRTUAL_OBJECT_TYPE_aligned(...)
 
-#define PP_AGT_impl_OBJECT_BASE(...) AGT_concat(PP_AGT_impl_, VIRTUAL_OBJECT_TYPE_##__VA_ARGS__)
-#define PP_AGT_impl_SPECIALIZE_OBJECT_ENUM(objType) \
+
+#define PP_AGT_impl_GET_SUPERTYPE(a) AGT_concat(PP_AGT_impl_VIRTUAL_OBJECT_TYPE_, a)
+#define PP_AGT_impl_DEFAULT_SUPERTYPE() agt::object
+
+#define PP_AGT_impl_OBJECT_BASE(...) PP_AGT_impl_FOREACH(PP_AGT_impl_GET_SUPERTYPE, PP_AGT_impl_DEFAULT_SUPERTYPE, ##__VA_ARGS__)
+
+// #define PP_AGT_impl_OBJECT_ATTR_
+
+#define PP_AGT_impl_OBJECT_ATTR_ref_counted
+
+#define PP_AGT_impl_OBJECT_ATTR_extends(...)
+
+#define PP_AGT_impl_OBJECT_ATTR_aligned_indirect(val) alignas(val)
+#define PP_AGT_impl_OBJECT_ATTR_aligned PP_AGT_impl_OBJECT_ATTR_aligned_indirect
+
+
+#define PP_AGT_impl_GET_OBJECT_ATTR(a) AGT_concat(PP_AGT_impl_OBJECT_ATTR_, a)
+#define PP_AGT_impl_DEFAULT_OBJECT_ATTR()
+#define PP_AGT_impl_OBJECT_ATTR(...) PP_AGT_impl_FOREACH(PP_AGT_impl_GET_OBJECT_ATTR, PP_AGT_impl_DEFAULT_OBJECT_ATTR, ##__VA_ARGS__)
+
+
+#define PP_AGT_impl_OBJECT_ENUM(v) AGT_concat(PP_AGT_impl_OBJECT_ENUM_, v)
+
+
+#define PP_AGT_impl_OBJECT_ENUM_value(objType)  \
+  inline constexpr static object_type value = object_type::objType;
+#define PP_AGT_impl_OBJECT_ENUM_range(from, to)  \
+  inline constexpr static object_type minValue = object_type::from; \
+  inline constexpr static object_type maxValue = object_type::to;
+#define PP_AGT_impl_DEF_OBJECT_ENUM(objType, ...) \
   template <> \
   struct ::agt::impl::obj_types::object_type_id<objType> { \
-    inline constexpr static object_type value = object_type::objType; \
+    PP_AGT_impl_FOREACH(PP_AGT_impl_OBJECT_ENUM, , ##__VA_ARGS__) \
   }
 
-#define PP_AGT_impl_SPECIALIZE_OBJECT_ENUM_RANGE(objType) \
-  template <> \
-  struct ::agt::impl::obj_types::object_type_range<objType> { \
-    inline constexpr static object_type minValue = object_type::objType##_begin; \
-    inline constexpr static object_type maxValue = object_type::objType##_end;   \
-  }
+
+// #define PP_AGT_impl_OBJECT_BASE(...) AGT_concat(PP_AGT_impl_, VIRTUAL_OBJECT_TYPE_##__VA_ARGS__)
+#define PP_AGT_impl_SPECIALIZE_VIRTUAL_OBJECT_ENUM(apiType, objType) \
+  PP_AGT_impl_DEF_OBJECT_ENUM(apiType, value(objType), range(objType##_begin, objType##_end))
+
+#define PP_AGT_impl_SPECIALIZE_OBJECT_ENUM(apiType, objType) \
+  PP_AGT_impl_DEF_OBJECT_ENUM(apiType, value(objType))
+
+#define PP_AGT_impl_SPECIALIZE_ABSTRACT_OBJECT_ENUM(apiType, objType) \
+  PP_AGT_impl_DEF_OBJECT_ENUM(apiType, range(objType##_begin, objType##_end))
 
 
 #define AGT_type_id_of(objType)  ::agt::impl::obj_types::object_type_id<objType>::value

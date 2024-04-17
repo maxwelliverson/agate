@@ -9,7 +9,7 @@
 #include "agate/time.hpp"
 #include "ctx.hpp"
 
-#include "agents/agents.hpp"
+#include "core/agents.hpp"
 
 #include <utility>
 

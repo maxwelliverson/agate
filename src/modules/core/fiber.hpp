@@ -7,7 +7,7 @@
 
 #include "config.hpp"
 
-#include "rc.hpp"
+#include "object.hpp"
 
 
 #include <bitset>
@@ -114,7 +114,7 @@ namespace agt {
   struct fiber_pool;
   struct fiber_header;
 
-  AGT_virtual_object_type(fiber_pool, ref_counted) {
+  AGT_abstract_object(fiber_pool, ref_counted) {
     agt_u32_t             fiberCount;
     agt_u32_t             stackReserveSize;
     agt_u32_t             stackCommitSize;
@@ -131,11 +131,11 @@ namespace agt {
 
   };
 
-  AGT_final_object_type(pooled_fctx, ref_counted) {
+  AGT_object(pooled_fctx, ref_counted) {
 
   };
 
-  AGT_final_object_type(fctx) {
+  AGT_object(fctx) {
     agt_u32_t              fiberCount;
     agt_u32_t              maxFiberCount;
     agt_u32_t              stackReserveSize;
@@ -147,7 +147,7 @@ namespace agt {
     pooled_fctx*           pooledFctx;
   };
 
-  AGT_final_object_type(fiber) {
+  AGT_object(fiber) {
     agt_u32_t         saveRegionSize;
     uint64_t          storeStateFlags;
     agt::fiber_data*  privateData;

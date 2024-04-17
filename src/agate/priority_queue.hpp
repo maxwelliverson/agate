@@ -6,7 +6,7 @@
 #define AGATE_PRIORITY_QUEUE_HPP
 
 #include "config.hpp"
-#include "core/object_pool.hpp"
+#include "core/object.hpp"
 
 // Initial attempt at a composable priority queue, not sure if I like the design, holding off on finishing implementation
 

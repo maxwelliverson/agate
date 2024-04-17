@@ -9,9 +9,11 @@
 
 #include "agate/epoch_ptr.hpp"
 #include "agate/tagged_value.hpp"
+#include "core/ref.hpp"
 #include "message.hpp"
 #include "receiver.hpp"
 #include "sender.hpp"
+
 
 namespace agt {
 
@@ -46,6 +48,8 @@ namespace agt {
   struct local_spsc_sender;
   struct local_spsc_receiver;
 
+  // All senders must have a message pool field at an offset of 16 bytes
+
 
   /*struct local_spsc_queue : message_queue_header {
     basic_message*    head;
@@ -54,107 +58,117 @@ namespace agt {
 
   struct private_sender;
 
-  AGT_final_object_type(private_receiver, extends(receiver)) {
-    message*          head;
-    message***        tail;
-    unsafe_maybe_ref<private_sender, bool> sender;
+  AGT_object(private_receiver) {
+    agt_u32_t       refCount;
+    agt_message_t   head;
+    agt_message_t** tail;
+    private_sender* sender;
   };
 
-  AGT_final_object_type(private_sender, extends(sender)) {
-    message** tail;
-    unsafe_maybe_ref<private_receiver> receiver;
-  };
-
-
-
-  AGT_final_object_type(local_spsc_sender, extends(sender)) {
-    message**                      tail;
-    maybe_ref<local_spsc_receiver> receiver;
-  };
-
-  AGT_final_object_type(local_spsc_receiver, extends(receiver)) {
-    message*                           head;
-    message***                         pTail;
-    maybe_ref<local_spsc_sender, bool> sender;
+  AGT_object(private_sender) {
+    agt_u32_t         refCount;
+    agt_message_t*    tail;
+    private_receiver* receiver; // If receiver dies, it sets this variable to null.
+    agt_u32_t         maxSenders;
+    agt_u32_t         maxReceivers; // This is stored in the sender for data packing purposes. This way, both sender and receiver are exactly 32 bytes.
   };
 
 
 
-  AGT_final_object_type(local_mpsc_receiver, extends(receiver)) {
-    // local_mpsc_queue* queue;
-    message*  head;
-    message** tail;
-    agt_u32_t maxSenders;
-    agt_u32_t senderCount;
-    // agt_u32_t        hasReceiver;
+  // Have a local blocked_queue specialized for spsc use here (note that spsc does not necessarily mean that there can only be one waiter, as it's multiplexed by executor).
+  AGT_object(local_spsc_sender) {
+    agt_u32_t            refCount; // Not using ref counted api cause this is a specialized case
+    agt_message_t*       tail;
+    agt_msg_pool_t       msgPool;
+    agt_ctx_t            ctx;
+    local_spsc_receiver* receiver;
   };
 
-  AGT_final_object_type(local_mpsc_sender, extends(sender)) {
-    local_mpsc_receiver* receiver;
-  };
-
-
-
-  struct local_spmc_sender   : sender {
-    agt_message_st*  head;
-    agt_message_st** tail;
-    agt_u32_t        maxReceivers;
-    agt_u32_t        receiverCount;
-    agt_u32_t        hasSender;
-  };
-
-  struct local_spmc_receiver : receiver {
-    local_spmc_sender* sender;
+  AGT_object(local_spsc_receiver) {
+    agt_message_t      head;
+    agt_msg_pool_t     msgPool;
+    agt_ctx_t          ctx;
+    agt_message_t**    pTail;
+    local_spsc_sender* sender;
   };
 
 
-  struct local_mpmc_queue    : object {
+
+  AGT_object(local_mpsc_receiver, ref_counted) {
+    agt_msg_pool_t  msgPool;
+    agt_message_t   head;
+    agt_message_t*  tail;
+    agt_u32_t       senderCount;
+    agt_bool_t      isAlive;
+  };
+
+  AGT_object(local_mpsc_sender) {
+    ref<local_mpsc_receiver> receiver;
+    agt_msg_pool_t           msgPool;
+  };
+
+
+
+  AGT_object(local_spmc_sender, ref_counted) {
+    agt_msg_pool_t  msgPool;
+    agt_message_t   head;
+    agt_message_t*  tail;
+    agt_u32_t       receiverCount;
+    agt_bool_t      isAlive;
+  };
+
+  AGT_object(local_spmc_receiver) {
+    ref<local_spmc_sender> sender;
+    agt_msg_pool_t         msgPool;
+  };
+
+
+  AGT_object(local_mpmc_queue, ref_counted) {
     atomic_epoch_ptr<message>                   head;
     atomic_epoch_ptr<atomic_epoch_ptr<message>> tail;
-    agt_u32_t maxSenders;
-    agt_u32_t maxReceivers;
-    agt_u32_t senderCount;
-    agt_u32_t receiverCount;
+    agt_u32_t      senderCount;
+    agt_u32_t      receiverCount;
+    agt_msg_pool_t msgPool;
   };
 
-  struct local_mpmc_sender   : sender {
-    local_mpmc_queue* queue;
+  AGT_object(local_mpmc_sender) {
+    ref<local_mpmc_queue> queue;
+    agt_msg_pool_t        msgPool;
   };
 
-  struct local_mpmc_receiver : receiver {
-    local_mpmc_queue* queue;
+  AGT_object(local_mpmc_receiver) {
+    ref<local_mpmc_queue> queue;
+    agt_msg_pool_t        msgPool;
   };
 
 
 
+  AGT_object(shared_spsc_sender) {};
+
+  AGT_object(shared_spsc_receiver) {};
+
+  AGT_object(shared_mpsc_sender) {};
+
+  AGT_object(shared_mpsc_receiver) {};
+
+  AGT_object(shared_spmc_sender) {};
+
+  AGT_object(shared_spmc_receiver) {};
+
+  AGT_object(shared_mpmc_sender) {};
+
+  AGT_object(shared_mpmc_receiver) {};
 
 
-  struct shared_spsc_sender : sender {};
-
-  struct shared_spsc_receiver : receiver {};
-
-  struct shared_mpsc_sender : sender {};
-
-  struct shared_mpsc_receiver : receiver {};
-
-  struct shared_spmc_sender : sender {};
-
-  struct shared_spmc_receiver : receiver {};
-
-  struct shared_mpmc_sender : sender {};
-
-  struct shared_mpmc_receiver : receiver {};
-
-
-
-
-  message try_receive(private_receiver* receiver) noexcept;
-  message try_receive(local_mpsc_receiver* receiver) noexcept;
-
-  agt_status_t receive(private_receiver& receiver, message& msg, agt_timeout_t timeout) noexcept;
-  agt_status_t receive(local_mpsc_receiver& receiver, message& msg, agt_timeout_t timeout) noexcept;
-
-
+  agt_status_t     open_private_channel(agt_ctx_t ctx, agt_sender_t* pSender, agt_receiver_t* pReceiver, const agt_channel_desc_t& channelDesc) noexcept;
+  agt_status_t  open_local_spsc_channel(agt_ctx_t ctx, agt_sender_t* pSender, agt_receiver_t* pReceiver, const agt_channel_desc_t& channelDesc) noexcept;
+  agt_status_t  open_local_mpsc_channel(agt_ctx_t ctx, agt_sender_t* pSender, agt_receiver_t* pReceiver, const agt_channel_desc_t& channelDesc) noexcept;
+  agt_status_t  open_local_spmc_channel(agt_ctx_t ctx, agt_sender_t* pSender, agt_receiver_t* pReceiver, const agt_channel_desc_t& channelDesc) noexcept;
+  agt_status_t  open_local_mpmc_channel(agt_ctx_t ctx, agt_sender_t* pSender, agt_receiver_t* pReceiver, const agt_channel_desc_t& channelDesc) noexcept;
+  agt_status_t open_shared_spsc_channel(agt_ctx_t ctx, agt_sender_t* pSender, agt_receiver_t* pReceiver, const agt_channel_desc_t& channelDesc) noexcept;
+  agt_status_t open_shared_mpsc_channel(agt_ctx_t ctx, agt_sender_t* pSender, agt_receiver_t* pReceiver, const agt_channel_desc_t& channelDesc) noexcept;
+  agt_status_t open_shared_spmc_channel(agt_ctx_t ctx, agt_sender_t* pSender, agt_receiver_t* pReceiver, const agt_channel_desc_t& channelDesc) noexcept;
+  agt_status_t open_shared_mpmc_channel(agt_ctx_t ctx, agt_sender_t* pSender, agt_receiver_t* pReceiver, const agt_channel_desc_t& channelDesc) noexcept;
 
 
   // These are the underlying function calls, which are differentiated by name rather than by
@@ -163,85 +177,85 @@ namespace agt {
 
   // Trampoline functions for better code legibility
 
-  AGT_forceinline agt_status_t send(local_spsc_sender* sender,  message* message) noexcept {
+  AGT_forceinline agt_status_t send(local_spsc_sender* sender, agt_message_t message) noexcept {
     AGT_assert_is_a(sender, local_spsc_sender);
-    return sendLocalSPSCQueue(sender, message);
+    return send_local_spsc(sender, message);
   }
-  AGT_forceinline agt_status_t receive(local_spsc_receiver* receiver,  message*& message, agt_timeout_t timeout) noexcept {
+  AGT_forceinline agt_status_t receive(local_spsc_receiver* receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept {
     AGT_assert_is_a(receiver, local_spsc_receiver);
-    return receiveLocalSPSCQueue(receiver, message, timeout);
+    return receive_local_spsc(receiver, message, timeout);
   }
 
-  AGT_forceinline agt_status_t send(local_mpsc_sender* sender,  message* message) noexcept {
+  AGT_forceinline agt_status_t send(local_mpsc_sender* sender,  agt_message_t message) noexcept {
     AGT_assert_is_a(sender, local_mpsc_sender);
-    return sendLocalMPSCQueue(sender, message);
+    return send_local_mpsc(sender, message);
   }
-  AGT_forceinline agt_status_t receive(local_mpsc_receiver* receiver,  message*& message, agt_timeout_t timeout) noexcept {
+  AGT_forceinline agt_status_t receive(local_mpsc_receiver* receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept {
     AGT_assert_is_a(receiver, local_mpsc_receiver);
-    return receiveLocalMPSCQueue(receiver, message, timeout);
+    return receive_local_mpsc(receiver, message, timeout);
   }
 
-  AGT_forceinline agt_status_t send(local_spmc_sender* sender,  message* message) noexcept {
+  AGT_forceinline agt_status_t send(local_spmc_sender* sender,  agt_message_t message) noexcept {
     AGT_assert_is_a(sender, local_spmc_sender);
-    return sendLocalSPMCQueue(sender, message);
+    return send_local_spmc(sender, message);
   }
-  AGT_forceinline agt_status_t receive(local_spmc_receiver* receiver,  message*& message, agt_timeout_t timeout) noexcept {
+  AGT_forceinline agt_status_t receive(local_spmc_receiver* receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept {
     AGT_assert_is_a(receiver, local_spmc_receiver);
-    return receiveLocalSPMCQueue(receiver, message, timeout);
+    return receive_local_spmc(receiver, message, timeout);
   }
 
-  AGT_forceinline agt_status_t send(local_mpmc_sender* sender,  message* message) noexcept {
+  AGT_forceinline agt_status_t send(local_mpmc_sender* sender,  agt_message_t message) noexcept {
     AGT_assert_is_a(sender, local_mpmc_sender);
-    return sendLocalMPMCQueue(sender, message);
+    return send_local_mpmc(sender, message);
   }
-  AGT_forceinline agt_status_t receive(local_mpmc_receiver* receiver,  message*& message, agt_timeout_t timeout) noexcept {
+  AGT_forceinline agt_status_t receive(local_mpmc_receiver* receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept {
     AGT_assert_is_a(receiver, local_mpmc_receiver);
-    return receiveLocalMPMCQueue(receiver, message, timeout);
+    return receive_local_mpmc(receiver, message, timeout);
   }
 
-  AGT_forceinline agt_status_t send(shared_spsc_sender* sender, message* message) noexcept {
+  AGT_forceinline agt_status_t send(shared_spsc_sender* sender, agt_message_t message) noexcept {
     AGT_assert_is_a(sender, shared_spsc_sender);
-    return sendSharedSPSCQueue(sender, message);
+    return send_shared_spsc(sender, message);
   }
-  AGT_forceinline agt_status_t receive(shared_spsc_receiver* receiver,  message*& message, agt_timeout_t timeout) noexcept {
+  AGT_forceinline agt_status_t receive(shared_spsc_receiver* receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept {
     AGT_assert_is_a(receiver, shared_spsc_receiver);
-    return receiveSharedSPSCQueue(receiver, message, timeout);
+    return receive_shared_spsc(receiver, message, timeout);
   }
 
-  AGT_forceinline agt_status_t send(shared_mpsc_sender* sender, message* message) noexcept {
+  AGT_forceinline agt_status_t send(shared_mpsc_sender* sender, agt_message_t message) noexcept {
     AGT_assert_is_a(sender, shared_mpsc_sender);
-    return sendSharedMPSCQueue(sender, message);
+    return send_shared_mpsc(sender, message);
   }
-  AGT_forceinline agt_status_t receive(shared_mpsc_receiver* receiver,  message*& message, agt_timeout_t timeout) noexcept {
+  AGT_forceinline agt_status_t receive(shared_mpsc_receiver* receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept {
     AGT_assert_is_a(receiver, shared_mpsc_receiver);
-    return receiveSharedMPSCQueue(receiver, message, timeout);
+    return receive_shared_mpsc(receiver, message, timeout);
   }
 
-  AGT_forceinline agt_status_t send(shared_spmc_sender* sender, message* message) noexcept {
+  AGT_forceinline agt_status_t send(shared_spmc_sender* sender, agt_message_t message) noexcept {
     AGT_assert_is_a(sender, shared_spmc_sender);
-    return sendSharedSPMCQueue(sender, message);
+    return send_shared_spmc(sender, message);
   }
-  AGT_forceinline agt_status_t receive(shared_spmc_receiver* receiver,  message*& message, agt_timeout_t timeout) noexcept {
+  AGT_forceinline agt_status_t receive(shared_spmc_receiver* receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept {
     AGT_assert_is_a(receiver, shared_spmc_receiver);
-    return receiveSharedSPMCQueue(receiver, message, timeout);
+    return receive_shared_spmc(receiver, message, timeout);
   }
 
-  AGT_forceinline agt_status_t send(shared_mpmc_sender* sender, message* message) noexcept {
+  AGT_forceinline agt_status_t send(shared_mpmc_sender* sender, agt_message_t message) noexcept {
     AGT_assert_is_a(sender, shared_mpmc_sender);
-    return sendSharedMPMCQueue(sender, message);
+    return send_shared_mpmc(sender, message);
   }
-  AGT_forceinline agt_status_t receive(shared_mpmc_receiver* receiver,  message*& message, agt_timeout_t timeout) noexcept {
+  AGT_forceinline agt_status_t receive(shared_mpmc_receiver* receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept {
     AGT_assert_is_a(receiver, shared_mpmc_receiver);
-    return receiveSharedMPMCQueue(receiver, message, timeout);
+    return receive_shared_mpmc(receiver, message, timeout);
   }
 
-  AGT_forceinline agt_status_t send(private_sender* sender,     message* message) noexcept {
+  AGT_forceinline agt_status_t send(private_sender* sender,     agt_message_t message) noexcept {
     AGT_assert_is_a(sender, private_sender);
-    return sendPrivateQueue(sender, message);
+    return send_private_queue(sender, message);
   }
-  AGT_forceinline agt_status_t receive(private_receiver* receiver,  message*& message, agt_timeout_t timeout) noexcept {
+  AGT_forceinline agt_status_t receive(private_receiver* receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept {
     AGT_assert_is_a(receiver, private_receiver);
-    return receivePrivateQueue(receiver, message, timeout);
+    return receive_private_queue(receiver, message, timeout);
   }
 }
 
