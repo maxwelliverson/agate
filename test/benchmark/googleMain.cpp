@@ -49,11 +49,32 @@ __forceinline agt_fiber_param_t now() noexcept {
   return reinterpret_cast<const agt_fiber_param_t&>(time);
 }
 
-void setManualTime(void* state_, agt_fiber_param_t start_, agt_fiber_param_t end_) noexcept {
-  const auto start = std::bit_cast<std::chrono::high_resolution_clock::time_point>(start_);
-  const auto end = std::bit_cast<std::chrono::high_resolution_clock::time_point>(end_);
+void setManualTime(void* state_, agt_fiber_param_t start, agt_fiber_param_t end) noexcept {
+  const static long long PerfFrequency = []{
+    LARGE_INTEGER freq;
+    QueryPerformanceFrequency(&freq);
+    return freq.QuadPart;
+  }();
   auto& state = *static_cast<benchmark::State*>(state_);
-  state.SetIterationTime(std::chrono::duration_cast<std::chrono::duration<double>>(end - start).count());
+  const auto count = end - start;
+
+  using std::chrono::duration, std::chrono::duration_cast;
+
+  duration<double> iterationDuration;
+
+  if (PerfFrequency == 10000000) {
+    iterationDuration = duration_cast<duration<double>>(duration<uint64_t, std::nano>(count));
+  }
+  else {
+    iterationDuration =
+  }
+
+
+
+  // const auto start = std::bit_cast<std::chrono::high_resolution_clock::time_point>(start_);
+  // const auto end = std::bit_cast<std::chrono::high_resolution_clock::time_point>(end_);
+
+  // state.SetIterationTime(std::chrono::duration_cast<std::chrono::duration<double>>(end - start).count());
 }
 
 __forceinline agt_fiber_flags_t getFiberFlags(void* state, size_t pos = 0) noexcept {

@@ -21,12 +21,14 @@
 #include <algorithm>
 
 
-// Presently a MESS thanks to the stupid, environment variable selected implementation shit I decided to do. SIMPLIFY
-
 namespace agt {
 
   struct fctx;
-  struct agent_self;
+
+  enum {
+    CTX_FIBERS_ARE_LOCKED = 0x10,
+    CTX_HAS_USER_UEXEC    = 0x100,
+  };
 
 
   // If a context was already initialized on the current thread, return it. Otherwise, create a new one with the given params (may be null), initialize, and return it.
@@ -46,9 +48,11 @@ namespace agt {
 
   [[nodiscard]] inline agt_executor_t get_executor(agt_ctx_t ctx) noexcept;
 
-  [[nodiscard]] inline agent_self*    get_bound_agent(agt_ctx_t ctx) noexcept;
+  [[nodiscard]] inline agt_self_t     get_bound_agent(agt_ctx_t ctx) noexcept;
 
   [[nodiscard]] inline agt_message_t  get_current_message(agt_ctx_t ctx) noexcept;
+
+
 
 
 }// namespace agt
@@ -58,9 +62,13 @@ extern "C" {
 struct agt_ctx_st {
   agt_u32_t                      refCount;
   agt_flags32_t                  flags;
-  agt_executor_t                 executor;
-  agt::agent_self*               boundAgent;
-  agt_message_t                  currentMessage;
+  agt_uexec_t                    uexec;
+  const agt_uexec_vtable_t*      uexecVPtr;
+  agt_ctxexec_t                  ctxexec;
+  agt_utask_t                    task; // used by default uexec or by agent executors. Not used by user defined uexecs.
+  // agt_executor_t                 executor;
+  // agt_self_t                     boundAgent;
+  // agt_message_t                  currentMessage;
   agt::fctx*                     fctx; // null if this thread isn't using fibers
   agt_instance_t                 instance;
   uintptr_t                      threadId;
@@ -76,7 +84,7 @@ struct agt_ctx_st {
 
 
 template<size_t Size>
-agt::impl::ctx_pool&           agt::get_ctx_pool(agt_ctx_t ctx) noexcept {
+agt::impl::sized_pool&           agt::impl::get_ctx_pool(agt_ctx_t ctx) noexcept {
   // constexpr static size_t PoolIndex = alloc_impl::get_pool_index(Size);
   AGT_invariant( ctx != nullptr );
 
@@ -91,7 +99,7 @@ agt::impl::ctx_pool&           agt::get_ctx_pool(agt_ctx_t ctx) noexcept {
   return *alloc_impl::get_ctx_pool_unchecked(ctx->allocator, Size);
 }
 
-agt::impl::ctx_pool&           agt::get_ctx_pool_dyn(size_t size, agt_ctx_t ctx) noexcept {
+agt::impl::sized_pool& agt::impl::get_ctx_pool_dyn(agt_ctx_t ctx, size_t size) noexcept {
   // constexpr static size_t PoolIndex = alloc_impl::get_pool_index(Size);
   AGT_invariant( ctx != nullptr );
   if ( size > alloc_impl::get_max_alloc_size(ctx->allocator) ) [[unlikely]] {
@@ -107,13 +115,52 @@ AGT_forceinline agt_instance_t agt::get_instance(agt_ctx_t ctx) noexcept {
   return ctx->instance;
 }
 
+
+namespace agt {
+  inline static void lock_fibers(agt_ctx_t ctx) noexcept {
+    ctx->flags |= CTX_FIBERS_ARE_LOCKED;
+  }
+
+  inline static void unlock_fibers(agt_ctx_t ctx) noexcept {
+    ctx->flags &= ~CTX_FIBERS_ARE_LOCKED;
+  }
+
+  inline static bool fibers_are_locked(agt_ctx_t ctx) noexcept {
+    return ctx->flags & CTX_FIBERS_ARE_LOCKED;
+  }
+
+
+  inline static bool         yield(agt_ctx_t ctx) noexcept {
+    const auto yield = ctx->uexecVPtr->yield;
+    if (!yield)
+      return false;
+    return yield(ctx, ctx->ctxexec);
+  }
+
+  inline static void         suspend(agt_ctx_t ctx) noexcept {
+    ctx->uexecVPtr->suspend(ctx, ctx->ctxexec);
+  }
+
+  inline static agt_status_t suspend_for(agt_ctx_t ctx, agt_timeout_t timeout) noexcept {
+    return ctx->uexecVPtr->suspend_for(ctx, ctx->ctxexec, timeout);
+  }
+
+
+
+}
+
+
+
+
+/*
 AGT_forceinline agt_executor_t agt::get_executor(agt_ctx_t ctx) noexcept {
   return ctx->executor;
 }
 
-AGT_forceinline agt::agent_self* agt::get_bound_agent(agt_ctx_t ctx) noexcept {
+AGT_forceinline agt_self_t agt::get_bound_agent(agt_ctx_t ctx) noexcept {
   return ctx->boundAgent;
 }
+*/
 
 /*AGT_forceinline agt_message_t  agt::get_current_message(agt_ctx_t ctx) noexcept {
   return ctx->currentMessage;
@@ -121,8 +168,18 @@ AGT_forceinline agt::agent_self* agt::get_bound_agent(agt_ctx_t ctx) noexcept {
 
 
 
+// Use if the current function returns an agt_status_t
+#define AGT_try_resolve_ctx(_ctx)        \
+  do { if (_ctx == AGT_CURRENT_CTX) {    \
+    _ctx = agt::get_ctx();               \
+    if (!_ctx)                           \
+      return AGT_ERROR_CTX_NOT_ACQUIRED; \
+  } } while(false)
 
-
-
+#define AGT_resolve_ctx(_ctx)            \
+  do { if (_ctx == AGT_CURRENT_CTX) {    \
+    _ctx = agt::get_ctx();               \
+    AGT_invariant( _ctx != nullptr );    \
+  } } while(false)
 
 #endif//AGATE_CONTEXT_THREAD_CONTEXT_HPP

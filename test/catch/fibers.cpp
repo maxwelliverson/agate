@@ -91,8 +91,9 @@ agt_fiber_transfer_t fiber_fork(Fn&& fn) {
 }
 
 template <typename Fn> requires std::is_invocable_r_v<agt_fiber_param_t, Fn, agt_fiber_t, agt_fiber_param_t>
-agt_fiber_param_t fiber_loop(agt_fiber_param_t initialParam, Fn&& fn) {
+agt_fiber_param_t    fiber_loop(agt_fiber_param_t initialParam, Fn&& fn) {
   using func_t = std::remove_cvref_t<Fn>;
+
   func_t func{std::forward<Fn>(fn)};
 
   void* oldUserData = agt_set_fiber_data(AGT_CURRENT_FIBER, &func);
@@ -145,14 +146,19 @@ TEST_CASE("A normal thread may be converted into an fctx.", "[fibers]") {
     .maxFiberCount = 0,
     .parent = nullptr,
     .proc = [](agt_fiber_t fiber, agt_fiber_param_t param, void* userData) -> agt_fiber_param_t {
+
       REQUIRE( fiber != nullptr );
       REQUIRE( param == initialParam );
       REQUIRE( userData != nullptr );
+
       *static_cast<void**>(userData) = userData;
       auto currentFiber = agt_get_current_fiber(nullptr);
+
       REQUIRE( currentFiber != nullptr );
       REQUIRE( currentFiber == fiber );
+
       return initialParam;
+
     },
     .initialParam = initialParam,
     .userData = &userValue
@@ -174,13 +180,13 @@ TEST_CASE("Fibers in the same fctx can be switched between", "[fibers]") {
   agt_ctx_t ctx;
   agt_default_init(&ctx);
 
-  constexpr static agt_fiber_param_t InitialParam = 0;
-  constexpr static agt_fiber_param_t TotalSwitchCount = 0x4;
-  constexpr static agt_fiber_param_t ExpectedSumResult = sequential_sum(InitialParam, TotalSwitchCount);
+  const agt_fiber_param_t initialParam     = GENERATE(0, 1, 40);
+  const agt_fiber_param_t totalSwitchCount = GENERATE(4, 8, 32, 100);
+  const agt_fiber_param_t expectedSumResult = sequential_sum(initialParam, totalSwitchCount);
 
-  auto result = enter_fctx(InitialParam, [](agt_fiber_t source, agt_fiber_param_t param) -> agt_fiber_param_t {
+  auto result = enter_fctx(initialParam, [=](agt_fiber_t source, agt_fiber_param_t param) -> agt_fiber_param_t {
 
-    REQUIRE( param == InitialParam );
+    REQUIRE( param == initialParam );
 
     agt_fiber_param_t switchCount = param;
     agt_fiber_param_t sum = 0;
@@ -204,7 +210,7 @@ TEST_CASE("Fibers in the same fctx can be switched between", "[fibers]") {
     REQUIRE( secondFiber != nullptr );
     REQUIRE( firstFiber != secondFiber );
 
-    while (switchCount < TotalSwitchCount) {
+    while (switchCount < totalSwitchCount) {
       auto [ switchSource, nextSwitchCount ] = fiber_switch(secondFiber, switchCount);
 
       REQUIRE( this_fiber() == firstFiber );
@@ -221,7 +227,7 @@ TEST_CASE("Fibers in the same fctx can be switched between", "[fibers]") {
     return sum;
   });
 
-  REQUIRE( result == ExpectedSumResult );
+  REQUIRE( result == expectedSumResult );
 
   agt_finalize(ctx);
 }
@@ -246,6 +252,7 @@ TEST_CASE("A fiber can fork with agt_fiber_fork", "[fibers]") {
     agt_status_t newFiberResult;
     agt_fiber_t otherFiber;
 
+    // New fiber creates a new fiber but does not start execution right away.
     std::tie(newFiberResult, otherFiber) = new_fiber([&](agt_fiber_t innerSrc, agt_fiber_param_t innerParam) -> agt_fiber_param_t {
       const auto secondFiber = this_fiber();
 
@@ -264,18 +271,22 @@ TEST_CASE("A fiber can fork with agt_fiber_fork", "[fibers]") {
 
     REQUIRE( newFiberResult == AGT_SUCCESS );
 
-    // jump to other fiber
+    // The passed callback is invoked immediately on the current fiber.
     auto transfer = fiber_fork([&]() mutable -> agt_fiber_param_t {
+
       hasForked = true;
+      // This now jumps to the initial fiber entry point; ie. the callback passed to new_fiber.
       agt_fiber_jump(otherFiber, 2);
     });
 
+    // The above call to fiber_fork returns from the call to fiber_switch made by otherFiber
     REQUIRE( transfer.source == otherFiber );
     REQUIRE( transfer.param == 3);
 
     // switch to other fiber and fallthrough
     transfer = fiber_fork([&]() mutable -> agt_fiber_param_t {
 
+      // A fiber may switch successfully within a fork callback
       auto forkTransfer = fiber_switch(otherFiber, 4);
 
       REQUIRE( forkTransfer.source == otherFiber );

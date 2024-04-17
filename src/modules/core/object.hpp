@@ -11,10 +11,17 @@
 #include "agate/flags.hpp"
 #include "error.hpp"
 
+#include "ctx.hpp"
+
+
+// Note, the various bits of object infrastructure are not actually defined in this file,
+// but are rather in impl/object_defs.hpp, impl/sized_pool.hpp, and impl/allocator.hpp
+// Including this file however, does ensure all of the required files are included.
+
 
 namespace agt {
 
-  enum object_flags_t : agt_u8_t {
+  /*enum object_flags_t : agt_u8_t {
     OBJECT_IS_PRIVATE    = 0x1,
     OBJECT_IS_TRANSIENT  = 0x2,
     OBJECT_SLOT_IS_LARGE = 0x4,
@@ -203,181 +210,198 @@ namespace agt {
     else {
       release(static_cast<object*>(pObject));
     }
-  }
+  }*/
 
 
 
-#define AGT_object_type(objType, ...) \
+/*
+#define AGT_virtual_object(objType, ...) \
   struct objType; \
-  PP_AGT_impl_SPECIALIZE_OBJECT_ENUM(objType); \
+  PP_AGT_impl_SPECIALIZE_VIRTUAL_OBJECT_ENUM(objType); \
   struct objType : PP_AGT_impl_OBJECT_BASE(__VA_ARGS__)
 
-#define AGT_final_object_type(objType, ...) \
+#define AGT_object(objType, ...) \
   struct objType; \
   PP_AGT_impl_SPECIALIZE_OBJECT_ENUM(objType); \
   struct objType final : PP_AGT_impl_OBJECT_BASE(__VA_ARGS__)
 
-#define AGT_virtual_object_type(objType, ...)           \
+#define AGT_abstract_object(objType, ...)           \
   struct objType;                                       \
-  PP_AGT_impl_SPECIALIZE_OBJECT_ENUM_RANGE(objType);    \
+  PP_AGT_impl_SPECIALIZE_ABSTRACT_OBJECT_ENUM(objType);    \
   struct objType : PP_AGT_impl_OBJECT_BASE(__VA_ARGS__)
 
 #define AGT_assert_is_a(obj, selfType) AGT_assert( (obj)->type == object_type::selfType )
 #define AGT_assert_is_type(obj, selfType) AGT_assert( object_type::selfType##_begin <= (obj)->type && (obj)->type <= object_type::selfType##_end )
 #define AGT_get_type_index(obj, selfType) static_cast<agt_u32_t>(static_cast<agt_u16_t>((obj)->type) - static_cast<agt_u16_t>(object_type::selfType##_begin))
+*/
 
 
+  /*
+  template <typename T>
+  class weak_ref;
+  template <typename T>
+  class ref;
 
 
-
-
-
-  /*namespace impl {
-    template <bool IsThreadSafe>
-    class ref_base {
-    public:
-
-      ref_base() = default;
-      ref_base(const ref_base&) = delete;
-      ref_base(ref_base&& other) noexcept
-          : m_ptr(std::exchange(other.m_ptr, nullptr)) { }
-      explicit ref_base(rc_object* ptr) noexcept
-          : m_ptr(ptr) { }
-
-      ref_base& operator=(const ref_base&) = delete;
-      ref_base& operator=(ref_base&& other) noexcept {
-        _free();
-        m_ptr = std::exchange(other.m_ptr, nullptr);
-        return *this;
-      }
-
-      ~ref_base() {
-        _free();
-      }
-
-
-      [[nodiscard]] ref_base clone() const noexcept {
-        if (m_ptr) {
-          if constexpr (IsThreadSafe)
-            atomicRelaxedIncrement(m_ptr->refCount);
-          else
-            ++m_ptr->refCount;
-        }
-        return ref_base{ m_ptr };
-      }
-
-      [[nodiscard]] rc_object* get() const noexcept {
-        return m_ptr;
-      }
-
-      [[nodiscard]] rc_object* release() noexcept {
-        return std::exchange(m_ptr, nullptr);
-      }
-
-      void reset(rc_object* obj) noexcept {
-        if (obj != m_ptr) {
-          auto o = _acquire_or_null(obj);
-          _free();
-          m_ptr = obj;
-        }
-      }
-
-
-      static ref_base load(rc_object* obj) noexcept {
-        ref_base p;
-        p.m_ptr = obj;
-        return std::move(p);
-      }
-
-    private:
-
-      [[nodiscard]] static rc_object* _acquire(rc_object* obj) noexcept {
-        if constexpr (IsThreadSafe)
-          atomicRelaxedIncrement(obj->refCount);
-        else
-          ++obj->refCount;
-        return obj;
-      }
-
-      [[nodiscard]] static rc_object* _acquire_or_null(rc_object* obj) noexcept {
-        if (obj) {
-          if constexpr (IsThreadSafe)
-            atomicRelaxedIncrement(obj->refCount);
-          else
-            ++obj->refCount;
-        }
-        return obj;
-      }
-
-      void _free() noexcept {
-        if (m_ptr) {
-          if constexpr (IsThreadSafe) {
-            if (atomicDecrement(m_ptr->refCount) == 1)
-              free_obj(m_ptr);
-          }
-          else {
-            if (--m_ptr->refCount == 0)
-              free_obj(m_ptr);
-          }
-        }
-      }
-
-
-      rc_object* m_ptr;
-    };
-
-    extern template class ref_base<true>;
-    extern template class ref_base<false>;
-  }
-
-  template <typename T, bool IsThreadSafe>
+  template <typename T>
   class ref {
-    ref(impl::ref_base<IsThreadSafe> val) noexcept
-        : m_val(std::move(val)) { }
-
+    friend weak_ref<T>;
   public:
 
     using pointer   = T*;
     using reference = T&;
 
     ref() = default;
-    explicit ref(pointer p) noexcept
-        : m_val(p) {
-      static_assert(std::derived_from<T, object>);
+    ref(const ref&) = delete;
+    ref(ref&& other) noexcept : m_ptr(std::exchange(other.m_ptr, nullptr)) { }
+    ref(pointer p) noexcept
+        : m_ptr(p) {
+      static_assert(std::derived_from<T, rc_object>);
+    }
+
+    ref(const weak_ref<T>& weak, agt_epoch_t epoch) noexcept;
+
+    ref& operator=(const ref&) = delete;
+    ref& operator=(ref&& other) noexcept {
+      if (m_ptr)
+        agt::release(m_ptr);
+      m_ptr = std::exchange(other.m_ptr, nullptr);
+      return *this;
+    }
+
+    ~ref() {
+      if (m_ptr)
+        agt::release(m_ptr);
     }
 
 
     [[nodiscard]] inline pointer   operator->() const noexcept {
-      return m_val.get();
+      return m_ptr;
     }
     [[nodiscard]] inline reference operator*()  const noexcept {
-      return *m_val.get();
+      return *m_ptr;
     }
 
 
     [[nodiscard]] inline pointer get() const noexcept {
-      return m_val.get();
+      return m_ptr;
     }
 
     [[nodiscard]] inline ref clone() const noexcept {
-      return strong_ref(m_val.clone());
+      if (m_ptr)
+        agt::retain(m_ptr);
+      return ref(m_ptr);
     }
 
-    inline pointer release() noexcept {
-      return static_cast<pointer>(m_val.release());
+    template <typename ...Args>
+    inline void    recycle(Args&& ...args) noexcept {
+      AGT_assert( m_ptr != nullptr );
+      m_ptr = agt::recycle(m_ptr, std::forward<Args>(args)...);
     }
 
-    inline void    reset(pointer p) noexcept {
-      m_val.reset(p);
+    inline pointer take() noexcept {
+      return std::exchange(m_ptr, nullptr);
+    }
+
+    template <typename ...Args>
+    inline void    reset(pointer p, Args&& ...args) noexcept {
+      if (m_ptr)
+        agt::release(m_ptr, std::forward<Args>(args)...);
+      m_ptr = p;
+    }
+
+    // Disable overload if Args is a single argument that is convertible to pointer. In that case, we wish to select the other overload.
+    template <typename ...Args> requires(!(sizeof...(Args) == 1 && (std::convertible_to<Args, pointer> && ...)))
+    inline void    reset(Args&& ...args) noexcept {
+      if (m_ptr)
+        agt::release(m_ptr, std::forward<Args>(args)...);
+      m_ptr = nullptr;
     }
 
     [[nodiscard]] inline explicit operator bool() const noexcept {
-      return m_val.get() != nullptr;
+      return m_ptr != nullptr;
     }
 
   private:
-    impl::ref_base<IsThreadSafe> m_val;
-  };*/
+    pointer m_ptr = nullptr;
+  };
+
+  template <typename T>
+  class weak_ref {
+    friend ref<T>;
+
+    weak_ref(T* ptr) noexcept : m_ptr(ptr) { }
+  public:
+
+    using pointer   = T*;
+    using reference = T&;
+
+    weak_ref() = default;
+    weak_ref(const weak_ref&) = delete;
+    weak_ref(weak_ref&& other) noexcept
+      : m_ptr(std::exchange(other.m_ptr, nullptr)) { }
+
+    weak_ref(const ref<T>& obj, agt_epoch_t& key) noexcept
+      : weak_ref(obj.get(), key) { }
+    weak_ref(pointer ptr, agt_epoch_t& key) noexcept
+      : m_ptr(ptr) {
+      static_assert(std::derived_from<T, rc_object>);
+      key = take_weak_ref(ptr);
+    }
+
+    weak_ref& operator=(const weak_ref&) = delete;
+    weak_ref& operator=(weak_ref&& other) noexcept {
+      if (m_ptr)
+        drop_weak_ref(m_ptr);
+      m_ptr = std::exchange(other.m_ptr, nullptr);
+      return *this;
+    }
+
+    ~weak_ref() {
+      if (m_ptr)
+        drop_weak_ref(m_ptr);
+    }
+
+
+    weak_ref<T> clone(agt_epoch_t epoch) noexcept {
+      if (m_ptr && !retain_weak_ref(m_ptr, epoch))
+        return nullptr;
+      return m_ptr;
+    }
+
+    ref<T>      actualize(agt_epoch_t epoch) noexcept {
+      return { *this, epoch };
+    }
+
+
+    void        drop() noexcept {
+      if (m_ptr) {
+        drop_weak_ref(m_ptr);
+        m_ptr = nullptr;
+      }
+    }
+
+
+    [[nodiscard]] inline explicit operator bool() const noexcept {
+      return m_ptr != nullptr;
+    }
+
+  private:
+    pointer m_ptr = nullptr;
+  };
+
+
+  template <typename T>
+  ref<T>::ref(const weak_ref<T>& weak, agt_epoch_t epoch) noexcept
+    : m_ptr(static_cast<pointer>(actualize_weak_ref(weak.m_ptr, epoch))) { }
+
+  template <typename To, typename From>
+  ref<To> ref_cast(ref<From>&& r) noexcept {
+    return static_cast<To*>(r.take());
+  }
+  */
+
+
 }
 
 #endif//JEMSYS_AGATE2_INTERNAL_OBJECTS_HPP
