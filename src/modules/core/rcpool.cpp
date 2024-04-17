@@ -2,11 +2,12 @@
 // Created by maxwe on 2022-12-22.
 //
 
-#include "rc.hpp"
-#include "rcpool.hpp"
+// #include "rc.hpp"
+// #include "rcpool.hpp"
 
 
 
+/*
 #define AGT_return_type agt_status_t
 #define AGT_exported_function_name new_rcpool
 
@@ -41,4 +42,5 @@ AGT_export_family {
   }
 
 }
+*/
 

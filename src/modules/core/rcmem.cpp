@@ -2,10 +2,11 @@
 // Created by maxwe on 2022-12-22.
 //
 
-#include "rc.hpp"
-#include "rcpool.hpp"
+// #include "rc.hpp"
+// #include "rcpool.hpp"
 
 
+/*
 #define AGT_return_type void*
 
 #define AGT_exported_function_name rc_alloc
@@ -119,4 +120,4 @@ AGT_export_family {
       rc_user_release<true>(allocation, count);
     }
 
-}
+}*/

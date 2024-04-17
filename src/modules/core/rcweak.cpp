@@ -3,10 +3,11 @@
 //
 
 
-#include "rc.hpp"
-#include "rcpool.hpp"
+// #include "rc.hpp"
+// #include "rcpool.hpp"
 
 
+/*
 #define AGT_return_type agt_weak_ref_t
 #define AGT_exported_function_name weak_ref_take
 
@@ -142,4 +143,4 @@ AGT_export_family {
     return acquire_from_user_rc_weak_ref<agt::thread_user_safe>(token, epoch, flags);
   }
 
-}
+}*/
