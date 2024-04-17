@@ -1,18 +1,22 @@
 //
-// Created by maxwe on 2023-07-23.
+// Created by maxwe on 2024-04-07.
 //
 
-#ifndef AGATE_EXEC_H
-#define AGATE_EXEC_H
+#ifndef AGATE_EXECUTOR_H
+#define AGATE_EXECUTOR_H
+
 
 #include <agate/core.h>
 
 AGT_begin_c_namespace
 
+typedef void*                 agt_etask_t;
 typedef struct agt_equeue_st* agt_equeue_t;
 typedef void*                 agt_eagent_t;
 typedef struct agt_fiber_st*  agt_fiber_t;
 typedef struct agt_thread_st* agt_thread_t;
+
+typedef struct agt_exec_st*   agt_exec_t;
 
 typedef struct agt_receiver_st* agt_receiver_t;
 
@@ -27,6 +31,8 @@ typedef enum agt_ecmd_t {
   AGT_ECMD_SEND_AS,                 ///< Process message sent with agt_send_as
   AGT_ECMD_SEND_MANY,               ///< Process message sent with agt_send_many
   AGT_ECMD_SEND_MANY_AS,            ///< Process message sent with agt_send_many_as
+
+  AGT_ECMD_DELEGATE,                ///< May be sent as a result of calls to agt_delegate if the bound executor does not support direct delegation.
 
   AGT_ECMD_GET_TIMESTAMP,           ///<
 
@@ -77,7 +83,7 @@ typedef enum agt_executor_kind_t {
 
 
 typedef enum agt_executor_flag_bits_t {
-  AGT_EXECUTOR_IS_THREAD_SAFE = 0x1,
+  AGT_EXECUTOR_IS_THREAD_SAFE    = 0x1,
 } agt_executor_flag_bits_t;
 typedef agt_flags32_t agt_executor_flags_t;
 
@@ -108,9 +114,6 @@ typedef struct agt_executor_vtable_t {
   void            (* detachAgent)(void* userData, agt_eagent_t agentTag);
   agt_eagent_t    (* getReadyAgent)(void* userData);
   agt_bool_t      (* dispatchMessage)(void* userData, agt_ecmd_t cmd, agt_address_t paramA, agt_address_t paramB);
-  void            (* readyAgent)(void* userData, agt_eagent_t agent);
-  void            (* blockAgent)(void* userData, agt_eagent_t agent);
-  void            (* blockAgentUntil)(void* userData, agt_eagent_t agent, agt_timestamp_t timestamp);
 } agt_executor_vtable_t;
 
 
@@ -145,8 +148,11 @@ typedef struct agt_custom_executor_params_t {
   const agt_executor_vtable_t* vtable;
   agt_executor_proc_t          proc;
   void*                        userData;
-  agt_receiver_t               receiver;
 } agt_custom_executor_params_t;
+
+typedef struct agt_exec_desc_t {
+
+} agt_exec_desc_t;
 
 
 
@@ -204,9 +210,11 @@ AGT_exec_api agt_status_t AGT_stdcall agt_equeue_dispatch(agt_equeue_t equeue, a
 
 
 
+// AGT_exec_api agt_status_t AGT_stdcall agt_
 
 
 
 AGT_end_c_namespace
 
-#endif //AGATE_EXEC_H
+
+#endif//AGATE_EXECUTOR_H
