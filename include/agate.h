@@ -17,8 +17,9 @@
 #include <agate/agents.h>
 #include <agate/async.h>
 #include <agate/channels.h>
-#include <agate/exec.h>
+#include <agate/executor.h>
 #include <agate/fiber.h>
+#include <agate/hazptr.h>
 #include <agate/log.h>
 #include <agate/naming.h>
 #include <agate/network.h>
@@ -28,6 +29,7 @@
 #include <agate/task.h>
 #include <agate/thread.h>
 #include <agate/timer.h>
+#include <agate/uexec.h>
 
 #if defined(_MSC_VER)
 #pragma warning(pop)

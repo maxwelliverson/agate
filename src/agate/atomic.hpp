@@ -82,6 +82,28 @@ case 0:                                           \
 
 namespace agt {
 
+  namespace impl {
+    template <size_t N>
+    struct unsigned_size;
+    template <>
+    struct unsigned_size<1> { using type = agt_u8_t; };
+    template <>
+    struct unsigned_size<2> { using type = agt_u16_t; };
+    template <>
+    struct unsigned_size<4> { using type = agt_u32_t; };
+    template <>
+    struct unsigned_size<8> { using type = agt_u64_t; };
+
+    template <typename T> requires (std::is_trivial_v<T>)
+    using atomic_type_t = typename unsigned_size<sizeof(T)>::type;
+
+    template <typename T>
+    concept atomic_capable = std::is_trivial_v<T> && requires
+    {
+      typename unsigned_size<sizeof(T)>::type;
+    };
+  }
+
   class deadline {
 
 
@@ -130,6 +152,10 @@ namespace agt {
     agt_u64_t timestamp;
   };
 
+  inline static void spin() noexcept {
+    _mm_pause();
+  }
+
   inline void spin_sleep_until(deadline deadline) noexcept {
     agt_u32_t backoff = 0;
     while ( deadline.hasNotPassed() ) {
@@ -150,10 +176,51 @@ namespace agt {
     spin_sleep_until(deadline::fromTimeout(AGT_TIMEOUT_NS(ns)));
   }
 
+
+  /**
+   *
+   * Memory Semantics of Atomic Operations
+   *
+   * atomic_store --------------- Release
+   * atomic_load  --------------- Acquire
+   * atomic_relaxed_store ------- Relaxed
+   * atomic_relaxed_load -------- Relaxed
+   * atomic_store_if_equals ----- Acquire (essentially a CAS operation that does not need the actual stored value in case of failure)
+   * atomic_cas ----------------- Acquire, Release
+   * atomic_strict_cas ---------- Acquire, Release
+   * atomic_exchange ------------ Acquire, Release
+   * atomic_exchange_add -------- Acquire, Release
+   * atomic_exchange_sub -------- Acquire, Release
+   * atomic_exchange_and -------- Acquire, Release
+   * atomic_exchange_nand ------- Acquire, Release
+   * atomic_exchange_or --------- Acquire, Release
+   * atomic_exchange_xor -------- Acquire, Release
+   * atomic_add ----------------- Release
+   * atomic_sub ----------------- Release
+   * atomic_and ----------------- Release
+   * atomic_nand ---------------- Release
+   * atomic_or ------------------ Release
+   * atomic_xor ----------------- Release
+   * atomic_and ----------------- Release
+   * atomic_increment ----------- Acquire, Release
+   * atomic_relaxed_increment --- Relaxed (Special case for implementing reference counting).
+   * atomic_decrement ----------- Acquire, Release
+   *
+   *
+   *
+   *
+   * */
+
+
+
   void        atomicStore(agt_u8_t& value,  agt_u8_t newValue) noexcept;
   void        atomicStore(agt_u16_t& value, agt_u16_t newValue) noexcept;
   void        atomicStore(agt_u32_t& value, agt_u32_t newValue) noexcept;
   void        atomicStore(agt_u64_t& value, agt_u64_t newValue) noexcept;
+  template <impl::atomic_capable T>
+  inline void atomicStore(T& val, std::type_identity_t<T> newValue) noexcept {
+    atomicStore(*reinterpret_cast<impl::atomic_type_t<T>*>(&val), std::bit_cast<impl::atomic_type_t<T>>(newValue));
+  }
   template <typename T>
   inline void atomicStore(T*& value, std::type_identity_t<T>* newValue) noexcept {
     atomicStore(reinterpret_cast<agt_u64_t&>(value), reinterpret_cast<agt_u64_t>(newValue));
@@ -163,6 +230,10 @@ namespace agt {
   agt_u16_t atomicLoad(const agt_u16_t& value) noexcept;
   agt_u32_t atomicLoad(const agt_u32_t& value) noexcept;
   agt_u64_t atomicLoad(const agt_u64_t& value) noexcept;
+  template <impl::atomic_capable T>
+  inline T  atomicLoad(const T& val) noexcept {
+    return std::bit_cast<T>(atomicLoad(*reinterpret_cast<const impl::atomic_type_t<T>*>(&val)));
+  }
   template <typename T>
   inline T* atomicLoad(T* const & value) noexcept {
     return reinterpret_cast<T*>(atomicLoad(reinterpret_cast<const agt_u64_t&>(value)));
@@ -172,6 +243,10 @@ namespace agt {
   void       atomicRelaxedStore(agt_u16_t& value, agt_u16_t newValue) noexcept;
   void       atomicRelaxedStore(agt_u32_t& value, agt_u32_t newValue) noexcept;
   void       atomicRelaxedStore(agt_u64_t& value, agt_u64_t newValue) noexcept;
+  template <impl::atomic_capable T>
+  inline void atomicRelaxedStore(T& val, std::type_identity_t<T> newValue) noexcept {
+    atomicRelaxedStore(*reinterpret_cast<impl::atomic_type_t<T>*>(&val), std::bit_cast<impl::atomic_type_t<T>>(newValue));
+  }
   template <typename T>
   inline void atomicRelaxedStore(T*& value, std::type_identity_t<T>* newValue) noexcept {
     atomicRelaxedStore(reinterpret_cast<agt_u64_t&>(value), reinterpret_cast<agt_u64_t>(newValue));
@@ -181,6 +256,10 @@ namespace agt {
   agt_u16_t atomicRelaxedLoad(const agt_u16_t& value) noexcept;
   agt_u32_t atomicRelaxedLoad(const agt_u32_t& value) noexcept;
   agt_u64_t atomicRelaxedLoad(const agt_u64_t& value) noexcept;
+  template <impl::atomic_capable T>
+  inline T  atomicRelaxedLoad(const T& val) noexcept {
+    return std::bit_cast<T>(atomicRelaxedLoad(*reinterpret_cast<const impl::atomic_type_t<T>*>(&val)));
+  }
   template <typename T>
   inline T* atomicRelaxedLoad(T* const & value) noexcept {
     return reinterpret_cast<T*>(atomicRelaxedLoad(reinterpret_cast<const agt_u64_t&>(value)));
@@ -190,6 +269,11 @@ namespace agt {
   agt_u16_t atomicExchange(agt_u16_t& value, agt_u16_t newValue) noexcept;
   agt_u32_t atomicExchange(agt_u32_t& value, agt_u32_t newValue) noexcept;
   agt_u64_t atomicExchange(agt_u64_t& value, agt_u64_t newValue) noexcept;
+  template <impl::atomic_capable T>
+  inline T  atomicExchange(T& value, std::type_identity_t<T> newValue) noexcept {
+    using type_t = impl::atomic_type_t<T>;
+    return std::bit_cast<T>(atomicExchange(reinterpret_cast<type_t&>(value), std::bit_cast<type_t>(newValue)));
+  }
   template <typename T>
   inline T* atomicExchange(T*& value, std::type_identity_t<T>* newValue) noexcept {
     return reinterpret_cast<T*>(atomicExchange(reinterpret_cast<agt_u64_t&>(value), reinterpret_cast<agt_u64_t>(newValue)));
@@ -214,6 +298,11 @@ namespace agt {
       return false;
     }
     return true;
+  }
+  template <impl::atomic_capable T>
+  inline bool atomicCompareExchange(T& value, std::type_identity_t<T>& compare, std::type_identity_t<T> newValue) noexcept {
+    using type_t = impl::atomic_type_t<T>;
+    return atomicCompareExchange(reinterpret_cast<type_t&>(value), reinterpret_cast<type_t&>(compare), std::bit_cast<type_t>(newValue));
   }
   template <typename T>
   inline bool atomicCompareExchange(T*& value, T*& compare, std::type_identity_t<T>* newValue) noexcept {
@@ -242,6 +331,11 @@ namespace agt {
     }
     return true;
   }
+  template <impl::atomic_capable T>
+  inline bool atomicCompareExchangeWeak(T& value, std::type_identity_t<T>& compare, std::type_identity_t<T> newValue) noexcept {
+    using type_t = impl::atomic_type_t<T>;
+    return atomicCompareExchangeWeak(reinterpret_cast<type_t&>(value), reinterpret_cast<type_t&>(compare), std::bit_cast<type_t>(newValue));
+  }
   template <typename T>
   inline bool atomicCompareExchangeWeak(T*& value, T*& compare, std::type_identity_t<T>* newValue) noexcept {
     return atomicCompareExchangeWeak(reinterpret_cast<agt_u64_t&>(value), reinterpret_cast<agt_u64_t&>(compare), reinterpret_cast<agt_u64_t>(newValue));
@@ -251,6 +345,12 @@ namespace agt {
   agt_u16_t atomicIncrement(agt_u16_t& value) noexcept;
   agt_u32_t atomicIncrement(agt_u32_t& value) noexcept;
   agt_u64_t atomicIncrement(agt_u64_t& value) noexcept;
+
+  template <impl::atomic_capable T>
+  inline static T atomicIncrement(T& value) noexcept {
+    return atomicIncrement(*reinterpret_cast<impl::atomic_type_t<T>*>(&value));
+  }
+
   agt_u8_t  atomicRelaxedIncrement(agt_u8_t& value) noexcept;
   agt_u16_t atomicRelaxedIncrement(agt_u16_t& value) noexcept;
   agt_u32_t atomicRelaxedIncrement(agt_u32_t& value) noexcept;
@@ -261,10 +361,26 @@ namespace agt {
   agt_u32_t atomicDecrement(agt_u32_t& value) noexcept;
   agt_u64_t atomicDecrement(agt_u64_t& value) noexcept;
 
+  template <impl::atomic_capable T>
+  inline static T atomicDecrement(T& value) noexcept {
+    return atomicDecrement(*reinterpret_cast<impl::atomic_type_t<T>*>(&value));
+  }
+
   agt_u8_t  atomicExchangeAdd(agt_u8_t&  value, agt_u8_t  newValue) noexcept;
   agt_u16_t atomicExchangeAdd(agt_u16_t& value, agt_u16_t newValue) noexcept;
   agt_u32_t atomicExchangeAdd(agt_u32_t& value, agt_u32_t newValue) noexcept;
   agt_u64_t atomicExchangeAdd(agt_u64_t& value, agt_u64_t newValue) noexcept;
+
+  template <impl::atomic_capable T>
+  inline static T atomicExchangeAdd(T& value, std::type_identity_t<T> secondValue) noexcept {
+    return std::bit_cast<T>(atomicExchangeAdd(*reinterpret_cast<impl::atomic_type_t<T>*>(&value), std::bit_cast<impl::atomic_type_t<T>>(secondValue)));
+  }
+
+  agt_u8_t  atomicRelaxedExchangeAdd(agt_u8_t&  value, agt_u8_t  newValue) noexcept;
+  agt_u16_t atomicRelaxedExchangeAdd(agt_u16_t& value, agt_u16_t newValue) noexcept;
+  agt_u32_t atomicRelaxedExchangeAdd(agt_u32_t& value, agt_u32_t newValue) noexcept;
+  agt_u64_t atomicRelaxedExchangeAdd(agt_u64_t& value, agt_u64_t newValue) noexcept;
+
   agt_u8_t  atomicExchangeAnd(agt_u8_t&  value, agt_u8_t  newValue) noexcept;
   agt_u16_t atomicExchangeAnd(agt_u16_t& value, agt_u16_t newValue) noexcept;
   agt_u32_t atomicExchangeAnd(agt_u32_t& value, agt_u32_t newValue) noexcept;
@@ -2403,6 +2519,7 @@ namespace agt {
   };
 
 }
+
 
 #include "atomic.cpp"
 

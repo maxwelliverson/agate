@@ -4,6 +4,8 @@
 
 
 #include "instance.hpp"
+#include "attr.hpp"
+#include "time.hpp"
 
 #if AGT_system_windows
 #define NOMINMAX
@@ -15,6 +17,7 @@
 
 #include <init.hpp>
 #include <utility>
+#include <random>
 
 
 namespace {
@@ -24,6 +27,73 @@ namespace {
 #elif AGT_system_linux
     return static_cast<agt_u32_t>(gettid());
 #endif
+  }
+
+
+
+  uint64_t get_tsc_hz() noexcept {
+    DWORD data;
+    DWORD dataSize = sizeof(DWORD);
+    if (RegGetValue(HKEY_LOCAL_MACHINE,
+                "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
+                "~MHz", RRF_RT_DWORD, nullptr, &data, &dataSize) == ERROR_SUCCESS) {
+      return static_cast<uint64_t>(data) * 1000000;
+    }
+    return 0;
+  }
+
+  AGT_forceinline uint64_t get_100ns_timestamp() noexcept {
+    LARGE_INTEGER lrgInt;
+    QueryPerformanceCounter(&lrgInt);
+    return lrgInt.QuadPart;
+  }
+
+  template <typename T>
+  [[msvc::noinline, clang::noinline]] void do_not_optimize(T&&) noexcept { }
+
+  std::pair<uint32_t, uint32_t> get_tsc_to_ns_ratio() noexcept {
+    if (auto tscHz = get_tsc_hz()) {
+      auto billion = 1000000000ull;
+      const auto gcd = impl::calculate_gcd(tscHz, billion);
+      if (gcd != 1) {
+        tscHz /= gcd;
+        billion /= gcd;
+      }
+      if (tscHz > UINT_MAX) {
+        std::terminate(); // :(
+      }
+
+      return { static_cast<uint32_t>(billion), static_cast<uint32_t>(tscHz) };
+    }
+
+
+    constexpr static uint64_t EstimateTimeout_ms = 500;
+
+
+    const auto start100ns = get_100ns_timestamp();
+    const auto start      = __rdtsc();
+
+
+    const uint64_t   target100ns = start100ns + (EstimateTimeout_ms * 10000);
+
+
+    std::minstd_rand rng{};
+    uint64_t state = 0;
+    uint64_t curr100ns = get_100ns_timestamp();
+
+    while (curr100ns < target100ns) {
+      constexpr static auto BatchSize = 10000;
+      rng.discard(BatchSize);
+      state += rng();
+      curr100ns = get_100ns_timestamp();
+    }
+
+    do_not_optimize(state);
+
+    const auto end100ns = get_100ns_timestamp();
+    const auto end = __rdtsc();
+
+    return { static_cast<uint32_t>((end100ns - start100ns) * 100), static_cast<uint32_t>(end - start) };
   }
 }
 
@@ -62,6 +132,7 @@ void  agt::instance_free_pages(agt_instance_t inst, void *addr, size_t totalSize
 
 
 
+
 namespace agt {
 
   void                 AGT_stdcall destroy_instance_private(agt_instance_t instance, bool invokedOnThreadExit) {
@@ -70,6 +141,7 @@ namespace agt {
       auto procEntries = instance->exports->pProcSet;
       delete[] procEntries;
       auto modules = exports->modules;
+      impl::destroy_monitor_list_local(instance, instance->monitorList); // Don't worry about signalling all remaining waiters; the library is being destroyed, so they won't get a chance to do anything anyways if they *do* exist.
       destroy_default_allocator_params(instance, instance->defaultAllocatorParams);
       delete[] instance->attrTypes;
       delete[] instance->attrValues;
@@ -112,7 +184,14 @@ namespace agt {
     inst->contextCount = 0;
     inst->defaultMaxObjectSize = 512; // Arbitrary, change later need be.
 
-    const auto nativeDurationUnit = pAttrValues[AGT_ATTR_NATIVE_DURATION_UNIT_SIZE_NS];
+    agt::impl::init_monitor_list_local(inst, inst->monitorList, 512, attr::thread_count(inst));
+
+
+    auto [ tscToNsNum, tscToNsDenom ] = get_tsc_to_ns_ratio();
+    precompile_ratio(inst->tscToNs, tscToNsNum, tscToNsDenom);
+    precompile_ratio(inst->nsToTsc, tscToNsDenom, tscToNsNum);
+
+    /*const auto nativeDurationUnit = pAttrValues[AGT_ATTR_NATIVE_DURATION_UNIT_SIZE_NS];
     const auto durationUnit = pAttrValues[AGT_ATTR_DURATION_UNIT_SIZE_NS];
 
     if (nativeDurationUnit == durationUnit) {
@@ -127,7 +206,7 @@ namespace agt {
       else {
         // TODO: Implement!!
       }
-    }
+    }*/
 
 
     inst->instanceNameOffset = 0;

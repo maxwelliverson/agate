@@ -13,6 +13,8 @@
 #include "export_table.hpp"
 #include "impl/allocator.hpp"
 #include "impl/registry.hpp"
+#include "impl/monitor_list.hpp"
+#include "impl/hazptr_manager.hpp"
 
 
 
@@ -33,11 +35,15 @@ struct agt_instance_st {
   agt_internal_log_handler_t logCallback;
   void*                      logCallbackUserData;
   agt_u32_t                  contextCount;
+  agt::impl::monitor_list    monitorList;
+
+
 
   agt_size_t                 defaultMaxObjectSize;
 
 
-  integer_divisor            timeoutDivisor;
+  ratio_multiplier           tscToNs;
+  ratio_multiplier           nsToTsc;
 
   agt_u32_t                  instanceNameOffset;
   agt_u32_t                  instanceNameLength;

@@ -329,6 +329,36 @@ inline agt_u64_t agt::atomicExchangeAdd(agt_u64_t& value, agt_u64_t newValue) no
 }
 
 
+inline agt_u8_t  agt::atomicRelaxedExchangeAdd(agt_u8_t& value, agt_u8_t newValue) noexcept {
+#if AGT_system_windows
+  return (agt_u8_t)_InterlockedExchangeAdd8((char*)&value, (char)newValue);
+#else
+  return __atomic_fetch_add(&value, newValue, __ATOMIC_RELAXED);
+#endif
+}
+inline agt_u16_t agt::atomicRelaxedExchangeAdd(agt_u16_t& value, agt_u16_t newValue) noexcept {
+#if AGT_system_windows
+  return (agt_u16_t)_InterlockedExchangeAdd16((agt_i16_t*)&value, (agt_i16_t)newValue);
+#else
+  return __atomic_fetch_add(&value, newValue, __ATOMIC_RELAXED);
+#endif
+}
+inline agt_u32_t agt::atomicRelaxedExchangeAdd(agt_u32_t& value, agt_u32_t newValue) noexcept {
+#if AGT_system_windows
+  return _InterlockedExchangeAdd(&value, newValue);
+#else
+  return __atomic_fetch_add(&value, newValue, __ATOMIC_RELAXED);
+#endif
+}
+inline agt_u64_t agt::atomicRelaxedExchangeAdd(agt_u64_t& value, agt_u64_t newValue) noexcept {
+#if AGT_system_windows
+  return _InterlockedExchangeAdd(&value, newValue);
+#else
+  return __atomic_fetch_add(&value, newValue, __ATOMIC_RELAXED);
+#endif
+}
+
+
 inline agt_u8_t  agt::atomicExchangeAnd(agt_u8_t& value, agt_u8_t newValue) noexcept {
 #if AGT_system_windows
   return (agt_u8_t)InterlockedAnd8((char*)&value, (char)newValue);
