@@ -14,6 +14,7 @@
 
 #include <span>
 
+#include "core/async.hpp"
 
 
 /*
@@ -443,72 +444,108 @@ AGT_agent_api void         AGT_stdcall agt_delegate(agt_agent_t recipient) AGT_n
 }*/
 
 
+namespace {
+
+  agt_status_t resolve_direct_message(void* obj, agt_u64_t* pResult, void* callbackData) noexcept {
+    const auto data = static_cast<local_agent_message_async_data*>(obj);
+    if (atomicLoad(data->isComplete)) {
+      if (pResult)
+        *pResult = data->responseValue;
+      return data->status;
+    }
+    return AGT_NOT_READY;
+  }
+
+  void init_direct_message_async(agt_message_t msg, agt::async* async) noexcept {
+    if (async) {
+      auto asyncData = local_async_bind(*async, 1);
+      auto userData = static_cast<local_agent_message_async_data*>(get_local_async_user_data(asyncData));
+      userData->isComplete = AGT_FALSE;
+      userData->responseValue = 0;
+      userData->status = AGT_SUCCESS;
+      async->resolveCallback = resolve_direct_message;
+      async->resolveCallbackData = nullptr;
+      message_bind_async(msg, to_handle(asyncData), get_local_async_key(asyncData));
+    }
+    else {
+      msg->asyncData = {};
+      msg->asyncKey = {};
+    }
+  }
 
 
-namespace agt {
-  agt_status_t AGT_stdcall agent_send_local(agt_self_t self_, agt_agent_t recipient_, const agt_send_info_t* pSendInfo) noexcept {
-    if (!self_ || !pSendInfo || !recipient_) [[unlikely]]
-      return AGT_ERROR_INVALID_ARGUMENT;
-
+  agt_status_t send_local(agt_self_t self, agt_agent_t recipient, const agt_send_info_t* pSendInfo, agt_agent_instance_t sender) noexcept {
     agt_inline_async_t inlineAsync;
 
-    const auto self = reinterpret_cast<agent_self*>(self_);
-    const auto recipient = reinterpret_cast<agent*>(recipient_);
-
     acquire_message_info msgInfo{
-      .cmd        = AGT_ECMD_AGENT_MESSAGE,
-      .layout     = AGT_MSG_LAYOUT_AGENT_CMD,
-      .flags      = pSendInfo->flags,
-      .bufferSize = static_cast<agt_u32_t>(pSendInfo->size),
-      .sender     = self
+        .cmd        = AGT_ECMD_AGENT_MESSAGE,
+        .layout     = AGT_MSG_LAYOUT_AGENT_CMD,
+        .flags      = pSendInfo->flags,
+        .bufferSize = static_cast<agt_u32_t>(pSendInfo->size)
     };
 
-    if (pSendInfo->async == AGT_SYNCHRONIZE) {
-      const auto ctx = get_ctx();
-      msgInfo.async = init_inline_async_local(ctx, inlineAsync, AGT_ONE_AND_DONE);
+    const bool shouldSynchronize = pSendInfo->async == AGT_SYNCHRONIZE;
+
+    auto async = static_cast<agt::async*>(pSendInfo->async);
+
+    if (shouldSynchronize) {
+      const auto ctx = self->ctx;
+      inlineAsync = AGT_INIT_INLINE_ASYNC(self->ctx);
+      async = reinterpret_cast<agt::async*>(&inlineAsync);
     }
-    else
-      msgInfo.async = static_cast<agt::async*>(pSendInfo->async);
 
-    assert( recipient->executor != nullptr );
+    AGT_invariant( recipient->executor != nullptr );
+    const auto exec = recipient->executor;
 
-    executor receiverExec = recipient->executor;
+    agt_message_t msg;
 
-    message msg;
-    auto status = receiverExec.acquire_message(msgInfo, msg);
+    auto status = exec->vptr->acquireMessage(exec, msgInfo, msg);
 
     if (status != AGT_SUCCESS)
       return status;
 
-    auto agentMsg = msg.get_as<agent_message>();
+    AGT_invariant( pSendInfo->size != 0 );
 
-    // agentMsg->sender   = self;
-    agentMsg->receiver = recipient->self;
-    std::memcpy(agentMsg->buffer, pSendInfo->buffer, pSendInfo->size);
+    msg->sender = sender;
+    msg->agent  = recipient->instance;
 
-    msg.write_send_time();
+    msg->sendTime = now();
 
-    status = receiverExec.commit_message(msg);
+    init_direct_message_async(msg, async);
 
-    if (pSendInfo->async == AGT_SYNCHRONIZE && status == AGT_SUCCESS) {
+    std::memcpy(message_payload(msg), pSendInfo->buffer, pSendInfo->size);
 
-      auto async = msgInfo.async;
+    status = exec->vptr->commitMessage(exec, msg);
+
+    if (shouldSynchronize && status == AGT_SUCCESS) {
 
       status = async_status(*async); // Try getting status before blocking, in case it is able to complete right away.
 
-      if (status == AGT_NOT_READY) {
-        executor exec = self->executor;
-        status = exec.block_agent(self, *async);
+      if (status == AGT_NOT_READY) [[likely]] {
+        status = block_executor(self->executor, self, *async, 0);
+        local_async_destroy(*async);
       }
     }
 
     return status;
   }
+}
 
+
+
+namespace agt {
+  agt_status_t AGT_stdcall agent_send_local(agt_self_t self, agt_agent_t recipient, const agt_send_info_t* pSendInfo) noexcept {
+    if (!self || !pSendInfo || !recipient) [[unlikely]]
+      return AGT_ERROR_INVALID_ARGUMENT;
+    return send_local(self, recipient, pSendInfo, self->agent);
+  }
 
   agt_status_t AGT_stdcall agent_send_as_local(agt_self_t self, agt_agent_t spoofSender, agt_agent_t recipient, const agt_send_info_t* pSendInfo) noexcept {
-    return AGT_ERROR_NOT_YET_IMPLEMENTED;
+    if (!self || !spoofSender || !pSendInfo || !recipient) [[unlikely]]
+      return AGT_ERROR_INVALID_ARGUMENT;
+    return send_local(self, recipient, pSendInfo, spoofSender->instance);
   }
+
   agt_status_t AGT_stdcall agent_send_many_local(agt_self_t self, const agt_agent_t* recipients, agt_size_t agentCount, const agt_send_info_t* pSendInfo) noexcept {
     return AGT_ERROR_NOT_YET_IMPLEMENTED;
   }
@@ -548,6 +585,34 @@ namespace agt {
 
   void AGT_stdcall agent_delegate_local(agt_self_t self, agt_agent_t recipient) noexcept {
 
+    auto msg = self->message;
+    msg->agent = recipient->instance;
+    const auto exec = recipient->executor;
+
+    // If exec is unable to support externally sourced messages,
+    if ( test(exec->flags, agt::eExecutorHasIntegratedMsgQueue) ) {
+      acquire_message_info msgInfo{
+          .cmd        = AGT_ECMD_DELEGATE,
+          .layout     = AGT_MSG_LAYOUT_INDIRECT,
+          .flags      = 0,
+          .bufferSize = 0
+      };
+      agt_message_t indirectMsg;
+      auto status = acquire_executor_msg(exec, msgInfo, indirectMsg);
+
+      if (status != AGT_SUCCESS) {
+        self->errorCode = status;
+        return;
+      }
+
+      // we have to manually set msg's state here, as it isn't being directly requeued, but we need to ensure
+      // that it isn't released once self completes.
+
+      indirectMsg->indirectMsg = msg;
+      msg = indirectMsg;
+    }
+
+    self->errorCode = send_executor_msg(exec, msg);
   }
 
   void AGT_stdcall agent_return_local(agt_self_t self, agt_u64_t value) noexcept {

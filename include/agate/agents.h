@@ -8,6 +8,9 @@
 #include <agate/core.h>
 
 
+#define AGT_REPLY ((agt_agent_t)-2)
+
+
 AGT_begin_c_namespace
 
 /* =================[ Types ]================= */
