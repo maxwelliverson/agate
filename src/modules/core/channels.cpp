@@ -106,7 +106,7 @@ static agt_status_t resolve_channel_callback(void* obj, agt_u64_t* pResult, void
 
   AGT_invariant( obj != nullptr );
   auto& info = *static_cast<local_channel_async_info*>(obj);
-  if (atomicLoad(info.complete) == AGT_TRUE) {
+  if (atomic_load(info.complete) == AGT_TRUE) {
     if (pResult)
       *pResult = info.value;
     return AGT_SUCCESS;
@@ -237,7 +237,7 @@ namespace agt {
       if (auto obj = try_acquire_local_async(msg->asyncData, msg->asyncKey)) {
         auto& data = *static_cast<local_channel_async_info*>(obj);
         data.value = response;
-        atomicStore(data.complete, AGT_TRUE);
+        atomic_store(data.complete, AGT_TRUE);
         wake_local_async(msg->asyncData, &data.complete);
         release_local_async(msg->asyncData, false);
       }

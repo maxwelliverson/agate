@@ -204,12 +204,12 @@ namespace agt {
     }
 
     AGT_forceinline void                 _retain_chunk(pool_chunk_t chunk) noexcept {
-      atomicRelaxedIncrement(_get_first_chunk_header(chunk)->weakRefCount);
+      atomic_relaxed_increment(_get_first_chunk_header(chunk)->weakRefCount);
     }
 
     AGT_forceinline void                 _release_chunk(pool_chunk_t chunk) noexcept {
       const auto smallChunk = _get_first_chunk_header(chunk);
-      if ( atomicDecrement(smallChunk->weakRefCount) == 0)
+      if ( atomic_decrement(smallChunk->weakRefCount) == 0)
         instance_mem_free(smallChunk->instance, smallChunk, smallChunk->chunkSize, PoolChunkAlignment);
     }
 
@@ -487,13 +487,13 @@ namespace agt {
         } old, next;
 
 
-        old.bits = atomicRelaxedLoad(list.bits);
+        old.bits = atomic_relaxed_load(list.bits);
         next.nextSlot = slot.self;
 
         do {
           next.length = old.length + 1;
           slot.next   = old.nextSlot;
-        } while(!atomicCompareExchangeWeak(list.bits, old.bits, next.bits));
+        } while(!atomic_cas(list.bits, old.bits, next.bits));
 
         return next.length;
       }
@@ -520,7 +520,7 @@ namespace agt {
           agt_u32_t bits;
         } old, next;
 
-        old.bits = atomicRelaxedLoad(list.bits);
+        old.bits = atomic_relaxed_load(list.bits);
         pool_slot* slot;
 
         do {
@@ -532,7 +532,7 @@ namespace agt {
 
           next.length = old.length - 1;
           next.nextSlot = slot->next;
-        } while(!atomicCompareExchangeWeak(list.bits, old.bits, next.bits));
+        } while(!atomic_cas(list.bits, old.bits, next.bits));
 
         return std::pair{ *slot, next.length };
       }
@@ -555,7 +555,7 @@ namespace agt {
 
       delayed_free_list old, next;
 
-      old.bits = atomicRelaxedLoad(list.bits);
+      old.bits = atomic_relaxed_load(list.bits);
 
       agt_u16_t thisSlot = slot.self;
       next.next = thisSlot;
@@ -566,7 +566,7 @@ namespace agt {
         next.head = old.head == 0 ? thisSlot : old.head;
         next.length = old.length + 1;
         slot.next = old.next;
-      } while(!atomicCompareExchangeWeak(list.bits, old.bits, next.bits));
+      } while(!atomic_cas(list.bits, old.bits, next.bits));
     }
 
     // returns nullopt if no deferred pushes were processed
@@ -581,7 +581,7 @@ namespace agt {
 
       delayed_free_list old;
 
-      if ((old.bits = atomicExchange(list.bits, 0))) {
+      if ((old.bits = atomic_exchange(list.bits, 0))) {
         chunk->freeSlotList.nextSlot = old.next;
         chunk->freeSlotList.length   = old.length;
 
@@ -601,7 +601,7 @@ namespace agt {
 
       delayed_free_list old;
 
-      if ((old.bits = atomicExchange(list.bits, 0))) {
+      if ((old.bits = atomic_exchange(list.bits, 0))) {
         _get_slot(chunk, old.head).next = chunk->freeSlotList.nextSlot;
         chunk->freeSlotList.nextSlot = old.next;
         chunk->freeSlotList.length   += old.length;

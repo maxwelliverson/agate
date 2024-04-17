@@ -22,7 +22,7 @@ agt_status_t agt::send_local_spsc(sender_t sender, agt_message_t message) noexce
   auto tail = s->tail;
   s->tail = &msg.next();
   std::atomic_thread_fence(std::memory_order_acq_rel);
-  atomicStore(tail->c_ref(), message);
+  atomic_store(tail->c_ref(), message);
 
   return AGT_SUCCESS;
 }
@@ -36,8 +36,8 @@ agt_status_t agt::send_local_mpsc(sender_t sender,  agt_message_t message) noexc
   if (auto queue = s->receiver.actualize(s->receiverEpoch)) [[likely]] {
     // While seemingly overly simplistic, this actually works fine.
     // Doing the updates in this order ensures consistency, because the receiver never cares about the value of queue->tail.
-    auto tail = atomicExchange(queue->tail, &msg.next());
-    atomicStore(tail->c_ref(), message);
+    auto tail = atomic_exchange(queue->tail, &msg.next());
+    atomic_store(tail->c_ref(), message);
 
     return AGT_SUCCESS;
   }
@@ -49,8 +49,8 @@ agt_status_t agt::send_local_mpsc(sender_t sender,  agt_message_t message) noexc
   // message->next = nullptr;
 
   // basic_message** expectedTail = &q->head;
-  // while (!atomicCompareExchange(q->tail, expectedTail, &message->next));
-  // atomicStore(*expectedTail, message);
+  // while (!atomic_try_replace(q->tail, expectedTail, &message->next));
+  // atomic_store(*expectedTail, message);
 
 
 }
@@ -61,12 +61,12 @@ agt_status_t agt::send_local_spmc(sender_t sender,  agt_message_t message) noexc
   agt::message msg = message;
   msg.next() = nullptr;
 
-  if (atomicRelaxedLoad(s->receiverCount) == 0)
+  if (atomic_relaxed_load(s->receiverCount) == 0)
     return AGT_ERROR_NO_RECEIVERS;
 
   // This can probably be optimized
-  auto tail = atomicExchange(s->tail, &msg.next());
-  atomicStore(tail->c_ref(), message);
+  auto tail = atomic_exchange(s->tail, &msg.next());
+  atomic_store(tail->c_ref(), message);
 
   return AGT_SUCCESS;
 }

@@ -97,7 +97,7 @@ namespace agt {
     agt_u32_t availableSize = sender->availableSize;
 
     if (availableSize < requiredSize) {
-      availableSize += atomicExchange(*sender->pReleasedSize, 0);
+      availableSize += atomic_exchange(*sender->pReleasedSize, 0);
       if (availableSize < requiredSize) {
         switch (timeout) {
           case AGT_DO_NOT_WAIT:
@@ -121,7 +121,7 @@ namespace agt {
     msg->nextOffset = nextOffset;
     sender->tailOffset = nextOffset;
     sender->availableSize = availableSize - requiredSize;
-    atomicRelaxedIncrement(sender->enqueuedMessageCount);
+    atomic_relaxed_increment(sender->enqueuedMessageCount);
 
     *pMsg = _get_msg_buffer(msg);
 

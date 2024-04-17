@@ -71,17 +71,17 @@ namespace {
 
 
   void      async_data_attach_waiter(agt::async_data* data) noexcept {
-    agt::atomicExchangeAdd(data->refCount, AttachWaiter);
+    agt::atomic_exchange_add(data->refCount, AttachWaiter);
   }
   void      async_data_detach_waiter(agt::async_data* data) noexcept {
-    agt::atomicExchangeAdd(data->refCount, DetachWaiter);
+    agt::atomic_exchange_add(data->refCount, DetachWaiter);
   }
 
   void      async_data_modify_ref_count(agt_ctx_t ctx, async_data_t data_, agt_u64_t diff) noexcept {
     if (auto data = handle_cast<local_async_data>(data_))
-      agt::atomicExchangeAdd(data->refCount, diff);
+      agt::atomic_exchange_add(data->refCount, diff);
     else
-      agt::atomicExchangeAdd(get_shared_async_data(ctx, data_)->refCount, diff);
+      agt::atomic_exchange_add(get_shared_async_data(ctx, data_)->refCount, diff);
   }
 
   void      async_data_attach_waiter(agt_ctx_t ctx, async_data_t data) noexcept {
@@ -96,7 +96,7 @@ namespace {
   void      async_data_advance_epoch(agt::async_data* data) noexcept {
     ++data->epoch;
     // data->currentKey = (async_key_t)((std::underlying_type_t<async_key_t>)data->currentKey + 1);
-    agt::atomicRelaxedStore(data->responseCounter, 0);
+    agt::atomic_relaxed_store(data->responseCounter, 0);
   }*/
 
 
@@ -104,7 +104,7 @@ namespace {
 
   /*agt_status_t     async_data_status(agt::async_data* data, agt_u32_t expectedCount) noexcept {
     if (expectedCount != 0) [[likely]] {
-      agt_u64_t responseCount = agt::atomicLoad(data->responseCounter);
+      agt_u64_t responseCount = agt::atomic_load(data->responseCounter);
       if (async_total_responses(responseCount) >= expectedCount) {
         // FIXME: (Probably fine) The following line may or may not need to be here depending on when waiters are attached, so to speak
         async_data_detach_waiter(data);
@@ -117,9 +117,9 @@ namespace {
 
   agt_status_t     async_data_status(agt::shared_async_data* data, agt_u32_t expectedCount) noexcept {
     /*if (expectedCount != 0) [[likely]] {
-      agt_u64_t responseCount = agt::impl::atomicLoad(data->responseCounter);
+      agt_u64_t responseCount = agt::impl::atomic_load(data->responseCounter);
       if (totalResponses(responseCount) >= expectedCount) {
-        // FIXME: agt::impl::atomicExchangeAdd(asyncData->refCount, DetatchWaiter);
+        // FIXME: agt::impl::atomic_exchange_add(asyncData->refCount, DetatchWaiter);
         //        The above line may or may not need to be here depending on when waiters are attached, so to speak
         return hasDroppedResponses(responseCount) ? AGT_ERROR_PARTNER_DISCONNECTED : AGT_SUCCESS;
       }
@@ -153,7 +153,7 @@ namespace {
 
   void             async_data_destroy(agt_ctx_t context, agt::async_data* data) noexcept {
 
-    AGT_assert(atomicLoad(data->refCount) == 0);
+    AGT_assert(atomic_load(data->refCount) == 0);
 
     ctxReleaseLocalAsyncData(context, data);
 
@@ -167,7 +167,7 @@ namespace {
 
   void             async_data_destroy(agt_ctx_t context, agt::shared_async_data* data, async_data_t handle) noexcept {
 
-    AGT_assert(atomicLoad(data->refCount) == 0);
+    AGT_assert(atomic_load(data->refCount) == 0);
 
     ctxReleaseSharedAsyncData(context, handle);
 
@@ -212,7 +212,7 @@ namespace {
   // returns total responses
 
   AGT_forceinline agt_u32_t async_respond(agt::async_data* asyncData, agt_u64_t response) noexcept {
-    return static_cast<agt_u32_t>(async_total_responses(atomicExchangeAdd(asyncData->responseCounter, response) + response));
+    return static_cast<agt_u32_t>(async_total_responses(atomic_exchange_add(asyncData->responseCounter, response) + response));
   }
 
 
@@ -244,7 +244,7 @@ namespace {
       }
     }
 
-    return atomicExchangeAdd(data->refCount, DecNonWaiterRef) == 0x1;
+    return atomic_exchange_add(data->refCount, DecNonWaiterRef) == 0x1;
   }
 
 
@@ -446,7 +446,7 @@ async_key_t agt::async_data_attach(agt_ctx_t ctx, async_data_t data) noexcept {
     // if data is local, assign to localData and fallthrough
     if (!(localData = handle_cast<local_async_data>(data))) {
       auto sharedData = get_shared_async_data(ctx, data);
-      atomicExchangeAdd(sharedData->refCount, IncNonWaiterRef);
+      atomic_exchange_add(sharedData->refCount, IncNonWaiterRef);
       return static_cast<async_key_t>(sharedData->epoch);
     }
   }
@@ -454,7 +454,7 @@ async_key_t agt::async_data_attach(agt_ctx_t ctx, async_data_t data) noexcept {
     localData = reinterpret_cast<local_async_data*>(data);
   }
 
-  atomicExchangeAdd(localData->refCount, IncNonWaiterRef);
+  atomic_exchange_add(localData->refCount, IncNonWaiterRef);
   return static_cast<async_key_t>(localData->epoch);
 }
 template <bool SharedIsEnabled>
@@ -561,7 +561,7 @@ std::pair<async_data_t, async_key_t> agt::async_attach_local(async& async, agt_u
     bool shouldDetatchAndCreateNew = false;
 
     if (isWaiting) {
-      if (async_total_waiters(atomicLoad(data->refCount)) != 1)
+      if (async_total_waiters(atomic_load(data->refCount)) != 1)
         shouldDetatchAndCreateNew = true;
     }
     else if (current_key(data) == async.dataKey) {
@@ -570,8 +570,8 @@ std::pair<async_data_t, async_key_t> agt::async_attach_local(async& async, agt_u
       // attach again, in which case its best to let it for the sake of data locality. We wouldn't be avoiding new allocations
       // in that case, because if we reuse this data and the other entity tries to also reuse this data, it'll also have to
       // allocate a new object. TL;DR, while tempting to reuse every async_data object free for reuse, it's not always optimal.
-      agt_u64_t refCount = atomicRelaxedLoad(data->refCount);
-      if (async_total_waiters(refCount) || !atomicCompareExchange(data->refCount, refCount, refCount + AttachWaiter))
+      agt_u64_t refCount = atomic_relaxed_load(data->refCount);
+      if (async_total_waiters(refCount) || !atomic_try_replace(data->refCount, refCount, refCount + AttachWaiter))
         shouldDetatchAndCreateNew = true;
     }
     else
@@ -580,8 +580,8 @@ std::pair<async_data_t, async_key_t> agt::async_attach_local(async& async, agt_u
 
     if (shouldDetatchAndCreateNew) {
       // Detatch, but in the off chance that all other references were dropped before this, reuse.
-      if (atomicExchangeAdd(data->refCount, refOffset) + refOffset == 0)
-        atomicStore(data->refCount, IncWaiterRef);
+      if (atomic_exchange_add(data->refCount, refOffset) + refOffset == 0)
+        atomic_store(data->refCount, IncWaiterRef);
       else
         shouldCreateNew = true;
     }
@@ -593,12 +593,12 @@ std::pair<async_data_t, async_key_t> agt::async_attach_local(async& async, agt_u
       data->expectedResponses = expectedCount;
       data->errorCode = AGT_NOT_READY;
       data->isComplete = false;
-      atomicStore(data->responseCounter, 0);
+      atomic_store(data->responseCounter, 0);
     }
   }
   else {
     auto sharedData = get_shared_async_data(ctx, async.data);
-    if (atomicExchangeAdd(sharedData->refCount, refOffset) == 0)
+    if (atomic_exchange_add(sharedData->refCount, refOffset) == 0)
       async_data_destroy(ctx, sharedData, async.data);
     shouldCreateNew = true;
   }

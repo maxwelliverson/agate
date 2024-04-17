@@ -131,7 +131,7 @@ namespace {
 
     do {
       lockValue = 0;
-      if (agt::atomicCompareExchange(cb->initializingLock, lockValue, 1))
+      if (agt::atomic_try_replace(cb->initializingLock, lockValue, 1))
         break;
       agt::atomicWait(cb->initializingLock, lockValue);
     } while (true);
@@ -141,7 +141,7 @@ namespace {
       cb->initialized = true;
     }
 
-    agt::atomicStore(cb->initializingLock, 0);
+    agt::atomic_store(cb->initializingLock, 0);
     agt::atomicNotifyOne(cb->initializingLock);
   }
 

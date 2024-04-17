@@ -31,11 +31,11 @@ namespace agt {
   // Waits for the atomic value at addr to compare unequal to cmpValue, at which point it is returned.
   template <impl::atomic_capable T>
   inline static T wait_on_local(agt_ctx_t ctx, const T& addr, std::type_identity_t<T> cmpValue) noexcept {
-    auto value = atomicRelaxedLoad(addr);
+    auto value = atomic_relaxed_load(addr);
 
     while (value == cmpValue) {
       impl::wait_on_local_address_nocheck(ctx, &addr, AGT_WAIT, std::bit_cast<impl::atomic_type_t<T>>(cmpValue), sizeof(T));
-      value = atomicRelaxedLoad(addr);
+      value = atomic_relaxed_load(addr);
     }
 
     return value;
@@ -52,7 +52,7 @@ namespace agt {
     }
 
     agt_status_t status = AGT_SUCCESS;
-    auto value = atomicRelaxedLoad(addr);
+    auto value = atomic_relaxed_load(addr);
 
     if (value == cmpValue) {
 
@@ -66,7 +66,7 @@ namespace agt {
         status = impl::wait_on_local_address_nocheck(ctx, &addr, remainingTimeout, std::bit_cast<impl::atomic_type_t<T>>(cmpValue), sizeof(T));
         if (status != AGT_SUCCESS)
           return status;
-        value = atomicRelaxedLoad(addr);
+        value = atomic_relaxed_load(addr);
         if (value != cmpValue)
           break;
         const auto currentTime = now();
@@ -85,15 +85,15 @@ namespace agt {
 
   template <impl::atomic_capable T, std::predicate<T> Fn>
   inline static T wait_on_local(agt_ctx_t ctx, const T& addr, Fn&& predicate) noexcept {
-    auto value = atomicRelaxedLoad(addr);
+    auto value = atomic_relaxed_load(addr);
 
     while (!std::invoke(predicate, value)) {
       // NOTE: It's okay that the callback pointer here points to local memory; this callback will only ever be called within the scope of this function.
       impl::wait_on_local_address_nocheck(ctx, std::addressof(addr), AGT_WAIT, [](agt_ctx_t ctx, const void* addr, void* userData) -> bool {
-        auto value = atomicRelaxedLoad(*static_cast<const T*>(addr));
+        auto value = atomic_relaxed_load(*static_cast<const T*>(addr));
         return std::invoke(*static_cast<std::remove_cvref_t<Fn>*>(userData), value);
       }, (void*)std::addressof(predicate));
-      value = atomicRelaxedLoad(addr);
+      value = atomic_relaxed_load(addr);
     }
 
     return value;
@@ -102,15 +102,15 @@ namespace agt {
   // Overload if the predicate function needs access to the context.
   template <impl::atomic_capable T, std::predicate<agt_ctx_t, T> Fn>
   inline static T wait_on_local(agt_ctx_t ctx, const T& addr, Fn&& predicate) noexcept {
-    auto value = atomicRelaxedLoad(addr);
+    auto value = atomic_relaxed_load(addr);
 
     while (!std::invoke(predicate, ctx, value)) {
       // NOTE: It's okay that the callback pointer here points to local memory; this callback will only ever be called within the scope of this function.
       impl::wait_on_local_address_nocheck(ctx, std::addressof(addr), AGT_WAIT, [](agt_ctx_t ctx, const void* addr, void* userData) -> bool {
-        auto value = atomicRelaxedLoad(*static_cast<const T*>(addr));
+        auto value = atomic_relaxed_load(*static_cast<const T*>(addr));
         return std::invoke(*static_cast<std::remove_cvref_t<Fn>*>(userData), ctx, value);
       }, (void*)std::addressof(predicate));
-      value = atomicRelaxedLoad(addr);
+      value = atomic_relaxed_load(addr);
     }
 
     return value;
@@ -127,7 +127,7 @@ namespace agt {
     }
 
     agt_status_t status = AGT_SUCCESS;
-    auto value = atomicRelaxedLoad(addr);
+    auto value = atomic_relaxed_load(addr);
 
     if (!std::invoke(predicate, value)) {
 
@@ -139,12 +139,12 @@ namespace agt {
 
       do {
         status = impl::wait_on_local_address_nocheck(ctx, std::addressof(addr), remainingTimeout, [](agt_ctx_t ctx, const void* addr, void* userData) -> bool {
-          auto value = atomicRelaxedLoad(*static_cast<const T*>(addr));
+          auto value = atomic_relaxed_load(*static_cast<const T*>(addr));
           return std::invoke(*static_cast<std::remove_cvref_t<Fn>*>(userData), value);
         }, (void*)std::addressof(predicate));
         if (status != AGT_SUCCESS)
           return status;
-        value = atomicRelaxedLoad(addr);
+        value = atomic_relaxed_load(addr);
         if (std::invoke(predicate, value))
           break;
         const auto currentTime = now();
@@ -172,7 +172,7 @@ namespace agt {
     }
 
     agt_status_t status = AGT_SUCCESS;
-    auto value = atomicRelaxedLoad(addr);
+    auto value = atomic_relaxed_load(addr);
 
     if (!std::invoke(predicate, ctx, value)) {
 
@@ -184,12 +184,12 @@ namespace agt {
 
       do {
         status = impl::wait_on_local_address_nocheck(ctx, std::addressof(addr), remainingTimeout, [](agt_ctx_t ctx, const void* addr, void* userData) -> bool {
-          auto value = atomicRelaxedLoad(*static_cast<const T*>(addr));
+          auto value = atomic_relaxed_load(*static_cast<const T*>(addr));
           return std::invoke(*static_cast<std::remove_cvref_t<Fn>*>(userData), ctx, value);
         }, (void*)std::addressof(predicate));
         if (status != AGT_SUCCESS)
           return status;
-        value = atomicRelaxedLoad(addr);
+        value = atomic_relaxed_load(addr);
         if (std::invoke(predicate, ctx, value))
           break;
         const auto currentTime = now();

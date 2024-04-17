@@ -109,7 +109,7 @@ namespace agt {
 
       bool success;
 
-      prev.bits = atomicRelaxedLoad(rc.bits); // It is more efficient to have a second atomic operation guaranteed to execute, but have the conditional easily predicted than it is having only the CAS-loop as is.
+      prev.bits = atomic_relaxed_load(rc.bits); // It is more efficient to have a second atomic operation guaranteed to execute, but have the conditional easily predicted than it is having only the CAS-loop as is.
 
       do {
         // assert(prev.epoch == epoch); // ownership is held, so the epoch should never advance.
@@ -128,7 +128,7 @@ namespace agt {
           next.weakRefCount  = prev.weakRefCount - 1;
         }
       }
-      while (!atomicCompareExchangeWeak(rc.bits, prev.bits, next.bits));
+      while (!atomic_cas(rc.bits, prev.bits, next.bits));
 
       return success;
     }
@@ -141,7 +141,7 @@ namespace agt {
 
       bool success;
 
-      prev.bits = atomicRelaxedLoad(rc.bits); // It is more efficient to have a second atomic operation guaranteed to execute, but have the conditional easily predicted than it is having only the CAS-loop as is.
+      prev.bits = atomic_relaxed_load(rc.bits); // It is more efficient to have a second atomic operation guaranteed to execute, but have the conditional easily predicted than it is having only the CAS-loop as is.
 
       do {
         success = prev.epoch == epoch && prev.ownerRefCount > 0; // if there are no owners, it is also failure.
@@ -156,15 +156,15 @@ namespace agt {
           next.weakRefCount = prev.weakRefCount - 1;
           shouldFreeAsyncData = next.weakRefCount == 0;
         }
-      } while(!atomicCompareExchangeWeak(rc.bits, prev.bits, next.bits));
+      } while(!atomic_cas(rc.bits, prev.bits, next.bits));
 
       return success;
     }
 
 
     inline static void _retain(async_rc& rc) noexcept {
-      atomicExchangeAdd(rc.bits, 0x0000000100010000ULL);
-      // atomicRelaxedIncrement(rc.ownerRefCount);
+      atomic_exchange_add(rc.bits, 0x0000000100010000ULL);
+      // atomic_relaxed_increment(rc.ownerRefCount);
     }
 
     /// Releases ownership while retaining a weak reference.
@@ -172,7 +172,7 @@ namespace agt {
     ///
     inline static bool _release_ownership(async_rc& rc) noexcept {
       /*async_rc prev, next;
-      prev.bits = atomicRelaxedLoad(rc.bits);
+      prev.bits = atomic_relaxed_load(rc.bits);
 
       do {
         AGT_invariant( prev.weakRefCount > 0 );
@@ -183,11 +183,11 @@ namespace agt {
         next.epoch         = prev.epoch;
         next.ownerRefCount = prev.ownerRefCount - 1;
         next.weakRefCount  = prev.weakRefCount;
-      } while(!atomicCompareExchangeWeak(rc.bits, prev.bits, next.bits));
+      } while(!atomic_cas(rc.bits, prev.bits, next.bits));
 
       return true;*/
       async_rc prev;
-      prev.bits = atomicExchangeAdd(rc.bits, -0x10000);
+      prev.bits = atomic_exchange_add(rc.bits, -0x10000);
       AGT_invariant( prev.weakRefCount > 0 );
       return prev.weakRefCount == 1;
     }
@@ -195,31 +195,31 @@ namespace agt {
     /// Returns true if the async data object should be freed.
     inline static bool _drop_ownership(async_rc& rc) noexcept {
       async_rc prev;
-      prev.bits = atomicExchangeAdd(rc.bits,  -0x100010000ULL);
+      prev.bits = atomic_exchange_add(rc.bits,  -0x100010000ULL);
       AGT_invariant( prev.weakRefCount > 0 );
       return prev.weakRefCount == 1;
       /*async_rc prev, next;
 
-      prev.bits = atomicRelaxedLoad(rc.bits);
+      prev.bits = atomic_relaxed_load(rc.bits);
 
       do {
         next.epoch = prev.epoch;
         next.ownerRefCount = prev.ownerRefCount - 1;
         next.weakRefCount = prev.weakRefCount - 1;
-      } while(!atomicCompareExchangeWeak(rc.bits, prev.bits, next.bits));
+      } while(!atomic_cas(rc.bits, prev.bits, next.bits));
 
       return next.weakRefCount == 0;*/
     }
 
     /// Returns true if the async data object should be freed.
     inline static bool _drop_nonowner(async_rc& rc) noexcept {
-      return atomicDecrement(rc.weakRefCount) == 0;
+      return atomic_decrement(rc.weakRefCount) == 0;
     }
 
 
     inline static uint32_t _count_weak_refs(async_rc& rc) noexcept {
       async_rc val;
-      val.bits = atomicRelaxedLoad(rc.bits);
+      val.bits = atomic_relaxed_load(rc.bits);
       return val.weakRefCount - val.ownerRefCount;
     }
   }

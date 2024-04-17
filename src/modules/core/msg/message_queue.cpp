@@ -46,9 +46,9 @@ agt::basic_message* agt::dequeueLocalSPSC(message_queue_t queue, agt_timeout_t  
   basic_message* msg = nullptr;
 
   if (atomicWaitFor(q->head, msg, timeout, nullptr)) {
-    atomicStore(q->head, msg->next);
+    atomic_store(q->head, msg->next);
     auto newTail = &msg->next;
-    atomicCompareExchange(q->tail, newTail, &q->head);
+    atomic_try_replace(q->tail, newTail, &q->head);
   }
 
   return msg;
@@ -60,11 +60,11 @@ agt_status_t        agt::enqueueLocalMPSC(message_queue_t queue, basic_message* 
   message->next = nullptr;
 
   // basic_message** expectedTail = &q->head;
-  // while (!atomicCompareExchange(q->tail, expectedTail, &message->next));
-  // atomicStore(*expectedTail, message);
+  // while (!atomic_try_replace(q->tail, expectedTail, &message->next));
+  // atomic_store(*expectedTail, message);
 
-  basic_message** tail = atomicExchange(q->tail, &message->next);
-  atomicStore(*tail, message);
+  basic_message** tail = atomic_exchange(q->tail, &message->next);
+  atomic_store(*tail, message);
 
   return AGT_SUCCESS;
 }
@@ -75,9 +75,9 @@ agt::basic_message* agt::dequeueLocalMPSC(message_queue_t queue, agt_timeout_t t
   basic_message* msg = nullptr;
 
   if (atomicWaitFor(q->head, msg, timeout, nullptr)) {
-    atomicStore(q->head, msg->next);
+    atomic_store(q->head, msg->next);
     auto newTail = &msg->next;
-    atomicCompareExchange(q->tail, newTail, &q->head);
+    atomic_try_replace(q->tail, newTail, &q->head);
   }
 
   return msg;
@@ -88,9 +88,9 @@ agt_status_t        agt::enqueueLocalSPMC(message_queue_t queue, basic_message* 
   auto q = static_cast<agt::local_spmc_queue*>(queue);
   message->next = nullptr;
 
-  basic_message** tail = atomicExchange(q->tail, &message->next);
+  basic_message** tail = atomic_exchange(q->tail, &message->next);
   // std::atomic_thread_fence(std::memory_order_acq_rel);
-  atomicStore(*tail, message);
+  atomic_store(*tail, message);
 
   return AGT_SUCCESS;
 }
@@ -115,7 +115,7 @@ agt::basic_message* agt::dequeueLocalSPMC(message_queue_t queue, agt_timeout_t t
       atomicWait(q->head, msg, nullptr);
       break;
     case AGT_DO_NOT_WAIT:
-      if (!(msg = atomicLoad(q->head)))
+      if (!(msg = atomic_load(q->head)))
         return nullptr;
   }
 
@@ -124,9 +124,9 @@ agt::basic_message* agt::dequeueLocalSPMC(message_queue_t queue, agt_timeout_t t
   } while(true);
 
   if (atomicWaitFor(q->head, msg, timeout, nullptr)) {
-    atomicStore(q->head, msg->next);
+    atomic_store(q->head, msg->next);
     auto newTail = &msg->next;
-    atomicCompareExchange(q->tail, newTail, &q->head);
+    atomic_try_replace(q->tail, newTail, &q->head);
   }
 
   return msg;

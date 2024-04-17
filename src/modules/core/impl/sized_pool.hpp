@@ -215,12 +215,12 @@ namespace agt {
 
 
     AGT_forceinline void                 _retain_chunk(pool_chunk_t chunk) noexcept {
-      atomicRelaxedIncrement(_get_first_chunk_header(chunk)->weakRefCount);
+      atomic_relaxed_increment(_get_first_chunk_header(chunk)->weakRefCount);
     }
 
     AGT_forceinline void                 _release_chunk(pool_chunk_t chunk) noexcept {
       const auto smallChunk = _get_first_chunk_header(chunk);
-      if ( atomicDecrement(smallChunk->weakRefCount) == 0 )
+      if ( atomic_decrement(smallChunk->weakRefCount) == 0 )
         instance_mem_free(get_instance(smallChunk->ctx), smallChunk, smallChunk->chunkSize, PoolChunkAlignment);
     }
 
@@ -346,7 +346,7 @@ namespace agt {
 
       delayed_free_list old, next;
 
-      old.bits = atomicRelaxedLoad(list.bits);
+      old.bits = atomic_relaxed_load(list.bits);
 
       agt_u16_t thisSlot = slot.self;
       next.next = thisSlot;
@@ -357,7 +357,7 @@ namespace agt {
         next.head = old.head == 0 ? thisSlot : old.head;
         next.length = old.length + 1;
         slot.next = old.next;
-      } while(!atomicCompareExchangeWeak(list.bits, old.bits, next.bits));
+      } while(!atomic_cas(list.bits, old.bits, next.bits));
     }
 
     // returns nullopt if no deferred pushes were processed
@@ -475,11 +475,11 @@ namespace agt {
     }
 
     AGT_forceinline static void       _atomic_cas_init(rc_object& obj, rc_object_cas_wrapper& old) noexcept {
-      old.u64 = atomicRelaxedLoad(_get_cas_value(obj));
+      old.u64 = atomic_relaxed_load(_get_cas_value(obj));
     }
 
     AGT_forceinline static bool       _atomic_cas(rc_object& obj, rc_object_cas_wrapper& old, rc_object_cas_wrapper next) noexcept {
-      return atomicCompareExchangeWeak(_get_cas_value(obj), old.u64, next.u64);
+      return atomic_cas(_get_cas_value(obj), old.u64, next.u64);
     }
 
 
@@ -664,7 +664,7 @@ namespace agt {
 
 
   AGT_forceinline void        retain(rc_object* obj) noexcept {
-    atomicRelaxedIncrement(obj->refCount);
+    atomic_relaxed_increment(obj->refCount);
   }
 
 

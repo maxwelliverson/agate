@@ -158,7 +158,7 @@ namespace {
   }
 
   void           _release_chunk(object_chunk_t chunk) noexcept {
-    if (atomicDecrement(chunk->retainedRefCount) == 0) {
+    if (atomic_decrement(chunk->retainedRefCount) == 0) {
       ctxFreePages(get_ctx(), chunk, chunk->chunkSize);
     }
   }
@@ -263,7 +263,7 @@ namespace {
       agt_u32_t value = 0;
     };
 
-    value = atomicExchange(chunk->delayedFreeList, 0);
+    value = atomic_exchange(chunk->delayedFreeList, 0);
 
     if (value != 0) {
 
@@ -302,13 +302,13 @@ namespace {
       agt_u32_t value = 0;
     } old, self;
 
-    old.value = atomicRelaxedLoad(chunk->delayedFreeList);
+    old.value = atomic_relaxed_load(chunk->delayedFreeList);
     self.head = obj->slotNumber;
 
     do {
       obj->nextSlot = old.head;
       self.length   = old.length + 1;
-    } while(!atomicCompareExchangeWeak(chunk->delayedFreeList, old.value, self.value));
+    } while(!atomic_cas(chunk->delayedFreeList, old.value, self.value));
   }
 
 
@@ -383,9 +383,9 @@ namespace {
 
     for (auto chunk = pool->stackBase; chunk != pool->stackHead; ++chunk) {
       auto c = *chunk;
-      value = atomicExchange(c->delayedFreeList, 0);
+      value = atomic_exchange(c->delayedFreeList, 0);
       c->availableSlotCount += length;
-      atomicStore(c->ownerPool, nullptr);
+      atomic_store(c->ownerPool, nullptr);
       // std::atomic_thread_fence(std::memory_order_release);
       _release_chunk(c);
     }
@@ -487,7 +487,7 @@ void    agt::free_obj(object* obj) noexcept {
 
   auto slot = reinterpret_cast<object_slot*>(static_cast<void*>(obj));
 
-  // atomicIncrement(slot->epoch);
+  // atomic_increment(slot->epoch);
 
   if (chunk->threadId == thread_identifier()) {
     slot->nextSlot = chunk->nextFreeSlot;

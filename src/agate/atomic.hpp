@@ -102,6 +102,8 @@ namespace agt {
     {
       typename unsigned_size<sizeof(T)>::type;
     };
+    template <typename T>
+    concept atomic_cas_capable = atomic_capable<T> || (std::is_trivial_v<T> && (sizeof(T) == 16));
   }
 
   class deadline {
@@ -152,30 +154,6 @@ namespace agt {
     agt_u64_t timestamp;
   };
 
-  inline static void spin() noexcept {
-    _mm_pause();
-  }
-
-  inline void spin_sleep_until(deadline deadline) noexcept {
-    agt_u32_t backoff = 0;
-    while ( deadline.hasNotPassed() ) {
-      DUFFS_MACHINE(backoff);
-    }
-  }
-
-  inline void sleep(agt_u64_t ms) noexcept {
-    if ( ms > 20 )
-      Sleep((DWORD)ms);
-    else
-      spin_sleep_until(deadline::fromTimeout(AGT_TIMEOUT_MS(ms)));
-  }
-  inline void usleep(agt_u64_t us) noexcept {
-    spin_sleep_until(deadline::fromTimeout(AGT_TIMEOUT_US(us)));
-  }
-  inline void nanosleep(agt_u64_t ns) noexcept {
-    spin_sleep_until(deadline::fromTimeout(AGT_TIMEOUT_NS(ns)));
-  }
-
 
   /**
    *
@@ -213,490 +191,194 @@ namespace agt {
 
 
 
-  void        atomicStore(agt_u8_t& value,  agt_u8_t newValue) noexcept;
-  void        atomicStore(agt_u16_t& value, agt_u16_t newValue) noexcept;
-  void        atomicStore(agt_u32_t& value, agt_u32_t newValue) noexcept;
-  void        atomicStore(agt_u64_t& value, agt_u64_t newValue) noexcept;
+  void        atomic_store(agt_u8_t& value,  agt_u8_t newValue) noexcept;
+  void        atomic_store(agt_u16_t& value, agt_u16_t newValue) noexcept;
+  void        atomic_store(agt_u32_t& value, agt_u32_t newValue) noexcept;
+  void        atomic_store(agt_u64_t& value, agt_u64_t newValue) noexcept;
   template <impl::atomic_capable T>
-  inline void atomicStore(T& val, std::type_identity_t<T> newValue) noexcept {
-    atomicStore(*reinterpret_cast<impl::atomic_type_t<T>*>(&val), std::bit_cast<impl::atomic_type_t<T>>(newValue));
+  inline void atomic_store(T& val, std::type_identity_t<T> newValue) noexcept {
+    atomic_store(*reinterpret_cast<impl::atomic_type_t<T>*>(&val), std::bit_cast<impl::atomic_type_t<T>>(newValue));
   }
   template <typename T>
-  inline void atomicStore(T*& value, std::type_identity_t<T>* newValue) noexcept {
-    atomicStore(reinterpret_cast<agt_u64_t&>(value), reinterpret_cast<agt_u64_t>(newValue));
+  inline void atomic_store(T*& value, std::type_identity_t<T>* newValue) noexcept {
+    atomic_store(reinterpret_cast<agt_u64_t&>(value), reinterpret_cast<agt_u64_t>(newValue));
   }
 
-  agt_u8_t  atomicLoad(const agt_u8_t& value) noexcept;
-  agt_u16_t atomicLoad(const agt_u16_t& value) noexcept;
-  agt_u32_t atomicLoad(const agt_u32_t& value) noexcept;
-  agt_u64_t atomicLoad(const agt_u64_t& value) noexcept;
+  agt_u8_t  atomic_load(const agt_u8_t& value) noexcept;
+  agt_u16_t atomic_load(const agt_u16_t& value) noexcept;
+  agt_u32_t atomic_load(const agt_u32_t& value) noexcept;
+  agt_u64_t atomic_load(const agt_u64_t& value) noexcept;
   template <impl::atomic_capable T>
-  inline T  atomicLoad(const T& val) noexcept {
-    return std::bit_cast<T>(atomicLoad(*reinterpret_cast<const impl::atomic_type_t<T>*>(&val)));
+  inline T  atomic_load(const T& val) noexcept {
+    return std::bit_cast<T>(atomic_load(*reinterpret_cast<const impl::atomic_type_t<T>*>(&val)));
   }
   template <typename T>
-  inline T* atomicLoad(T* const & value) noexcept {
-    return reinterpret_cast<T*>(atomicLoad(reinterpret_cast<const agt_u64_t&>(value)));
+  inline T* atomic_load(T* const & value) noexcept {
+    return reinterpret_cast<T*>(atomic_load(reinterpret_cast<const agt_u64_t&>(value)));
   }
 
-  void       atomicRelaxedStore(agt_u8_t& value,  agt_u8_t newValue) noexcept;
-  void       atomicRelaxedStore(agt_u16_t& value, agt_u16_t newValue) noexcept;
-  void       atomicRelaxedStore(agt_u32_t& value, agt_u32_t newValue) noexcept;
-  void       atomicRelaxedStore(agt_u64_t& value, agt_u64_t newValue) noexcept;
+  void       atomic_relaxed_store(agt_u8_t& value,  agt_u8_t newValue) noexcept;
+  void       atomic_relaxed_store(agt_u16_t& value, agt_u16_t newValue) noexcept;
+  void       atomic_relaxed_store(agt_u32_t& value, agt_u32_t newValue) noexcept;
+  void       atomic_relaxed_store(agt_u64_t& value, agt_u64_t newValue) noexcept;
   template <impl::atomic_capable T>
-  inline void atomicRelaxedStore(T& val, std::type_identity_t<T> newValue) noexcept {
-    atomicRelaxedStore(*reinterpret_cast<impl::atomic_type_t<T>*>(&val), std::bit_cast<impl::atomic_type_t<T>>(newValue));
+  inline void atomic_relaxed_store(T& val, std::type_identity_t<T> newValue) noexcept {
+    atomic_relaxed_store(*reinterpret_cast<impl::atomic_type_t<T>*>(&val), std::bit_cast<impl::atomic_type_t<T>>(newValue));
   }
   template <typename T>
-  inline void atomicRelaxedStore(T*& value, std::type_identity_t<T>* newValue) noexcept {
-    atomicRelaxedStore(reinterpret_cast<agt_u64_t&>(value), reinterpret_cast<agt_u64_t>(newValue));
+  inline void atomic_relaxed_store(T*& value, std::type_identity_t<T>* newValue) noexcept {
+    atomic_relaxed_store(reinterpret_cast<agt_u64_t&>(value), reinterpret_cast<agt_u64_t>(newValue));
   }
 
-  agt_u8_t  atomicRelaxedLoad(const agt_u8_t& value) noexcept;
-  agt_u16_t atomicRelaxedLoad(const agt_u16_t& value) noexcept;
-  agt_u32_t atomicRelaxedLoad(const agt_u32_t& value) noexcept;
-  agt_u64_t atomicRelaxedLoad(const agt_u64_t& value) noexcept;
+  agt_u8_t  atomic_relaxed_load(const agt_u8_t& value) noexcept;
+  agt_u16_t atomic_relaxed_load(const agt_u16_t& value) noexcept;
+  agt_u32_t atomic_relaxed_load(const agt_u32_t& value) noexcept;
+  agt_u64_t atomic_relaxed_load(const agt_u64_t& value) noexcept;
   template <impl::atomic_capable T>
-  inline T  atomicRelaxedLoad(const T& val) noexcept {
-    return std::bit_cast<T>(atomicRelaxedLoad(*reinterpret_cast<const impl::atomic_type_t<T>*>(&val)));
+  inline T  atomic_relaxed_load(const T& val) noexcept {
+    return std::bit_cast<T>(atomic_relaxed_load(*reinterpret_cast<const impl::atomic_type_t<T>*>(&val)));
   }
   template <typename T>
-  inline T* atomicRelaxedLoad(T* const & value) noexcept {
-    return reinterpret_cast<T*>(atomicRelaxedLoad(reinterpret_cast<const agt_u64_t&>(value)));
+  inline T* atomic_relaxed_load(T* const & value) noexcept {
+    return reinterpret_cast<T*>(atomic_relaxed_load(reinterpret_cast<const agt_u64_t&>(value)));
   }
 
-  agt_u8_t  atomicExchange(agt_u8_t& value,  agt_u8_t newValue) noexcept;
-  agt_u16_t atomicExchange(agt_u16_t& value, agt_u16_t newValue) noexcept;
-  agt_u32_t atomicExchange(agt_u32_t& value, agt_u32_t newValue) noexcept;
-  agt_u64_t atomicExchange(agt_u64_t& value, agt_u64_t newValue) noexcept;
+  agt_u8_t  atomic_exchange(agt_u8_t& value,  agt_u8_t newValue) noexcept;
+  agt_u16_t atomic_exchange(agt_u16_t& value, agt_u16_t newValue) noexcept;
+  agt_u32_t atomic_exchange(agt_u32_t& value, agt_u32_t newValue) noexcept;
+  agt_u64_t atomic_exchange(agt_u64_t& value, agt_u64_t newValue) noexcept;
   template <impl::atomic_capable T>
-  inline T  atomicExchange(T& value, std::type_identity_t<T> newValue) noexcept {
+  inline T  atomic_exchange(T& value, std::type_identity_t<T> newValue) noexcept {
     using type_t = impl::atomic_type_t<T>;
-    return std::bit_cast<T>(atomicExchange(reinterpret_cast<type_t&>(value), std::bit_cast<type_t>(newValue)));
+    return std::bit_cast<T>(atomic_exchange(reinterpret_cast<type_t&>(value), std::bit_cast<type_t>(newValue)));
   }
   template <typename T>
-  inline T* atomicExchange(T*& value, std::type_identity_t<T>* newValue) noexcept {
-    return reinterpret_cast<T*>(atomicExchange(reinterpret_cast<agt_u64_t&>(value), reinterpret_cast<agt_u64_t>(newValue)));
+  inline T* atomic_exchange(T*& value, std::type_identity_t<T>* newValue) noexcept {
+    return reinterpret_cast<T*>(atomic_exchange(reinterpret_cast<agt_u64_t&>(value), reinterpret_cast<agt_u64_t>(newValue)));
   }
 
-  bool        atomicCompareExchange(agt_u8_t& value,  agt_u8_t&  compare, agt_u8_t newValue) noexcept;
-  bool        atomicCompareExchange(agt_u16_t& value, agt_u16_t& compare, agt_u16_t newValue) noexcept;
-  bool        atomicCompareExchange(agt_u32_t& value, agt_u32_t& compare, agt_u32_t newValue) noexcept;
-  bool        atomicCompareExchange(agt_u64_t& value, agt_u64_t& compare, agt_u64_t newValue) noexcept;
-  bool        atomicCompareExchange16(void* value, void* compare, const void* newValue) noexcept;
-  inline bool atomicCompareExchange12(void* value, void* compare, const void* newValue) noexcept {
-    agt_u32_t tmp_compare_buffer[4];
-    agt_u32_t tmp_new_val_buffer[4];
-
-    std::memcpy(tmp_compare_buffer, compare, 12);
-    std::memcpy(&tmp_compare_buffer[3], static_cast<agt_u32_t*>(value) + 3, sizeof(agt_u32_t));
-    std::memcpy(tmp_new_val_buffer, newValue, 12);
-    tmp_new_val_buffer[3] = tmp_compare_buffer[3];
-
-    if (!atomicCompareExchange16(value, tmp_compare_buffer, tmp_new_val_buffer)) {
-      std::memcpy(compare, tmp_compare_buffer, sizeof(agt_u32_t[3]));
-      return false;
+  bool        atomic_try_replace(agt_u8_t& value,  agt_u8_t  compare, agt_u8_t newValue) noexcept;
+  bool        atomic_try_replace(agt_u16_t& value, agt_u16_t compare, agt_u16_t newValue) noexcept;
+  bool        atomic_try_replace(agt_u32_t& value, agt_u32_t compare, agt_u32_t newValue) noexcept;
+  bool        atomic_try_replace(agt_u64_t& value, agt_u64_t compare, agt_u64_t newValue) noexcept;
+  bool        atomic_try_replace_16bytes(void* value, void* compare, const void* newValue) noexcept;
+  template <impl::atomic_cas_capable T>
+  inline bool atomic_try_replace(T& value, std::type_identity_t<T> compare, std::type_identity_t<T> newValue) noexcept {
+    if constexpr (sizeof(T) == 16) {
+      return atomic_try_replace_16bytes(&value, &compare, &newValue);
     }
-    return true;
-  }
-  template <impl::atomic_capable T>
-  inline bool atomicCompareExchange(T& value, std::type_identity_t<T>& compare, std::type_identity_t<T> newValue) noexcept {
-    using type_t = impl::atomic_type_t<T>;
-    return atomicCompareExchange(reinterpret_cast<type_t&>(value), reinterpret_cast<type_t&>(compare), std::bit_cast<type_t>(newValue));
+    else {
+      using type_t = impl::atomic_type_t<T>;
+      return atomic_try_replace(reinterpret_cast<type_t&>(value), std::bit_cast<type_t>(compare), std::bit_cast<type_t>(newValue));
+    }
+
   }
   template <typename T>
-  inline bool atomicCompareExchange(T*& value, T*& compare, std::type_identity_t<T>* newValue) noexcept {
-    return atomicCompareExchange(reinterpret_cast<agt_u64_t&>(value), reinterpret_cast<agt_u64_t&>(compare), reinterpret_cast<agt_u64_t>(newValue));
+  inline bool atomic_try_replace(T*& value, T*& compare, std::type_identity_t<T>* newValue) noexcept {
+    return atomic_try_replace(reinterpret_cast<agt_u64_t&>(value), reinterpret_cast<agt_u64_t&>(compare), reinterpret_cast<agt_u64_t>(newValue));
   }
 
-  bool        atomicCompareExchangeWeak(agt_u8_t& value,  agt_u8_t&  compare, agt_u8_t newValue) noexcept;
-  bool        atomicCompareExchangeWeak(agt_u16_t& value, agt_u16_t& compare, agt_u16_t newValue) noexcept;
-  bool        atomicCompareExchangeWeak(agt_u32_t& value, agt_u32_t& compare, agt_u32_t newValue) noexcept;
-  bool        atomicCompareExchangeWeak(agt_u64_t& value, agt_u64_t& compare, agt_u64_t newValue) noexcept;
-  bool        atomicCompareExchangeWeak16(void* value, void* compare, const void* newValue) noexcept;
+  bool        atomic_cas(agt_u8_t& value,  agt_u8_t&  compare, agt_u8_t newValue) noexcept;
+  bool        atomic_cas(agt_u16_t& value, agt_u16_t& compare, agt_u16_t newValue) noexcept;
+  bool        atomic_cas(agt_u32_t& value, agt_u32_t& compare, agt_u32_t newValue) noexcept;
+  bool        atomic_cas(agt_u64_t& value, agt_u64_t& compare, agt_u64_t newValue) noexcept;
+  bool        atomic_cas_16bytes(void* value, void* compare, const void* newValue) noexcept;
   // value must have 4 bytes of padding at the end of it;
-  inline bool atomicCompareExchangeWeak12(void* value, void* compare, const void* newValue) noexcept {
-
-    agt_u32_t tmp_compare_buffer[4];
-    agt_u32_t tmp_new_val_buffer[4];
-
-    std::memcpy(tmp_compare_buffer, compare, 12);
-    std::memcpy(&tmp_compare_buffer[3], static_cast<agt_u32_t*>(value) + 3, sizeof(agt_u32_t));
-    std::memcpy(tmp_new_val_buffer, newValue, 12);
-    tmp_new_val_buffer[3] = tmp_compare_buffer[3];
-
-    if (!atomicCompareExchangeWeak16(value, tmp_compare_buffer, tmp_new_val_buffer)) {
-      std::memcpy(compare, tmp_compare_buffer, sizeof(agt_u32_t[3]));
-      return false;
+  template <impl::atomic_cas_capable T>
+  inline bool atomic_cas(T& value, std::type_identity_t<T>& compare, std::type_identity_t<T> newValue) noexcept {
+    if constexpr (sizeof(T) == 16) {
+      return atomic_cas_16bytes(&value, &compare, &newValue);
     }
-    return true;
-  }
-  template <impl::atomic_capable T>
-  inline bool atomicCompareExchangeWeak(T& value, std::type_identity_t<T>& compare, std::type_identity_t<T> newValue) noexcept {
-    using type_t = impl::atomic_type_t<T>;
-    return atomicCompareExchangeWeak(reinterpret_cast<type_t&>(value), reinterpret_cast<type_t&>(compare), std::bit_cast<type_t>(newValue));
+    else {
+      using type_t = impl::atomic_type_t<T>;
+      return atomic_cas(reinterpret_cast<type_t&>(value), reinterpret_cast<type_t&>(compare), std::bit_cast<type_t>(newValue));
+    }
+
   }
   template <typename T>
-  inline bool atomicCompareExchangeWeak(T*& value, T*& compare, std::type_identity_t<T>* newValue) noexcept {
-    return atomicCompareExchangeWeak(reinterpret_cast<agt_u64_t&>(value), reinterpret_cast<agt_u64_t&>(compare), reinterpret_cast<agt_u64_t>(newValue));
+  inline bool atomic_cas(T*& value, T*& compare, std::type_identity_t<T>* newValue) noexcept {
+    return atomic_cas(reinterpret_cast<agt_u64_t&>(value), reinterpret_cast<agt_u64_t&>(compare), reinterpret_cast<agt_u64_t>(newValue));
   }
 
-  agt_u8_t  atomicIncrement(agt_u8_t& value) noexcept;
-  agt_u16_t atomicIncrement(agt_u16_t& value) noexcept;
-  agt_u32_t atomicIncrement(agt_u32_t& value) noexcept;
-  agt_u64_t atomicIncrement(agt_u64_t& value) noexcept;
+  agt_u8_t  atomic_increment(agt_u8_t& value) noexcept;
+  agt_u16_t atomic_increment(agt_u16_t& value) noexcept;
+  agt_u32_t atomic_increment(agt_u32_t& value) noexcept;
+  agt_u64_t atomic_increment(agt_u64_t& value) noexcept;
 
   template <impl::atomic_capable T>
-  inline static T atomicIncrement(T& value) noexcept {
-    return atomicIncrement(*reinterpret_cast<impl::atomic_type_t<T>*>(&value));
+  inline static T atomic_increment(T& value) noexcept {
+    return atomic_increment(*reinterpret_cast<impl::atomic_type_t<T>*>(&value));
   }
 
-  agt_u8_t  atomicRelaxedIncrement(agt_u8_t& value) noexcept;
-  agt_u16_t atomicRelaxedIncrement(agt_u16_t& value) noexcept;
-  agt_u32_t atomicRelaxedIncrement(agt_u32_t& value) noexcept;
-  agt_u64_t atomicRelaxedIncrement(agt_u64_t& value) noexcept;
+  agt_u8_t  atomic_relaxed_increment(agt_u8_t& value) noexcept;
+  agt_u16_t atomic_relaxed_increment(agt_u16_t& value) noexcept;
+  agt_u32_t atomic_relaxed_increment(agt_u32_t& value) noexcept;
+  agt_u64_t atomic_relaxed_increment(agt_u64_t& value) noexcept;
 
-  agt_u8_t  atomicDecrement(agt_u8_t& value) noexcept;
-  agt_u16_t atomicDecrement(agt_u16_t& value) noexcept;
-  agt_u32_t atomicDecrement(agt_u32_t& value) noexcept;
-  agt_u64_t atomicDecrement(agt_u64_t& value) noexcept;
+  agt_u8_t  atomic_decrement(agt_u8_t& value) noexcept;
+  agt_u16_t atomic_decrement(agt_u16_t& value) noexcept;
+  agt_u32_t atomic_decrement(agt_u32_t& value) noexcept;
+  agt_u64_t atomic_decrement(agt_u64_t& value) noexcept;
 
   template <impl::atomic_capable T>
-  inline static T atomicDecrement(T& value) noexcept {
-    return atomicDecrement(*reinterpret_cast<impl::atomic_type_t<T>*>(&value));
+  inline static T atomic_decrement(T& value) noexcept {
+    return atomic_decrement(*reinterpret_cast<impl::atomic_type_t<T>*>(&value));
   }
 
-  agt_u8_t  atomicExchangeAdd(agt_u8_t&  value, agt_u8_t  newValue) noexcept;
-  agt_u16_t atomicExchangeAdd(agt_u16_t& value, agt_u16_t newValue) noexcept;
-  agt_u32_t atomicExchangeAdd(agt_u32_t& value, agt_u32_t newValue) noexcept;
-  agt_u64_t atomicExchangeAdd(agt_u64_t& value, agt_u64_t newValue) noexcept;
+  agt_u8_t  atomic_exchange_add(agt_u8_t&  value, agt_u8_t  newValue) noexcept;
+  agt_u16_t atomic_exchange_add(agt_u16_t& value, agt_u16_t newValue) noexcept;
+  agt_u32_t atomic_exchange_add(agt_u32_t& value, agt_u32_t newValue) noexcept;
+  agt_u64_t atomic_exchange_add(agt_u64_t& value, agt_u64_t newValue) noexcept;
 
   template <impl::atomic_capable T>
-  inline static T atomicExchangeAdd(T& value, std::type_identity_t<T> secondValue) noexcept {
-    return std::bit_cast<T>(atomicExchangeAdd(*reinterpret_cast<impl::atomic_type_t<T>*>(&value), std::bit_cast<impl::atomic_type_t<T>>(secondValue)));
+  inline static T atomic_exchange_add(T& value, std::type_identity_t<T> secondValue) noexcept {
+    return std::bit_cast<T>(atomic_exchange_add(*reinterpret_cast<impl::atomic_type_t<T>*>(&value), std::bit_cast<impl::atomic_type_t<T>>(secondValue)));
   }
 
-  agt_u8_t  atomicRelaxedExchangeAdd(agt_u8_t&  value, agt_u8_t  newValue) noexcept;
-  agt_u16_t atomicRelaxedExchangeAdd(agt_u16_t& value, agt_u16_t newValue) noexcept;
-  agt_u32_t atomicRelaxedExchangeAdd(agt_u32_t& value, agt_u32_t newValue) noexcept;
-  agt_u64_t atomicRelaxedExchangeAdd(agt_u64_t& value, agt_u64_t newValue) noexcept;
+  void      atomic_add(agt_u8_t&  value, agt_u8_t  newValue) noexcept;
+  void      atomic_add(agt_u16_t& value, agt_u16_t newValue) noexcept;
+  void      atomic_add(agt_u32_t& value, agt_u32_t newValue) noexcept;
+  void      atomic_add(agt_u64_t& value, agt_u64_t newValue) noexcept;
 
-  agt_u8_t  atomicExchangeAnd(agt_u8_t&  value, agt_u8_t  newValue) noexcept;
-  agt_u16_t atomicExchangeAnd(agt_u16_t& value, agt_u16_t newValue) noexcept;
-  agt_u32_t atomicExchangeAnd(agt_u32_t& value, agt_u32_t newValue) noexcept;
-  agt_u64_t atomicExchangeAnd(agt_u64_t& value, agt_u64_t newValue) noexcept;
-
-  agt_u8_t  atomicExchangeOr(agt_u8_t&  value, agt_u8_t newValue) noexcept;
-  agt_u16_t atomicExchangeOr(agt_u16_t& value, agt_u16_t newValue) noexcept;
-  agt_u32_t atomicExchangeOr(agt_u32_t& value, agt_u32_t newValue) noexcept;
-  agt_u64_t atomicExchangeOr(agt_u64_t& value, agt_u64_t newValue) noexcept;
-
-  agt_u8_t  atomicExchangeXor(agt_u8_t&  value, agt_u8_t newValue) noexcept;
-  agt_u16_t atomicExchangeXor(agt_u16_t& value, agt_u16_t newValue) noexcept;
-  agt_u32_t atomicExchangeXor(agt_u32_t& value, agt_u32_t newValue) noexcept;
-  agt_u64_t atomicExchangeXor(agt_u64_t& value, agt_u64_t newValue) noexcept;
-
-  void      atomicNotifyOne(void* value) noexcept;
-  void      atomicNotifyAll(void* value) noexcept;
-  void      atomicNotifyOneLocal(void* value) noexcept;
-  void      atomicNotifyAllLocal(void* value) noexcept;
-  void      atomicNotifyOneShared(void* value) noexcept;
-  void      atomicNotifyAllShared(void* value) noexcept;
-
-  template <typename T> requires (std::integral<T>)
-  inline void      atomicNotifyOne(T& value) noexcept {
-    atomicNotifyOne(std::addressof(value));
-  }
-  template <typename T> requires (std::integral<T>)
-  inline void      atomicNotifyOneLocal(T& value) noexcept {
-    atomicNotifyOneLocal(std::addressof(value));
-  }
-  template <typename T> requires (std::integral<T>)
-  inline void      atomicNotifyOneShared(T& value) noexcept {
-    atomicNotifyOneShared(std::addressof(value));
-  }
-  template <typename T> requires (std::integral<T>)
-  inline void      atomicNotifyAll(T& value) noexcept {
-    atomicNotifyAll(std::addressof(value));
-  }
-  template <typename T> requires (std::integral<T>)
-  inline void      atomicNotifyAllLocal(T& value) noexcept {
-    atomicNotifyAllLocal(std::addressof(value));
-  }
-  template <typename T> requires (std::integral<T>)
-  inline void      atomicNotifyAllShared(T& value) noexcept {
-    atomicNotifyAllShared(std::addressof(value));
+  template <impl::atomic_capable T>
+  inline static void atomic_add(T& value, std::type_identity_t<T> secondValue) noexcept {
+    atomic_add(*reinterpret_cast<impl::atomic_type_t<T>*>(&value), std::bit_cast<impl::atomic_type_t<T>>(secondValue));
   }
 
+  agt_u8_t  atomic_exchange_sub(agt_u8_t&  value, agt_u8_t  newValue) noexcept;
+  agt_u16_t atomic_exchange_sub(agt_u16_t& value, agt_u16_t newValue) noexcept;
+  agt_u32_t atomic_exchange_sub(agt_u32_t& value, agt_u32_t newValue) noexcept;
+  agt_u64_t atomic_exchange_sub(agt_u64_t& value, agt_u64_t newValue) noexcept;
 
-  // Deep Wait
-
-  void      atomicDeepWaitRaw(const void* atomicAddress, void* compareAddress, size_t addressSize) noexcept;
-  bool      atomicDeepWaitRaw(const void* atomicAddress, void* compareAddress, size_t addressSize, agt_u32_t timeout) noexcept;
-
-  template <typename T>
-  inline void atomicDeepWait(const T& value, std::type_identity_t<T> waitValue) noexcept {
-    while ( atomicLoad(value) == waitValue ) {
-      atomicDeepWaitRaw(std::addressof(value), std::addressof(waitValue), sizeof(T));
-    }
+  template <impl::atomic_capable T>
+  inline static T atomic_exchange_sub(T& value, std::type_identity_t<T> secondValue) noexcept {
+    return std::bit_cast<T>(atomic_exchange_sub(*reinterpret_cast<impl::atomic_type_t<T>*>(&value), std::bit_cast<impl::atomic_type_t<T>>(secondValue)));
   }
 
-  template <typename T>
-  inline void atomicDeepWait(const T& value, T& capturedValue, std::type_identity_t<T> waitValue) noexcept {
+  void      atomic_sub(agt_u8_t&  value, agt_u8_t  newValue) noexcept;
+  void      atomic_sub(agt_u16_t& value, agt_u16_t newValue) noexcept;
+  void      atomic_sub(agt_u32_t& value, agt_u32_t newValue) noexcept;
+  void      atomic_sub(agt_u64_t& value, agt_u64_t newValue) noexcept;
 
-    T tmpValue;
-
-    while ( (tmpValue = atomicLoad(value)) == waitValue ) {
-      atomicDeepWaitRaw(std::addressof(value), std::addressof(waitValue), sizeof(T));
-    }
-
-    capturedValue = tmpValue;
+  template <impl::atomic_capable T>
+  inline static void atomic_sub(T& value, std::type_identity_t<T> secondValue) noexcept {
+    atomic_sub(*reinterpret_cast<impl::atomic_type_t<T>*>(&value), std::bit_cast<impl::atomic_type_t<T>>(secondValue));
   }
 
-  template <typename T, std::predicate<const T&> Fn>
-  inline void atomicDeepWait(const T& value, Fn&& functor) noexcept {
-    T tmpValue;
+  agt_u8_t  atomic_exchange_and(agt_u8_t&  value, agt_u8_t  newValue) noexcept;
+  agt_u16_t atomic_exchange_and(agt_u16_t& value, agt_u16_t newValue) noexcept;
+  agt_u32_t atomic_exchange_and(agt_u32_t& value, agt_u32_t newValue) noexcept;
+  agt_u64_t atomic_exchange_and(agt_u64_t& value, agt_u64_t newValue) noexcept;
 
-    while ( !functor(tmpValue = atomicLoad(value)) ) {
-      atomicDeepWaitRaw(std::addressof(value), std::addressof(tmpValue), sizeof(T));
-    }
-  }
+  agt_u8_t  atomic_exchange_or(agt_u8_t&  value, agt_u8_t newValue) noexcept;
+  agt_u16_t atomic_exchange_or(agt_u16_t& value, agt_u16_t newValue) noexcept;
+  agt_u32_t atomic_exchange_or(agt_u32_t& value, agt_u32_t newValue) noexcept;
+  agt_u64_t atomic_exchange_or(agt_u64_t& value, agt_u64_t newValue) noexcept;
 
-  template <typename T, std::predicate<const T&> Fn>
-  inline void atomicDeepWait(const T& value, T& capturedValue, Fn&& functor) noexcept {
-
-    T tmpValue;
-
-    while ( !functor(tmpValue = atomicLoad(value)) ) {
-      atomicDeepWaitRaw(std::addressof(value), std::addressof(tmpValue), sizeof(T));
-    }
-
-    capturedValue = tmpValue;
-  }
-
-  template <typename T>
-  inline bool atomicDeepWaitUntil(const T& value, deadline deadline, std::type_identity_t<T> waitValue) noexcept {
-    while ( atomicLoad(value) == waitValue ) {
-      if (deadline.hasPassed())
-        return false;
-      atomicDeepWaitRaw(std::addressof(value), std::addressof(waitValue), sizeof(T));
-    }
-    return true;
-  }
-
-  template <typename T>
-  inline bool atomicDeepWaitUntil(const T& value, T& capturedValue, deadline deadline, std::type_identity_t<T> waitValue) noexcept {
-
-    T tmpValue;
-
-    while ( (tmpValue = atomicLoad(value)) == waitValue ) {
-      if (deadline.hasPassed())
-        return false;
-      atomicDeepWaitRaw(std::addressof(value), std::addressof(waitValue), sizeof(T));
-    }
-
-    capturedValue = tmpValue;
-    return true;
-  }
-
-  template <typename T, std::predicate<const T&> Fn>
-  inline bool atomicDeepWaitUntil(const T& value, deadline deadline, Fn&& functor) noexcept {
-
-    T capturedValue;
-
-    while ( !functor((capturedValue = atomicLoad(value))) ) {
-      if (deadline.hasPassed())
-        return false;
-      atomicDeepWaitRaw(std::addressof(value), std::addressof(capturedValue), sizeof(T));
-    }
-    return true;
-  }
-
-  template <typename T, std::predicate<const T&> Fn>
-  inline bool atomicDeepWaitUntil(const T& value, T& capturedValue, deadline deadline, Fn&& functor) noexcept {
-
-    T tmpValue;
-
-    while ( !functor(tmpValue = atomicLoad(value)) ) {
-      if (deadline.hasPassed())
-        return false;
-      atomicDeepWaitRaw(std::addressof(value), std::addressof(tmpValue), sizeof(T));
-    }
-
-    capturedValue = tmpValue;
-    return true;
-  }
-
-
-
-  // Wait
-
-  template <typename T>
-  inline void atomicWait(const T& value, std::type_identity_t<T> waitValue) noexcept {
-    agt_u32_t backoff = 0;
-
-    while ( atomicLoad(value) == waitValue ) {
-      DUFFS_MACHINE_EX(backoff, atomicDeepWaitRaw(std::addressof(value), std::addressof(waitValue), sizeof(T)); );
-    }
-  }
-
-  template <typename T>
-  inline void atomicWait(const T& value, T& capturedValue, std::type_identity_t<T> waitValue) noexcept {
-    T tmpValue;
-    agt_u32_t backoff = 0;
-
-    while ( (tmpValue = atomicLoad(value)) == waitValue ) {
-      DUFFS_MACHINE_EX(backoff,
-                       atomicDeepWaitRaw(std::addressof(value), std::addressof(waitValue), sizeof(T)); );
-    }
-
-    capturedValue = tmpValue;
-  }
-
-  template <typename T, std::predicate<const T&> Fn>
-  inline void atomicWait(const T& value, Fn&& functor) noexcept {
-    T capturedValue;
-    agt_u32_t backoff = 0;
-
-    while ( !functor((capturedValue = atomicLoad(value))) ) {
-      DUFFS_MACHINE_EX(backoff, atomicDeepWaitRaw(std::addressof(value), std::addressof(capturedValue), sizeof(T)); );
-    }
-  }
-
-  template <typename T, std::predicate<const T&> Fn>
-  inline void atomicWait(const T& value, T& capturedValue, Fn&& functor) noexcept {
-    T tmpValue;
-    agt_u32_t backoff = 0;
-
-    while ( !functor((tmpValue = atomicLoad(value))) ) {
-      DUFFS_MACHINE_EX(backoff, atomicDeepWaitRaw(std::addressof(value), std::addressof(tmpValue), sizeof(T)); );
-    }
-
-    capturedValue = tmpValue;
-  }
-
-  template <typename T>
-  inline bool atomicWaitUntil(const T& value, deadline deadline, std::type_identity_t<T> waitValue) noexcept {
-    agt_u32_t backoff = 0;
-
-    while ( atomicLoad(value) == waitValue ) {
-      if ( deadline.hasPassed() )
-        return false;
-      DUFFS_MACHINE_EX(backoff, if (!atomicDeepWaitRaw(std::addressof(value), std::addressof(waitValue), sizeof(T), deadline.toTimeoutMs())) {
-            return false;
-          } );
-    }
-
-    return true;
-  }
-
-  template <typename T>
-  inline bool atomicWaitUntil(const T& value, T& capturedValue, deadline deadline, std::type_identity_t<T> waitValue) noexcept {
-    T tmpValue;
-    agt_u32_t backoff = 0;
-
-    while ( (tmpValue = atomicLoad(value)) == waitValue ) {
-      if ( deadline.hasPassed() )
-        return false;
-      DUFFS_MACHINE_EX(backoff, if (!atomicDeepWaitRaw(std::addressof(value), std::addressof(waitValue), sizeof(T), deadline.toTimeoutMs())) {
-            return false;
-          } );
-    }
-
-    capturedValue = tmpValue;
-    return true;
-  }
-
-  template <typename T, std::predicate<const T&> Fn>
-  inline bool atomicWaitUntil(const T& value, deadline deadline, Fn&& functor) noexcept {
-    T capturedValue;
-    agt_u32_t backoff = 0;
-
-    while ( !functor((capturedValue = atomicLoad(value))) ) {
-      if ( deadline.hasPassed() )
-        return false;
-      DUFFS_MACHINE_EX(backoff, if (!atomicDeepWaitRaw(std::addressof(value), std::addressof(capturedValue), sizeof(T), deadline.toTimeoutMs())) {
-            return false;
-          } );
-    }
-
-    return true;
-  }
-
-  template <typename T, std::predicate<const T&> Fn>
-  inline bool atomicWaitUntil(const T& value, T& capturedValue, deadline deadline, Fn&& functor) noexcept {
-    T tmpValue;
-    agt_u32_t backoff = 0;
-
-    while ( !functor((tmpValue = atomicLoad(value))) ) {
-      if ( deadline.hasPassed() )
-        return false;
-      DUFFS_MACHINE_EX(backoff, if (!atomicDeepWaitRaw(std::addressof(value), std::addressof(tmpValue), sizeof(T), deadline.toTimeoutMs())) {
-            return false;
-          } );
-    }
-    capturedValue = tmpValue;
-    return true;
-  }
-
-  template <typename T>
-  inline bool atomicWaitFor(const T& value, agt_timeout_t timeout, std::type_identity_t<T> waitValue) noexcept {
-    switch (timeout) {
-      case AGT_WAIT:
-        atomicWait(value, waitValue);
-        return true;
-      case AGT_DO_NOT_WAIT:
-        return atomicLoad(value) != waitValue;
-      default:
-        return atomicWaitUntil(value, deadline::fromTimeout(timeout), waitValue);
-    }
-  }
-
-  template <typename T>
-  inline bool atomicWaitFor(const T& value, T& capturedValue, agt_timeout_t timeout, std::type_identity_t<T> waitValue) noexcept {
-    switch (timeout) {
-      case AGT_WAIT:
-        atomicWait(value, capturedValue, waitValue);
-        return true;
-      case AGT_DO_NOT_WAIT: {
-        T tmpValue;
-        if ((tmpValue = atomicLoad(value)) != waitValue) {
-          capturedValue = tmpValue;
-          return true;
-        }
-        return false;
-      }
-      default:
-        return atomicWaitUntil(value, capturedValue, deadline::fromTimeout(timeout), waitValue);
-    }
-  }
-
-  template <typename T, std::predicate<const T&> Fn>
-  inline bool atomicWaitFor(const T& value, agt_timeout_t timeout, Fn&& functor) noexcept {
-    switch (timeout) {
-      case AGT_WAIT:
-        atomicWait(value, std::forward<Fn>(functor));
-        return true;
-      case AGT_DO_NOT_WAIT:
-        return functor(atomicLoad(value));
-      default:
-        return atomicWaitUntil(value, deadline::fromTimeout(timeout), std::forward<Fn>(functor));
-    }
-  }
-
-  template <typename T, std::predicate<const T&> Fn>
-  inline bool atomicWaitFor(const T& value, T& capturedValue, agt_timeout_t timeout, Fn&& functor) noexcept {
-    switch (timeout) {
-      case AGT_WAIT:
-        atomicWait(value, capturedValue, std::forward<Fn>(functor));
-        return true;
-      case AGT_DO_NOT_WAIT:
-        return functor((capturedValue = atomicLoad(value)));
-      default:
-        return atomicWaitUntil(value, capturedValue, deadline::fromTimeout(timeout), std::forward<Fn>(functor));
-    }
-  }
-
+  agt_u8_t  atomic_exchange_xor(agt_u8_t&  value, agt_u8_t newValue) noexcept;
+  agt_u16_t atomic_exchange_xor(agt_u16_t& value, agt_u16_t newValue) noexcept;
+  agt_u32_t atomic_exchange_xor(agt_u32_t& value, agt_u32_t newValue) noexcept;
+  agt_u64_t atomic_exchange_xor(agt_u64_t& value, agt_u64_t newValue) noexcept;
 
   
   namespace impl {
@@ -716,85 +398,85 @@ namespace agt {
       }
 
       AGT_nodiscard AGT_forceinline bool testAny(IntType flags) const noexcept {
-        return static_cast<bool>(atomicLoad(bits) & flags);
+        return static_cast<bool>(atomic_load(bits) & flags);
       }
       AGT_nodiscard AGT_forceinline bool testAll(IntType flags) const noexcept {
-        return (atomicLoad(bits) & flags) == flags;
+        return (atomic_load(bits) & flags) == flags;
       }
       AGT_nodiscard AGT_forceinline bool testAny() const noexcept {
-        return static_cast<bool>(atomicLoad(bits));
+        return static_cast<bool>(atomic_load(bits));
       }
 
       AGT_nodiscard AGT_forceinline bool testAndSet(IntType flags) noexcept {
         return testAnyAndSet(flags);
       }
       AGT_nodiscard AGT_forceinline bool testAnyAndSet(IntType flags) noexcept {
-        return static_cast<bool>(atomicExchangeOr(bits, flags) & flags);
+        return static_cast<bool>(atomic_exchange_or(bits, flags) & flags);
       }
       AGT_nodiscard AGT_forceinline bool testAllAndSet(IntType flags) noexcept {
-        return (atomicExchangeOr(bits, flags) & flags) == flags;
+        return (atomic_exchange_or(bits, flags) & flags) == flags;
       }
 
       AGT_nodiscard AGT_forceinline bool testAndReset(IntType flags) noexcept {
         return testAnyAndReset(flags);
       }
       AGT_nodiscard AGT_forceinline bool testAnyAndReset(IntType flags) noexcept {
-        return static_cast<bool>(atomicExchangeAnd(bits, ~flags) & flags);
+        return static_cast<bool>(atomic_exchange_and(bits, ~flags) & flags);
       }
       AGT_nodiscard AGT_forceinline bool testAllAndReset(IntType flags) noexcept {
-        return (atomicExchangeAnd(bits, ~flags) & flags) == flags;
+        return (atomic_exchange_and(bits, ~flags) & flags) == flags;
       }
 
       AGT_nodiscard AGT_forceinline bool testAndFlip(IntType flags) noexcept {
         return testAnyAndFlip(flags);
       }
       AGT_nodiscard AGT_forceinline bool testAnyAndFlip(IntType flags) noexcept {
-        return static_cast<bool>(atomicExchangeXor(bits, flags) & flags);
+        return static_cast<bool>(atomic_exchange_xor(bits, flags) & flags);
       }
       AGT_nodiscard AGT_forceinline bool testAllAndFlip(IntType flags) noexcept {
-        return (atomicExchangeXor(bits, flags) & flags) == flags;
+        return (atomic_exchange_xor(bits, flags) & flags) == flags;
       }
 
       AGT_nodiscard AGT_forceinline IntType fetch() const noexcept {
-        return atomicLoad(bits);
+        return atomic_load(bits);
       }
       AGT_nodiscard AGT_forceinline IntType fetch(IntType flags) const noexcept {
-        return atomicLoad(bits) & flags;
+        return atomic_load(bits) & flags;
       }
 
       AGT_nodiscard AGT_forceinline IntType fetchAndSet(IntType flags) noexcept {
-        return atomicExchangeOr(bits, flags);
+        return atomic_exchange_or(bits, flags);
       }
       AGT_nodiscard AGT_forceinline IntType fetchAndReset(IntType flags) noexcept {
-        return atomicExchangeAnd(bits, ~flags);
+        return atomic_exchange_and(bits, ~flags);
       }
       AGT_nodiscard AGT_forceinline IntType fetchAndFlip(IntType flags) noexcept {
-        return atomicExchangeXor(bits, flags);
+        return atomic_exchange_xor(bits, flags);
       }
 
       AGT_nodiscard AGT_forceinline IntType fetchAndClear() noexcept {
-        return atomicExchange(bits, static_cast<IntType>(0));
+        return atomic_exchange(bits, static_cast<IntType>(0));
       }
 
       AGT_forceinline void set(IntType flags) noexcept {
-        atomicExchangeOr(bits, flags);
+        atomic_exchange_or(bits, flags);
       }
       AGT_forceinline void reset(IntType flags) noexcept {
-        atomicExchangeAnd(bits, ~flags);
+        atomic_exchange_and(bits, ~flags);
       }
       AGT_forceinline void flip(IntType flags) noexcept {
-        atomicExchangeXor(bits, flags);
+        atomic_exchange_xor(bits, flags);
       }
 
       AGT_forceinline void clear() noexcept {
         reset();
       }
       AGT_forceinline void clearAndSet(IntType flags) noexcept {
-        atomicStore(bits, flags);
+        atomic_store(bits, flags);
       }
 
       AGT_forceinline void reset() noexcept {
-        atomicStore(bits, static_cast<IntType>(0));
+        atomic_store(bits, static_cast<IntType>(0));
       }
 
 
@@ -845,7 +527,7 @@ namespace agt {
   }
 
 
-  class local_binary_semaphore {
+  /*class local_binary_semaphore {
     agt_u32_t val_;
   public:
 
@@ -856,7 +538,7 @@ namespace agt {
     bool tryAcquireFor(agt_timeout_t timeout) noexcept;
     bool tryAcquireUntil(deadline deadline) noexcept;
     void release() noexcept {
-      atomicRelaxedStore(val_, 1);
+      atomic_relaxed_store(val_, 1);
       atomicNotifyOne(val_);
     }
 
@@ -883,40 +565,40 @@ namespace agt {
     constexpr explicit local_semaphore(agt_u32_t val) : val_(val) { }
 
     void acquire() noexcept {
-      auto current = atomicRelaxedLoad(val_);
+      auto current = atomic_relaxed_load(val_);
       for (;;) {
         while ( current == 0 ) {
           atomicWait(val_, 0);
-          current = atomicRelaxedLoad(val_);
+          current = atomic_relaxed_load(val_);
         }
 
-        if ( atomicCompareExchangeWeak(val_, current, current - 1) )
+        if ( atomic_cas(val_, current, current - 1) )
           return;
       }
     }
     bool tryAcquire() noexcept {
-      if ( auto current = atomicRelaxedLoad(val_) )
-        return atomicCompareExchange(val_, current, current - 1);
+      if ( auto current = atomic_relaxed_load(val_) )
+        return atomic_try_replace(val_, current, current - 1);
       return false;
     }
     bool try_acquire_for(agt_timeout_t timeout) noexcept {
       return try_acquire_until(deadline::fromTimeout(timeout));
     }
     bool try_acquire_until(deadline deadline) noexcept {
-      auto current  = atomicRelaxedLoad(val_);
+      auto current  = atomic_relaxed_load(val_);
       for (;;) {
         while ( current == 0 ) {
           if ( !priv_wait_until(deadline) )
             return false;
-          current = atomicRelaxedLoad(val_);
+          current = atomic_relaxed_load(val_);
         }
 
-        if ( atomicCompareExchangeWeak(val_, current, current - 1) )
+        if ( atomic_cas(val_, current, current - 1) )
           return true;
       }
     }
     void release() noexcept {
-      atomicIncrement(val_);
+      atomic_increment(val_);
       atomicNotifyOne(val_);
     }
 
@@ -926,7 +608,7 @@ namespace agt {
 
     }
     bool priv_wait_until(deadline deadline) const noexcept {
-      if (auto current = atomicLoad(val_))
+      if (auto current = atomic_load(val_))
         return true;
       return atomicWaitUntil(val_, deadline, 0);
     }
@@ -962,7 +644,7 @@ namespace agt {
     bool tryAcquireFor(agt_u32_t n, agt_timeout_t timeout) noexcept;
     bool tryAcquireUntil(agt_u32_t n, deadline deadline) noexcept;
     void release(agt_u32_t n) noexcept;
-  };
+  };*/
 
 
   /*class semaphore {
@@ -1254,31 +936,6 @@ namespace agt {
 
   enum class futex_key_t : agt_u16_t;
 
-  class spinlock {
-
-    inline constexpr static agt_u32_t UnlockedValue = 0;
-    inline constexpr static agt_u32_t LockedValue   = static_cast<agt_u32_t>(-1);
-
-  public:
-
-    spinlock() = default;
-
-
-    void lock() noexcept {
-      agt_u32_t oldValue;
-      do {
-        oldValue = UnlockedValue;
-      } while(!atomicCompareExchangeWeak(m_lock, oldValue, LockedValue));
-    }
-
-    void unlock() noexcept {
-      atomicStore(m_lock, UnlockedValue);
-    }
-
-  private:
-    agt_u32_t m_lock = UnlockedValue;
-  };
-
   /*class futex {
 
     inline constexpr static agt_u16_t MaxIndex  = 16;
@@ -1320,7 +977,7 @@ namespace agt {
     // Increments
     [[nodiscard]] futex_key_t take() noexcept {
       lock_type oldLock, newLock;
-      oldLock.bits  = atomicRelaxedLoad(m_lock.bits);
+      oldLock.bits  = atomic_relaxed_load(m_lock.bits);
       newLock.state = ACQUIRED_BY_TAKE;
 
       do {
@@ -1331,7 +988,7 @@ namespace agt {
         newLock.waiterEpoch = oldLock.waiterEpoch;
         newLock.waiters     = oldLock.waiters;
 
-      } while(!atomicCompareExchangeWeak(m_lock.bits, oldLock.bits, newLock.bits));
+      } while(!atomic_cas(m_lock.bits, oldLock.bits, newLock.bits));
 
       return _key_cast(newLock.epoch);
     }
@@ -1339,7 +996,7 @@ namespace agt {
     [[nodiscard]] std::optional<futex_key_t> try_take() noexcept {
 
       lock_type oldLock, newLock;
-      oldLock.bits  = atomicRelaxedLoad(m_lock.bits);
+      oldLock.bits  = atomic_relaxed_load(m_lock.bits);
       newLock.state = ACQUIRED_BY_TAKE;
 
       do {
@@ -1349,14 +1006,14 @@ namespace agt {
         newLock.waiterEpoch = oldLock.waiterEpoch;
         newLock.waiters     = oldLock.waiters;
 
-      } while(!atomicCompareExchangeWeak(m_lock.bits, oldLock.bits, newLock.bits));
+      } while(!atomic_cas(m_lock.bits, oldLock.bits, newLock.bits));
 
       return _key_cast(newLock.epoch);
     }
 
     void drop(futex_key_t key) noexcept {
       lock_type oldLock, newLock;
-      oldLock.bits = atomicRelaxedLoad(m_lock.bits);
+      oldLock.bits = atomic_relaxed_load(m_lock.bits);
 
       bool transferOwnership;
       do {
@@ -1372,13 +1029,13 @@ namespace agt {
           newLock.waiters = 0;
           newLock.state   = NOT_ACQUIRED;
         }
-      } while(!atomicCompareExchangeWeak(m_lock.bits, oldLock.bits, newLock.bits));
+      } while(!atomic_cas(m_lock.bits, oldLock.bits, newLock.bits));
     }
 
     //
     [[nodiscard]] futex_key_t wait(futex_key_t key) noexcept {
       lock_type oldLock, newLock;
-      oldLock.bits = atomicRelaxedLoad(m_lock.bits);
+      oldLock.bits = atomic_relaxed_load(m_lock.bits);
       newLock.epoch = _key_cast(key) + 1;
 
       do {
@@ -1393,7 +1050,7 @@ namespace agt {
           newLock.spinLock = UnlockedValue;
         }
 
-        if (atomicCompareExchangeWeak(m_lock.bits, oldLock.bits, newLock.bits)) {
+        if (atomic_cas(m_lock.bits, oldLock.bits, newLock.bits)) {
           if (transferOwnership) {
 
           }
@@ -1456,51 +1113,51 @@ namespace agt {
       }
 
       AGT_forceinline void _load(void* dst) const noexcept {
-        *static_cast<storage_type*>(dst) = atomicLoad(m_bits);
+        *static_cast<storage_type*>(dst) = atomic_load(m_bits);
       }
       AGT_forceinline void _relaxed_load(void* dst) const noexcept {
-        *static_cast<storage_type*>(dst) = atomicRelaxedLoad(m_bits);
+        *static_cast<storage_type*>(dst) = atomic_relaxed_load(m_bits);
       }
 
       AGT_forceinline void _store(const void* src) noexcept {
-        atomicStore(m_bits, *static_cast<const storage_type*>(src));
+        atomic_store(m_bits, *static_cast<const storage_type*>(src));
       }
       AGT_forceinline void _relaxed_store(const void* src) noexcept {
-        atomicRelaxedStore(m_bits, *static_cast<const storage_type*>(src));
+        atomic_relaxed_store(m_bits, *static_cast<const storage_type*>(src));
       }
 
       AGT_forceinline void _exchange(void* dst, const void* src) noexcept {
-        *static_cast<storage_type*>(dst) = atomicExchange(m_bits, *static_cast<const storage_type*>(src));
+        *static_cast<storage_type*>(dst) = atomic_exchange(m_bits, *static_cast<const storage_type*>(src));
       }
 
       AGT_forceinline void _increment(void* dst) noexcept {
-        *static_cast<storage_type*>(dst) = atomicIncrement(m_bits);
+        *static_cast<storage_type*>(dst) = atomic_increment(m_bits);
       }
       AGT_forceinline void _relaxed_increment(void* dst) noexcept {
-        *static_cast<storage_type*>(dst) = atomicRelaxedIncrement(m_bits);
+        *static_cast<storage_type*>(dst) = atomic_relaxed_increment(m_bits);
       }
       AGT_forceinline void _decrement(void* dst) noexcept {
-        *static_cast<storage_type*>(dst) = atomicDecrement(m_bits);
+        *static_cast<storage_type*>(dst) = atomic_decrement(m_bits);
       }
 
       AGT_forceinline void _exchange_add(void* dst, const void* src) noexcept {
-        *static_cast<storage_type*>(dst) = atomicExchangeAdd(m_bits, *static_cast<const storage_type*>(src));
+        *static_cast<storage_type*>(dst) = atomic_exchange_add(m_bits, *static_cast<const storage_type*>(src));
       }
       AGT_forceinline void _exchange_and(void* dst, const void* src) noexcept {
-        *static_cast<storage_type*>(dst) = atomicExchangeAnd(m_bits, *static_cast<const storage_type*>(src));
+        *static_cast<storage_type*>(dst) = atomic_exchange_and(m_bits, *static_cast<const storage_type*>(src));
       }
       AGT_forceinline void _exchange_or(void* dst, const void* src) noexcept {
-        *static_cast<storage_type*>(dst) = atomicExchangeOr(m_bits, *static_cast<const storage_type*>(src));
+        *static_cast<storage_type*>(dst) = atomic_exchange_or(m_bits, *static_cast<const storage_type*>(src));
       }
       AGT_forceinline void _exchange_xor(void* dst, const void* src) noexcept {
-        *static_cast<storage_type*>(dst) = atomicExchangeXor(m_bits, *static_cast<const storage_type*>(src));
+        *static_cast<storage_type*>(dst) = atomic_exchange_xor(m_bits, *static_cast<const storage_type*>(src));
       }
 
       AGT_forceinline bool _compare_exchange(void* compare, const void* value) noexcept {
-        return atomicCompareExchange(m_bits, *static_cast<storage_type*>(compare), *static_cast<const storage_type*>(value));
+        return atomic_try_replace(m_bits, *static_cast<storage_type*>(compare), *static_cast<const storage_type*>(value));
       }
       AGT_forceinline bool _compare_exchange_weak(void* compare, const void* value) noexcept {
-        return atomicCompareExchangeWeak(m_bits, *static_cast<storage_type*>(compare), *static_cast<const storage_type*>(value));
+        return atomic_cas(m_bits, *static_cast<storage_type*>(compare), *static_cast<const storage_type*>(value));
       }
 
       [[nodiscard]] AGT_forceinline void* _address() noexcept {
@@ -1822,11 +1479,11 @@ namespace agt {
     private:
 
       AGT_forceinline bool _aligned_compare_exchange(void* compare, const void* value) noexcept {
-        return atomicCompareExchange16(this, compare, value);
+        return atomic_try_replace_16bytes(this, compare, value);
       }
 
       AGT_forceinline bool _aligned_compare_exchange_weak(void* compare, const void* value) noexcept {
-        return atomicCompareExchangeWeak16(this, compare, value);
+        return atomic_cas_16bytes(this, compare, value);
       }
 
       alignas(alignment)
@@ -1963,13 +1620,13 @@ namespace agt {
     }
 
     AGT_nodiscard AGT_forceinline bool testAny(EnumType flags) const noexcept {
-      return static_cast<bool>(atomicLoad(this->bits) & toInt(flags));
+      return static_cast<bool>(atomic_load(this->bits) & toInt(flags));
     }
     AGT_nodiscard AGT_forceinline bool testAll(EnumType flags) const noexcept {
-      return (atomicLoad(this->bits) & toInt(flags)) == toInt(flags);
+      return (atomic_load(this->bits) & toInt(flags)) == toInt(flags);
     }
     AGT_nodiscard AGT_forceinline bool testAny() const noexcept {
-      return static_cast<bool>(atomicLoad(this->bits));
+      return static_cast<bool>(atomic_load(this->bits));
     }
 
     AGT_nodiscard AGT_forceinline bool testAndSet(EnumType flags) noexcept {
@@ -1977,11 +1634,11 @@ namespace agt {
     }
     AGT_nodiscard AGT_forceinline bool testAnyAndSet(EnumType flags) noexcept {
       return this->testAnyAndSet(toInt(flags));
-      // return static_cast<bool>(atomicExchangeOr(this->bits, flags) & flags);
+      // return static_cast<bool>(atomic_exchange_or(this->bits, flags) & flags);
     }
     AGT_nodiscard AGT_forceinline bool testAllAndSet(EnumType flags) noexcept {
       return this->testAllAndSet(toInt(flags));
-      // return (atomicExchangeOr(bits, flags) & flags) == flags;
+      // return (atomic_exchange_or(bits, flags) & flags) == flags;
     }
 
     AGT_nodiscard AGT_forceinline bool testAndReset(EnumType flags) noexcept {
@@ -1989,11 +1646,11 @@ namespace agt {
     }
     AGT_nodiscard AGT_forceinline bool testAnyAndReset(EnumType flags) noexcept {
       return this->testAnyAndReset(toInt(flags));
-      // return static_cast<bool>(atomicExchangeAnd(bits, ~flags) & flags);
+      // return static_cast<bool>(atomic_exchange_and(bits, ~flags) & flags);
     }
     AGT_nodiscard AGT_forceinline bool testAllAndReset(EnumType flags) noexcept {
       return this->testAllAndReset(toInt(flags));
-      // return (atomicExchangeAnd(bits, ~flags) & flags) == flags;
+      // return (atomic_exchange_and(bits, ~flags) & flags) == flags;
     }
 
     AGT_nodiscard AGT_forceinline bool testAndFlip(EnumType flags) noexcept {
@@ -2001,23 +1658,23 @@ namespace agt {
     }
     AGT_nodiscard AGT_forceinline bool testAnyAndFlip(EnumType flags) noexcept {
       return this->testAnyAndFlip(toInt(flags));
-      // return static_cast<bool>(atomicExchangeXor(bits, flags) & flags);
+      // return static_cast<bool>(atomic_exchange_xor(bits, flags) & flags);
     }
     AGT_nodiscard AGT_forceinline bool testAllAndFlip(EnumType flags) noexcept {
       return this->testAllAndFlip(toInt(flags));
-      // return (atomicExchangeXor(bits, flags) & flags) == flags;
+      // return (atomic_exchange_xor(bits, flags) & flags) == flags;
     }
 
     AGT_nodiscard AGT_forceinline EnumType fetch() const noexcept {
-      return toEnum(atomicLoad(this->bits));
+      return toEnum(atomic_load(this->bits));
     }
     AGT_nodiscard AGT_forceinline EnumType fetch(EnumType flags) const noexcept {
-      return toEnum(atomicLoad(this->bits) & toInt(flags));
+      return toEnum(atomic_load(this->bits) & toInt(flags));
     }
 
     AGT_nodiscard AGT_forceinline EnumType fetchAndSet(EnumType flags) noexcept {
       return toEnum(this->fetchAndSet(toInt(flags)));
-      // return atomicExchangeOr(bits, flags);
+      // return atomic_exchange_or(bits, flags);
     }
     AGT_nodiscard AGT_forceinline EnumType fetchAndReset(EnumType flags) noexcept {
       return toEnum(this->fetchAndReset(toInt(flags)));
@@ -2027,7 +1684,7 @@ namespace agt {
     }
 
     AGT_nodiscard AGT_forceinline EnumType fetchAndClear() noexcept {
-      return toEnum(atomicExchange(this->bits, static_cast<IntType>(0)));
+      return toEnum(atomic_exchange(this->bits, static_cast<IntType>(0)));
     }
 
     AGT_forceinline void set(EnumType flags) noexcept {
@@ -2044,11 +1701,11 @@ namespace agt {
       reset();
     }
     AGT_forceinline void clearAndSet(EnumType flags) noexcept {
-      atomicStore(this->bits, toInt(flags));
+      atomic_store(this->bits, toInt(flags));
     }
 
     AGT_forceinline void reset() noexcept {
-      atomicStore(this->bits, static_cast<IntType>(0));
+      atomic_store(this->bits, static_cast<IntType>(0));
     }
 
 
@@ -2089,145 +1746,42 @@ namespace agt {
 
 
     AGT_nodiscard agt_u32_t get() const noexcept {
-      return atomicRelaxedLoad(value_);
+      return atomic_relaxed_load(value_);
     }
 
 
     agt_u32_t acquire() noexcept {
-      return atomicIncrement(value_);
+      return atomic_increment(value_);
     }
     agt_u32_t acquire(agt_u32_t n) noexcept {
-      return atomicExchangeAdd(value_, n) + n;
+      return atomic_exchange_add(value_, n) + n;
     }
 
     agt_u32_t release() noexcept {
-      return atomicDecrement(value_);
+      return atomic_decrement(value_);
     }
     agt_u32_t release(agt_u32_t n) noexcept {
-      return atomicExchangeAdd(value_, 0 - n) - n;
+      return atomic_exchange_add(value_, 0 - n) - n;
     }
 
     agt_u32_t operator++()    noexcept {
       return this->acquire();
     }
     agt_u32_t operator++(int) noexcept {
-      return atomicExchangeAdd(value_, 1);
+      return atomic_exchange_add(value_, 1);
     }
 
     agt_u32_t operator--()    noexcept {
       return this->release();
     }
     agt_u32_t operator--(int) noexcept {
-      return atomicExchangeAdd(value_, -1);
+      return atomic_exchange_add(value_, -1);
     }
 
   private:
 
     agt_u32_t value_ = 0;
   };
-
-  class atomic_monotonic_counter {
-  public:
-    atomic_monotonic_counter() = default;
-
-
-    agt_u32_t getValue() const noexcept {
-      return atomicRelaxedLoad(value_);
-      // return __iso_volatile_load32(&reinterpret_cast<const int&>(value_));
-    }
-
-    void reset() noexcept {
-      atomicStore(value_, 0);
-    }
-
-
-
-    agt_u32_t operator++()    noexcept {
-      agt_u32_t result = atomicIncrement(value_);
-      notifyWaiters();
-      return result;
-    }
-    agt_u32_t operator++(int) noexcept {
-      agt_u32_t result = _InterlockedExchangeAdd(&value_, 1) + 1;
-      notifyWaiters();
-      return result;
-    }
-
-
-    bool      waitFor(agt_u32_t expectedValue, agt_timeout_t timeout) const noexcept {
-      switch (timeout) {
-        case AGT_WAIT:
-          deepWait(expectedValue);
-          return true;
-        case AGT_DO_NOT_WAIT:
-          return isAtLeast(expectedValue);
-        default:
-          return deepWaitUntil(expectedValue, deadline::fromTimeout(timeout));
-      }
-    }
-
-
-  private:
-
-    void notifyWaiters() noexcept {
-      const agt_u32_t waiters = atomicRelaxedLoad(deepSleepers_);
-
-      if ( waiters == 0 ) [[likely]] {
-
-      } else if ( waiters == 1 ) {
-        atomicNotifyOne(value_);
-      } else {
-        atomicNotifyAll(value_);
-      }
-    }
-
-    AGT_forceinline agt_u32_t orderedLoad() const noexcept {
-      return atomicLoad(value_);
-    }
-
-    AGT_forceinline bool isAtLeast(agt_u32_t value) const noexcept {
-      return orderedLoad() >= value;
-    }
-
-    AGT_forceinline bool      tryWaitOnce(agt_u32_t expectedValue) const noexcept {
-      return orderedLoad() >= expectedValue;
-    }
-
-    AGT_noinline    void      deepWait(agt_u32_t expectedValue) const noexcept {
-      agt_u32_t capturedValue;
-      agt_u32_t backoff = 0;
-      while ( (capturedValue = orderedLoad()) < expectedValue ) {
-        DUFFS_MACHINE_EX(backoff,
-                         atomicIncrement(deepSleepers_);
-                         atomicDeepWaitRaw(&value_, &capturedValue, sizeof(agt_u32_t));
-                         atomicDecrement(deepSleepers_);
-                         );
-      }
-    }
-
-    AGT_noinline    bool      deepWaitUntil(agt_u32_t expectedValue, deadline deadline) const noexcept {
-      agt_u32_t capturedValue;
-      agt_u32_t backoff = 0;
-
-      while ( (capturedValue = atomicLoad(value_)) < expectedValue ) {
-        if ( deadline.hasPassed() )
-          return false;
-        DUFFS_MACHINE_EX(backoff,
-          atomicIncrement(deepSleepers_);
-          bool result = atomicDeepWaitRaw(&value_, &capturedValue, sizeof(agt_u32_t), deadline.toTimeoutMs());
-          atomicDecrement(deepSleepers_);
-          if (!result) return false;
-          );
-      }
-
-      return true;
-    }
-
-
-    agt_u32_t value_ = 0;
-    mutable agt_u32_t deepSleepers_ = 0;
-  };
-
 
   class read_write_mutex {
     inline constexpr static agt_u32_t WriteLockConstant = static_cast<agt_u32_t>(-1);
@@ -2272,7 +1826,7 @@ namespace agt {
 
     void read_lock(agt_u32_t count) noexcept {
       /*first_half tmp{
-          .bits = atomicRelaxedLoad(m_first.bits)
+          .bits = atomic_relaxed_load(m_first.bits)
       };
       do {
         if (tmp.isWriteLocked || tmp.writeLockWaiting)

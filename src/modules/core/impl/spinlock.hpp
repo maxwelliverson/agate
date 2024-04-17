@@ -23,7 +23,7 @@ namespace agt::impl {
   inline static void lock(spinlock_t& spinlock) noexcept {
     uint32_t backoff = 0;
     do {
-      uint32_t prevValue = atomicExchange(spinlock.value, SpinlockLockedValue);
+      uint32_t prevValue = atomic_exchange(spinlock.value, SpinlockLockedValue);
       if (prevValue == SpinlockUnlockedValue) [[likely]]
         return;
       DUFFS_MACHINE_EX(backoff,
@@ -33,7 +33,7 @@ namespace agt::impl {
   }
 
   AGT_forceinline static void unlock(spinlock_t& spinlock) noexcept {
-    atomicStore(spinlock.value, SpinlockUnlockedValue);
+    atomic_store(spinlock.value, SpinlockUnlockedValue);
   }
 }
 

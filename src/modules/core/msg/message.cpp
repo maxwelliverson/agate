@@ -23,7 +23,7 @@ void* agt::try_message_get_async_local(agt_message_t message, bool& refCountIsZe
   }
 
   // In the case that there's no bound async, we use the extraData field as a reference count instead.
-  refCountIsZero = atomicDecrement(message->extraData) == 0;
+  refCountIsZero = atomic_decrement(message->extraData) == 0;
 
   return nullptr;
 }
@@ -59,7 +59,7 @@ void agt::complete_agent_message(agt_message_t message, agt_status_t status, agt
     const auto agentData = static_cast<local_agent_message_async_data*>(asyncData);
     agentData->responseValue = value;
     agentData->status = status;
-    atomicStore(agentData->isComplete, AGT_TRUE);
+    atomic_store(agentData->isComplete, AGT_TRUE);
     message_release_async_local(message, true);
   }
 

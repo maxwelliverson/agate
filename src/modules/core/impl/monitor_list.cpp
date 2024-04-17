@@ -38,7 +38,7 @@ namespace {
     for (agt::impl::monitored_address* entry = list.table[hash & list.tableMask]; entry != nullptr; entry = entry->next) {
       assert( !test(entry->flags, agt::impl::eMonitoredAddressIsShared) && "Shared address monitoring is not yet implemented.");
       if (entry->address == addr) {
-        atomicRelaxedIncrement(entry->activeRefCount);
+        atomic_relaxed_increment(entry->activeRefCount);
         return entry;
       }
 
@@ -142,7 +142,7 @@ bool agt::impl::remove_monitor(agt_ctx_t ctx, monitor_waiter & exec) noexcept {
   monitored_address* entryToBeReleased = nullptr;
 
   // Do an early check, before acquiring the lock.
-  if (atomicRelaxedLoad(exec.isEnqueued) == AGT_FALSE)
+  if (atomic_relaxed_load(exec.isEnqueued) == AGT_FALSE)
     return false;
 
   auto& spinlock = *exec.address->segmentLock;
@@ -195,16 +195,16 @@ namespace {
     else {
       switch (waiter->valueSize) {
         case 1:
-          shouldUnblock = atomicLoad(*static_cast<uint8_t*>(userData)) != static_cast<uint8_t>(waiter->cmpValue);
+          shouldUnblock = atomic_load(*static_cast<uint8_t*>(userData)) != static_cast<uint8_t>(waiter->cmpValue);
           break;
         case 2:
-          shouldUnblock = atomicLoad(*static_cast<uint16_t*>(userData)) != static_cast<uint16_t>(waiter->cmpValue);
+          shouldUnblock = atomic_load(*static_cast<uint16_t*>(userData)) != static_cast<uint16_t>(waiter->cmpValue);
           break;
         case 4:
-          shouldUnblock = atomicLoad(*static_cast<uint32_t*>(userData)) != static_cast<uint32_t>(waiter->cmpValue);
+          shouldUnblock = atomic_load(*static_cast<uint32_t*>(userData)) != static_cast<uint32_t>(waiter->cmpValue);
           break;
         case 8:
-          shouldUnblock = atomicLoad(*static_cast<uint64_t*>(userData)) != static_cast<uint64_t>(waiter->cmpValue);
+          shouldUnblock = atomic_load(*static_cast<uint64_t*>(userData)) != static_cast<uint64_t>(waiter->cmpValue);
           break;
       }
     }

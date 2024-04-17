@@ -57,7 +57,7 @@ namespace agt {
   {
     obj->next = obj;
     lval = obj->next;
-    atomicCompareExchange(obj->next, lval, obj);
+    atomic_try_replace(obj->next, lval, obj);
   };
 
 

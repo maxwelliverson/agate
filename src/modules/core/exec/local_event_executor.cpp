@@ -455,7 +455,7 @@ inline bool try_pop_from_timeout_queue(local_event_executor* exec, agt_timestamp
 
 bool time_out(self_state& state) noexcept {
   self_state prev = SELF_IS_BLOCKED;
-  return atomicCompareExchange(state, prev, SELF_IS_TIMED_OUT);
+  return atomic_try_replace(state, prev, SELF_IS_TIMED_OUT);
 }
 
 void make_timed_out_agents_ready(local_event_executor* exec) noexcept {
@@ -545,7 +545,7 @@ void make_timed_out_agents_ready(local_event_executor* exec) noexcept {
 
   [[noreturn]] void continue_ready_agent(local_event_executor* exec, local_event_self* readyAgent) noexcept {
     agt_fiber_param_t action;
-    const auto prevState = atomicExchange(readyAgent->state, SELF_IS_RUNNING);
+    const auto prevState = atomic_exchange(readyAgent->state, SELF_IS_RUNNING);
     if (prevState == SELF_IS_WOKEN_UP)
       action = FiberActionResumeSuccess;
     else {
@@ -876,10 +876,10 @@ agt_status_t commit_msg(basic_executor* exec, message msg) noexcept {
 // otherwise previous state must have been woken up, and we can instead resume immediately, resetting state to running.
 inline bool try_block(self_state& state) noexcept {
   self_state cmpVal = SELF_IS_RUNNING;
-  const auto result = atomicCompareExchange(state, cmpVal, SELF_IS_BLOCKED);
+  const auto result = atomic_try_replace(state, cmpVal, SELF_IS_BLOCKED);
   if (!result) {
     AGT_invariant( cmpVal == SELF_IS_WOKEN_UP );
-    atomicRelaxedStore(state, SELF_IS_RUNNING);
+    atomic_relaxed_store(state, SELF_IS_RUNNING);
   }
   return result;
 }

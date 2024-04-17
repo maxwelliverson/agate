@@ -86,11 +86,11 @@ namespace agt {
     };
 
     AGT_forceinline void atomicCASInit(rc_object& obj, rc_object_cas_wrapper& old) noexcept {
-      old.u64 = atomicRelaxedLoad(_get_cas_value(obj));
+      old.u64 = atomic_relaxed_load(_get_cas_value(obj));
     }
 
     AGT_forceinline bool atomicCAS(rc_object& obj, rc_object_cas_wrapper& old, rc_object_cas_wrapper next) noexcept {
-      return atomicCompareExchangeWeak(_get_cas_value(obj), old.u64, next.u64);
+      return atomic_cas(_get_cas_value(obj), old.u64, next.u64);
     }
 
     AGT_forceinline rcpool_chunk_t _get_chunk(rc_object& obj) noexcept;
@@ -301,7 +301,7 @@ namespace agt {
   inline void                     retain_rc_object(rc_object& obj, agt_u32_t retainedCount) noexcept {
     AGT_invariant(retainedCount > 0);
     if constexpr (test(SafetyModel, thread_owner_safe)) {
-      atomicExchangeAdd(obj.refCount, retainedCount);
+      atomic_exchange_add(obj.refCount, retainedCount);
     }
     else {
       obj.refCount += retainedCount;
@@ -312,7 +312,7 @@ namespace agt {
   template <thread_safety SafetyModel>
   inline void                     take_rc_weak_ref(rc_object& obj, agt_u32_t& epoch, agt_u32_t count) noexcept {
     if constexpr (test(SafetyModel, thread_user_safe)) {
-      epoch = atomicRelaxedLoad(obj.epoch);
+      epoch = atomic_relaxed_load(obj.epoch);
     }
     else {
       epoch = obj.epoch;

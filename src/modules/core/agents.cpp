@@ -448,7 +448,7 @@ namespace {
 
   agt_status_t resolve_direct_message(void* obj, agt_u64_t* pResult, void* callbackData) noexcept {
     const auto data = static_cast<local_agent_message_async_data*>(obj);
-    if (atomicLoad(data->isComplete)) {
+    if (atomic_load(data->isComplete)) {
       if (pResult)
         *pResult = data->responseValue;
       return data->status;

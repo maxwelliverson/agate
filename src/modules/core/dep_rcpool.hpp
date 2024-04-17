@@ -41,23 +41,23 @@ namespace agt {
     AGT_forceinline void slotListAtomicUpdate(slot_list& list, LoopFn&& fn) noexcept {
       slot_list old, next;
 
-      old.bits = atomicRelaxedLoad(list.bits);
+      old.bits = atomic_relaxed_load(list.bits);
 
       do {
         next = fn(old);
-      } while(!atomicCompareExchangeWeak(list.bits, old.bits, next.bits));
+      } while(!atomic_cas(list.bits, old.bits, next.bits));
     }
 
     template <std::invocable<slot_list, slot_list&> LoopFn>
     AGT_forceinline void slotListAtomicUpdate(slot_list& list, slot_list init, LoopFn&& fn) noexcept {
       slot_list old, next;
 
-      old.bits = atomicRelaxedLoad(list.bits);
+      old.bits = atomic_relaxed_load(list.bits);
       next = init;
 
       do {
         fn(old, next);
-      } while(!atomicCompareExchangeWeak(list.bits, old.bits, next.bits));
+      } while(!atomic_cas(list.bits, old.bits, next.bits));
     }
 
     AGT_forceinline void _init_delayed_free_list(delayed_free_list& list) noexcept {
@@ -68,7 +68,7 @@ namespace agt {
     AGT_forceinline void _delayed_free(delayed_free_list& list, rc_object& obj) noexcept {
       delayed_free_list old, next;
 
-      old.bits = atomicRelaxedLoad(list.bits);
+      old.bits = atomic_relaxed_load(list.bits);
 
       agt_u16_t thisSlot = obj.thisSlot;
       next.next = thisSlot;
@@ -78,7 +78,7 @@ namespace agt {
         AGT_invariant(old.padding == 0);
         next.head = old.head == 0 ? thisSlot : old.head;
         next.length = old.length + 1;
-      } while(!atomicCompareExchangeWeak(list.bits, old.bits, next.bits));
+      } while(!atomic_cas(list.bits, old.bits, next.bits));
     }*/
 
     struct AGT_cache_aligned rcpool_chunk {
@@ -352,7 +352,7 @@ namespace agt {
 
     AGT_forceinline bool _try_resolve_delayed_frees(rcpool_chunk_t chunk) noexcept {
       delayed_free_list list;
-      if ((list.bits = atomicExchange(chunk->delayedFreeList.bits, 0))) {
+      if ((list.bits = atomic_exchange(chunk->delayedFreeList.bits, 0))) {
         // There are delayed free operations that have to be processed
 
         reinterpret_cast<agt_u16_t&>(_get_slot(chunk, list.head).type) = chunk->freeSlotList.nextSlot;
@@ -369,7 +369,7 @@ namespace agt {
 
     AGT_forceinline bool _try_resolve_delayed_frees_from_full_chunk(rcpool_chunk_t chunk) noexcept {
       delayed_free_list list;
-      if ((list.bits = atomicExchange(chunk->delayedFreeList.bits, 0))) {
+      if ((list.bits = atomic_exchange(chunk->delayedFreeList.bits, 0))) {
         // There are delayed free operations that have to be processed
         chunk->freeSlotList.nextSlot = list.next;
         chunk->freeSlotList.length = list.length;
@@ -557,7 +557,7 @@ namespace agt {
   template <bool AtomicOp>
   AGT_forceinline void       impl::_retain_chunk(rcpool_chunk_t chunk, agt_u32_t count) noexcept {
     if constexpr (AtomicOp)
-      atomicExchangeAdd(chunk->chunkWeakRefCount, count);
+      atomic_exchange_add(chunk->chunkWeakRefCount, count);
     else
       chunk->chunkWeakRefCount += count;
   }
@@ -566,7 +566,7 @@ namespace agt {
   AGT_forceinline void       impl::_release_chunk(rcpool_chunk_t chunk, agt_u32_t count) noexcept {
     bool shouldFreeChunk;
     if constexpr (AtomicOp) {
-      shouldFreeChunk = atomicExchangeAdd(chunk->chunkWeakRefCount, -count) == count;
+      shouldFreeChunk = atomic_exchange_add(chunk->chunkWeakRefCount, -count) == count;
     }
     else {
       shouldFreeChunk = (chunk->chunkWeakRefCount -= count) == 0;

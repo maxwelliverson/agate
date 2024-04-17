@@ -75,10 +75,10 @@ namespace agt {
     template <size_t N>
     bool atomic_cas(tagged_storage<N>& self, tagged_storage<N>& compare, tagged_storage<N> newValue) noexcept {
       if constexpr (N == 8) {
-        return atomicCompareExchange16(&self, &compare, &newValue);
+        return atomic_try_replace_16bytes(&self, &compare, &newValue);
       }
       else {
-        return atomicCompareExchange(reinterpret_cast<agt_u64_t&>(self),
+        return atomic_try_replace(reinterpret_cast<agt_u64_t&>(self),
                                      reinterpret_cast<agt_u64_t&>(compare),
                                      *reinterpret_cast<agt_u64_t*>(&newValue));
       }
@@ -86,10 +86,10 @@ namespace agt {
     template <size_t N>
     bool atomic_cas_weak(tagged_storage<N>& self, tagged_storage<N>& compare, tagged_storage<N> newValue) noexcept {
       if constexpr (N == 8) {
-        return atomicCompareExchangeWeak16(&self, &compare, &newValue);
+        return atomic_cas_16bytes(&self, &compare, &newValue);
       }
       else {
-        return atomicCompareExchangeWeak(reinterpret_cast<agt_u64_t&>(self),
+        return atomic_cas(reinterpret_cast<agt_u64_t&>(self),
                                          reinterpret_cast<agt_u64_t&>(compare),
                                          *reinterpret_cast<agt_u64_t*>(&newValue));
       }
@@ -103,7 +103,7 @@ namespace agt {
         return loaded;
       }
       else {
-        return std::bit_cast<tagged_storage<N>>(atomicLoad(reinterpret_cast<const agt_u64_t&>(self)));
+        return std::bit_cast<tagged_storage<N>>(atomic_load(reinterpret_cast<const agt_u64_t&>(self)));
       }
 
     }
@@ -113,7 +113,7 @@ namespace agt {
         return atomic_load(self);
       }
       else {
-        return std::bit_cast<tagged_storage<N>>(atomicRelaxedLoad(reinterpret_cast<const agt_u64_t&>(self)));
+        return std::bit_cast<tagged_storage<N>>(atomic_relaxed_load(reinterpret_cast<const agt_u64_t&>(self)));
       }
     }
 
@@ -126,7 +126,7 @@ namespace agt {
       }
       else {
         return std::bit_cast<tagged_storage<N>>(
-            atomicExchange(reinterpret_cast<agt_u64_t&>(self),
+            atomic_exchange(reinterpret_cast<agt_u64_t&>(self),
                            *reinterpret_cast<const agt_u64_t*>(&tagged)));
       }
     }
@@ -139,7 +139,7 @@ namespace agt {
         while (!atomic_cas_weak(self, compareValue, tagged));
       }
       else {
-        atomicStore(reinterpret_cast<agt_u64_t&>(self), *reinterpret_cast<const agt_u64_t*>(&tagged));
+        atomic_store(reinterpret_cast<agt_u64_t&>(self), *reinterpret_cast<const agt_u64_t*>(&tagged));
       }
     }
     template <size_t N>
@@ -148,7 +148,7 @@ namespace agt {
         atomic_store(self, tagged);
       }
       else {
-        atomicRelaxedStore(reinterpret_cast<agt_u64_t&>(self), *reinterpret_cast<const agt_u64_t*>(&tagged));
+        atomic_relaxed_store(reinterpret_cast<agt_u64_t&>(self), *reinterpret_cast<const agt_u64_t*>(&tagged));
       }
     }
   }

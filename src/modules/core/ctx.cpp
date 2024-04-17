@@ -104,11 +104,11 @@ namespace agt {
     auto instance = ctx->instance;
     assert( ctx->pLocalCtxAddress );
     auto& tlVar = *ctx->pLocalCtxAddress;
-    if (atomicDecrement(ctx->refCount) == 0) {
+    if (atomic_decrement(ctx->refCount) == 0) {
       destroy_ctx_allocator(instance, ctx->allocator);
       _aligned_free(ctx);
       tlVar = nullptr;
-      return atomicDecrement(instance->refCount) == 0;
+      return atomic_decrement(instance->refCount) == 0;
     }
 
     return false;
@@ -136,7 +136,7 @@ namespace agt {
     ctx->timestampFrequencyRatio = instance->timeoutDivisor;
 
 
-    atomicRelaxedIncrement(instance->refCount);
+    atomic_relaxed_increment(instance->refCount);
 
     ctx->registryCache = {};
 

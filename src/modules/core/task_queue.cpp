@@ -48,24 +48,24 @@ namespace {
       task_queue queue;
     };
     const auto srcPtr = reinterpret_cast<const uint64_t*>(&src);
-    u64[0] = agt::atomicRelaxedLoad(srcPtr[0]);
-    u64[1] = agt::atomicRelaxedLoad(srcPtr[1]);
+    u64[0] = agt::atomic_relaxed_load(srcPtr[0]);
+    u64[1] = agt::atomic_relaxed_load(srcPtr[1]);
     return queue;
   }
 
   AGT_forceinline bool atomic_cas(task_queue& var, task_queue& prevVal, const task_queue& newVal) noexcept {
-    return agt::atomicCompareExchange16(&var, &prevVal, &newVal);
+    return agt::atomic_try_replace_16bytes(&var, &prevVal, &newVal);
   }
 
 
   AGT_forceinline bool atomic_update_counter(uint32_t& target, uint32_t newValue) noexcept {
-    uint32_t prev = atomicRelaxedLoad(target);
+    uint32_t prev = atomic_relaxed_load(target);
     do {
       if (newValue < prev) {
         if (prev - newValue < INT_MAX) [[likely]] // this should almost never be false, however it is here so that the counter can roll over without issue.
           return false;
       }
-    } while(!atomicCompareExchangeWeak(target, prev, newValue));
+    } while(!atomic_cas(target, prev, newValue));
     return true;
   }
 }
@@ -401,14 +401,14 @@ void agt::wake(agt_ctx_t ctx, unsafe_signal_task_queue &queue, uint32_t n) noexc
 
 
 bool agt::insert(signal_task_queue &queue, blocked_task &task) noexcept {
-  auto newSize= atomicIncrement(queue.size);
+  auto newSize= atomic_increment(queue.size);
 
   if (newSize <= 0)
     return false;
 
   task.next = nullptr;
-  auto tail = atomicExchange(queue.tail, &task.next);
-  atomicStore(*tail, &task);
+  auto tail = atomic_exchange(queue.tail, &task.next);
+  atomic_store(*tail, &task);
 
   return true;
 
@@ -418,7 +418,7 @@ bool agt::insert(signal_task_queue &queue, blocked_task &task) noexcept {
 
   s->tail = &msg.next();
   std::atomic_thread_fence(std::memory_order_acq_rel);
-  atomicStore(tail->c_ref(), message);
+  atomic_store(tail->c_ref(), message);
 
 
   task_queue prev, next;
@@ -481,7 +481,7 @@ void agt::wake(signal_task_queue &queue, int32_t n) noexcept {
 
   AGT_invariant( n > 0 );
 
-  /*const auto prevSize = atomicExchangeAdd(queue.size, -n);
+  /*const auto prevSize = atomic_exchange_add(queue.size, -n);
   const auto newSize = prevSize - n;
 
 
@@ -490,9 +490,9 @@ void agt::wake(signal_task_queue &queue, int32_t n) noexcept {
     return;
 
   if (newSize <= 0) { // ie. wake everything, remove all entries from queue
-    auto head = atomicExchange(queue.head, nullptr);
+    auto head = atomic_exchange(queue.head, nullptr);
     blocked_task* tail;
-    atomicStore(queue.tail, &queue.head);
+    atomic_store(queue.tail, &queue.head);
 
     for (uint32_t i = prevSize; i > 0; --i) {
       auto next = head->next;
@@ -505,18 +505,18 @@ void agt::wake(signal_task_queue &queue, int32_t n) noexcept {
   // newSize is greater than or equal to zero, meaning it was previously
 
 
-  blocked_task* head = atomicRelaxedLoad(queue.head);
+  blocked_task* head = atomic_relaxed_load(queue.head);
 
   do {
     while (head == nullptr) [[unlikely]] {
       spin();
-      head = atomicRelaxedLoad(queue.head);
+      head = atomic_relaxed_load(queue.head);
     }
-  } while (!atomicCompareExchangeWeak(queue.head, head, head->next));
+  } while (!atomic_cas(queue.head, head, head->next));
 
 
 
-  atomicStore(r->head, message->next);
+  atomic_store(r->head, message->next);
   auto newTail = &message->next;
-  atomicCompareExchange(*r->pTail, newTail, &r->head);*/
+  atomic_try_replace(*r->pTail, newTail, &r->head);*/
 }

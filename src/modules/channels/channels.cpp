@@ -182,7 +182,7 @@ namespace {
   }
   inline void cleanupMessage(agt_ctx_t ctx, agt_message_t message) noexcept {
     message->state    = default_message_state;
-    impl::atomicStore(message->refCount, 1);
+    impl::atomic_store(message->refCount, 1);
     message->flags    = flags_not_set;
     if (message->asyncData != nullptr)
       asyncDataDrop(message->asyncData, ctx, message->asyncDataKey);

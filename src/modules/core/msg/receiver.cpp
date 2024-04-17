@@ -16,9 +16,9 @@ agt_status_t agt::receive_local_spsc(receiver_t receiver, agt_message_t& message
   auto status = wait_on_local_for(r->ctx, r->head, nullptr, timeout, &message);
 
   if (status == AGT_SUCCESS) {
-    atomicStore(r->head, message->next);
+    atomic_store(r->head, message->next);
     auto newTail = &message->next;
-    atomicCompareExchange(*r->pTail, newTail, &r->head); // ie. the received message is the queue's tail, then set tail to point back to head.
+    atomic_try_replace(*r->pTail, newTail, &r->head); // ie. the received message is the queue's tail, then set tail to point back to head.
   }
 
   return status;

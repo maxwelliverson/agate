@@ -371,7 +371,7 @@ namespace agt {
         if (test(broadcastMsg->flags, message_flags::asyncIsBound))
           shouldDestroy = async_drop<SharedIsEnabled>(ctx, broadcastMsg->asyncData, broadcastMsg->asyncKey, dropReason);
         else
-          shouldDestroy = atomicDecrement(broadcastMsg->extraData) == 0;
+          shouldDestroy = atomic_decrement(broadcastMsg->extraData) == 0;
         if (shouldDestroy)
           destroy_message(broadcastMsg);
       }
@@ -391,7 +391,7 @@ namespace agt {
         if (test(broadcastMsg->flags, message_flags::asyncIsBound))
           shouldDestroy = async_arrive<SharedIsEnabled>(ctx, broadcastMsg->asyncData, broadcastMsg->asyncKey);
         else
-          shouldDestroy = atomicDecrement(broadcastMsg->extraData) == 0;
+          shouldDestroy = atomic_decrement(broadcastMsg->extraData) == 0;
         if (shouldDestroy)
           destroy_message(broadcastMsg);
       }
@@ -411,7 +411,7 @@ namespace agt {
         if (test(broadcastMsg->flags, message_flags::asyncIsBound))
           shouldDestroy = async_arrive_with_result<SharedIsEnabled>(ctx, broadcastMsg->asyncData, broadcastMsg->asyncKey, result);
         else
-          shouldDestroy = atomicDecrement(broadcastMsg->extraData) == 0;
+          shouldDestroy = atomic_decrement(broadcastMsg->extraData) == 0;
         if (shouldDestroy)
           destroy_message(broadcastMsg);
       }

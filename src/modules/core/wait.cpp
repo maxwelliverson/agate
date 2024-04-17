@@ -70,19 +70,19 @@ agt_status_t agt::wait_on_local_address(agt_ctx_t ctx, const void* address, agt_
 
   switch (valueSize) {
     case 8:
-      atomicValue = atomicRelaxedLoad(*static_cast<const agt_u64_t*>(address));
+      atomicValue = atomic_relaxed_load(*static_cast<const agt_u64_t*>(address));
       cmp         = *static_cast<const agt_u64_t*>(cmpValue);
       break;
     case 4:
-      atomicValue = atomicRelaxedLoad(*static_cast<const agt_u32_t*>(address));
+      atomicValue = atomic_relaxed_load(*static_cast<const agt_u32_t*>(address));
       cmp         = *static_cast<const agt_u32_t*>(cmpValue);
       break;
     case 2:
-      atomicValue = atomicRelaxedLoad(*static_cast<const agt_u16_t*>(address));
+      atomicValue = atomic_relaxed_load(*static_cast<const agt_u16_t*>(address));
       cmp         = *static_cast<const agt_u16_t*>(cmpValue);
       break;
     case 1:
-      atomicValue = atomicRelaxedLoad(*static_cast<const agt_u8_t*>(address));
+      atomicValue = atomic_relaxed_load(*static_cast<const agt_u8_t*>(address));
       cmp         = *static_cast<const agt_u8_t*>(cmpValue);
       break;
     AGT_no_default;

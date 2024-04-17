@@ -177,7 +177,7 @@ std::optional<std::pair<impl::pool_slot &, agt_u16_t>> agt::impl::_pop_slot_from
 
   slot_list old, next;
 
-  old.bits = atomicRelaxedLoad(list.bits);
+  old.bits = atomic_relaxed_load(list.bits);
   pool_slot* slot;
 
   do {
@@ -189,7 +189,7 @@ std::optional<std::pair<impl::pool_slot &, agt_u16_t>> agt::impl::_pop_slot_from
 
     next.length = old.length - 1;
     next.nextSlot = slot->next;
-  } while(!atomicCompareExchangeWeak(list.bits, old.bits, next.bits));
+  } while(!atomic_cas(list.bits, old.bits, next.bits));
 
   return std::pair<pool_slot&, agt_u16_t>{ *slot, next.length };
 }
@@ -202,13 +202,13 @@ agt_u16_t agt::impl::_push_slot_to_chunk_atomic(pool_chunk_t chunk, pool_slot& s
 
   slot_list old, next;
 
-  old.bits = atomicRelaxedLoad(list.bits);
+  old.bits = atomic_relaxed_load(list.bits);
   next.nextSlot = slot.self;
 
   do {
     next.length = old.length + 1;
     slot.next   = old.nextSlot;
-  } while(!atomicCompareExchangeWeak(list.bits, old.bits, next.bits));
+  } while(!atomic_cas(list.bits, old.bits, next.bits));
 
   return next.length;
 }
@@ -223,7 +223,7 @@ std::optional<bool> agt::impl::_try_resolve_deferred_ops(pool_chunk_t chunk) noe
 
   delayed_free_list old;
 
-  if ((old.bits = atomicExchange(list.bits, 0)) != 0) {
+  if ((old.bits = atomic_exchange(list.bits, 0)) != 0) {
     chunk->freeSlotList.nextSlot = old.next;
     chunk->freeSlotList.length   = old.length;
 
@@ -240,7 +240,7 @@ bool agt::impl::_resolve_deferred_ops(pool_chunk_t chunk) noexcept {
 
   delayed_free_list old;
 
-  if ((old.bits = atomicExchange(chunk->delayedFreeList.bits, 0))) {
+  if ((old.bits = atomic_exchange(chunk->delayedFreeList.bits, 0))) {
     _get_slot(chunk, old.head).next = chunk->freeSlotList.nextSlot;
     chunk->freeSlotList.nextSlot = old.next;
     chunk->freeSlotList.length  += old.length;
