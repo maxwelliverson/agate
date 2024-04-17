@@ -6,6 +6,7 @@
 #define AGATE_CAST_HPP
 
 #include "config.hpp"
+#include "atomic.hpp"
 
 namespace agt {
 
@@ -120,6 +121,8 @@ namespace agt {
     return src ? object_isa<Type>(*src) : false;
   }
 
+
+
   template <typename Type, typename Hdl>
   AGT_forceinline static bool handle_isa(Hdl handle) noexcept {
     static_assert(cast_impl::handle_castable_from<Type, Hdl>);
@@ -160,6 +163,96 @@ namespace agt {
   template <typename To, typename From>
   AGT_forceinline static To*       object_cast(From* obj) noexcept {
     return const_cast<To*>(object_cast<To>(const_cast<const From*>(obj)));
+  }
+
+
+
+
+  /// Casts from [const] void*, which are fairly common in the public interfaces.
+
+  template <typename Type>
+  AGT_forceinline static bool nonnull_object_isa(const void* p) noexcept {
+    return object_isa<Type>(*static_cast<const object*>(p));
+  }
+
+  template <typename Type>
+  AGT_forceinline static bool object_isa(const void* p) noexcept {
+    return p ? nonnull_object_isa<Type>(p) : false;
+  }
+
+
+  template <typename To>
+  AGT_forceinline static const To* nonnull_object_cast(const void* ptr) noexcept {
+    AGT_invariant( ptr != nullptr );
+    return nonnull_object_isa<To>(ptr) ? cast_impl::do_object_cast<To>(static_cast<const object*>(ptr)) : nullptr;
+  }
+
+  template <typename To>
+  AGT_forceinline static To*       nonnull_object_cast(void* ptr) noexcept {
+    return const_cast<To*>(nonnull_object_cast<To>(const_cast<const void*>(ptr)));
+  }
+
+  template <typename To>
+  AGT_forceinline static const To* object_cast(const void* ptr) noexcept {
+    return object_isa<To>(ptr) ? cast_impl::do_object_cast<To>(static_cast<const object*>(ptr)) : nullptr;
+  }
+
+  template <typename To>
+  AGT_forceinline static To*       object_cast(void* ptr) noexcept {
+    return const_cast<To*>(object_cast<To>(const_cast<const void*>(ptr)));
+  }
+
+  template <typename To>
+  AGT_forceinline static const To* unsafe_nonnull_object_cast(const void* ptr) noexcept {
+    AGT_invariant( ptr != nullptr );
+    AGT_invariant( nonnull_object_isa<To>(ptr) );
+    return cast_impl::do_object_cast<To>(static_cast<const object*>(ptr));
+  }
+
+  template <typename To>
+  AGT_forceinline static To*       unsafe_nonnull_object_cast(void* ptr) noexcept {
+    return const_cast<To*>(unsafe_nonnull_object_cast<To>(const_cast<const void*>(ptr)));
+  }
+
+  template <typename To>
+  AGT_forceinline static const To* unsafe_object_cast(const void* ptr) noexcept {
+    AGT_invariant( ptr == nullptr || nonnull_object_isa<To>(ptr) ); // either ptr is null, or is *is* type To
+    return ptr ? unsafe_nonnull_object_cast<To>(ptr) : nullptr;
+  }
+
+  template <typename To>
+  AGT_forceinline static To*       unsafe_object_cast(void* ptr) noexcept {
+    AGT_invariant( ptr == nullptr || nonnull_object_isa<To>(ptr) ); // either ptr is null, or is *is* type To
+    return ptr ? unsafe_nonnull_object_cast<To>(ptr) : nullptr;
+  }
+
+
+
+
+  namespace cast_impl {
+    template <auto MemberPtr>
+    struct member_ptr_info;
+    template <typename S, typename M, M S::* MemberPtr>
+    struct member_ptr_info<MemberPtr>{
+      using member_type = M;
+      using struct_type = S;
+    };
+  }
+
+
+  template <auto MemberPtr, typename From>
+  AGT_forceinline static auto      member_to_struct_cast(From* from) noexcept {
+    using from_t = std::remove_const_t<From>;
+    using info = cast_impl::member_ptr_info<MemberPtr>;
+    static_assert( not std::is_volatile_v<from_t> );
+    static_assert( std::same_as<typename info::member_type, from_t> );
+    using base_struct = typename info::struct_type;
+    using to_t = std::conditional_t<std::is_const_v<From>, const base_struct, base_struct>;
+    using byte_t = std::conditional_t<std::is_const_v<From>, const std::byte, std::byte>;
+
+
+    const auto Offset = std::bit_cast<impl::atomic_type_t<decltype(MemberPtr)>>(MemberPtr);
+    return reinterpret_cast<to_t*>(reinterpret_cast<byte_t*>(from) - Offset);
   }
 }
 
