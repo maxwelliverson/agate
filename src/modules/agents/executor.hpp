@@ -71,7 +71,7 @@ namespace agt {
     inline constexpr static object_type maxValue = object_type::executor_end;
   };
 
-  /*AGT_virtual_object_type(executor) {
+  /*AGT_abstract_object(executor) {
     set<executor*> linkedExecutors;
     agt_u32_t      maxAgents;
     agt_u32_t      attachedAgents;
@@ -79,7 +79,7 @@ namespace agt {
   };*/
 
 
-  AGT_final_object_type(local_user_executor, extends(basic_executor)) {
+  AGT_object(local_user_executor, extends(basic_executor)) {
     const agt_executor_vtable_t* userVTable;
     agt_equeue_t                 equeue;
     agt_receiver_t               receiver;
@@ -87,7 +87,7 @@ namespace agt {
   };
 
 
-  AGT_final_object_type(local_busy_executor, extends(basic_executor)) {
+  AGT_object(local_busy_executor, extends(basic_executor)) {
     local_mpsc_receiver     receiver;
     agent_self*             agent;
     local_spmc_message_pool defaultPool;
@@ -96,7 +96,7 @@ namespace agt {
 
   struct local_event_eagent;
 
-  AGT_final_object_type(local_event_executor, extends(basic_executor)) {
+  AGT_object(local_event_executor, extends(basic_executor)) {
     agt_ctx_t                  ctx;                // Reference to local context for efficient retrieval
     local_mpsc_receiver        receiver;           // Primary receiver from which new messages are obtained.
     private_sized_message_pool selfPool;           // Message pool if the need to send *new* messages to self arises
@@ -118,11 +118,11 @@ namespace agt {
     agt_fiber_param_t          fiberExitResult;    // result of the fiber exiting...
   };
 
-  AGT_final_object_type(local_parallel_executor, extends(basic_executor)) {
+  AGT_object(local_parallel_executor, extends(basic_executor)) {
 
   };
 
-  AGT_final_object_type(local_proxy_executor, extends(basic_executor)) {
+  AGT_object(local_proxy_executor, extends(basic_executor)) {
 
   };
 

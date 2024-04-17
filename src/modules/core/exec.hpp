@@ -14,19 +14,34 @@
 #include "core/agents.hpp"
 #include "core/msg/message_pool.hpp"
 #include "core/msg/message_queue.hpp"
+#include "core/uexec.hpp"
 
 
 #include "core/object.hpp"
 #include "core/ctx.hpp"
 
 
+
+AGT_abstract_api_object(agt_executor_st, executor, extends(agt_uexec_st)) {
+  executor_flags      flags;
+  executor_vptr_t     vptr;
+  agt_timeout_t       timeout;
+  set<agt_executor_t> linkedExecutors;
+  agt_u32_t           maxAgentCount;
+  agt_u32_t           attachedAgents;
+};
+
+
 namespace agt {
 
-  AGT_BITFLAG_ENUM(executor_flags, agt_u32_t) {
-    isShared          = 0x01,
-    isOverlaidByProxy = 0x40,
-    hasStarted        = 0x80,
+  AGT_DEFINE_BITFLAG_ENUM(executor_flags, agt_u32_t) {
+    isShared              = 0x01,
+    isOverlaidByProxy     = 0x40,
+    hasStarted            = 0x80,
+    hasIntegratedMsgQueue = 0x100, ///< set by executors to indicate that a message passed to 'send_executor_msg' must have been acquired from a paired 'acquire_executor_msg'.
   };
+
+  inline constexpr static executor_flags eExecutorHasIntegratedMsgQueue = executor_flags::hasIntegratedMsgQueue;
 
   struct agent_self;
 
@@ -34,55 +49,68 @@ namespace agt {
   struct basic_executor;
 
   struct acquire_message_info {
-    agt_ecmd_t       cmd;
-    msg_layout_t     layout;
-    agt_send_flags_t flags;
-    agt_u32_t        bufferSize;
-    agent_self*      sender;
-    async*           async;
+    agt_ecmd_t           cmd;
+    msg_layout_t         layout;
+    agt_send_flags_t     flags;
+    agt_u32_t            bufferSize;
   };
 
 
   size_t get_min_message_size(const acquire_message_info& msgInfo) noexcept;
 
   struct executor_vtable {
-    agt_status_t (* AGT_stdcall start)(basic_executor* exec, bool startOnCurrentThread);
-    agt_status_t (* AGT_stdcall bindAgent)(basic_executor* exec, agent_self* agent);
-    agt_status_t (* AGT_stdcall unbindAgent)(basic_executor* exec, agent_self* agent);
-    agt_status_t (* AGT_stdcall block)(basic_executor* exec, agent_self* agent, async& async, agt_timestamp_t deadline);
-    void         (* AGT_stdcall yield)(basic_executor* exec, agent_self* agent);
-    // agt_status_t (* AGT_stdcall processMsg)(basic_executor* exec, message msg);
-    // agt_status_t (* AGT_stdcall attachSender)(basic_executor* exec, );
-    agt_status_t (* AGT_stdcall acquireMessage)(basic_executor* exec, const acquire_message_info& msgInfo, message& msg);
-    void         (* AGT_stdcall releaseMessage)(basic_executor* exec, message msg);
-    agt_status_t (* AGT_stdcall commitMessage)(basic_executor* exec, message msg);
+    agt_status_t (* AGT_stdcall start)(agt_executor_t exec, bool startOnCurrentThread);
+    agt_status_t (* AGT_stdcall bindAgent)(agt_executor_t exec, agt_self_t agent);
+    agt_status_t (* AGT_stdcall unbindAgent)(agt_executor_t exec, agt_self_t agent);
+    agt_status_t (* AGT_stdcall acquireMessage)(agt_executor_t exec, const acquire_message_info& msgInfo, agt_message_t& msg);
+    void         (* AGT_stdcall releaseMessage)(agt_executor_t exec, agt_message_t msg);
+    agt_status_t (* AGT_stdcall commitMessage)(agt_executor_t exec, agt_message_t msg);
   };
 
 
-  struct basic_executor : object {
-    executor_flags       flags;
-    executor_vptr_t      vptr;
-    agt_timeout_t        timeout;
-    set<basic_executor*> linkedExecutors;
-    agt_u32_t            maxAgentCount;
-    agt_u32_t            attachedAgents;
-  };
+  AGT_forceinline static agt_status_t start_executor(agt_executor_t exec, bool startOnCurrentThread = false) noexcept {
+    return exec->vptr->start(exec, startOnCurrentThread);
+  }
 
-  template <>
-  struct impl::obj_types::object_type_range<basic_executor> {
-    inline constexpr static object_type minValue = object_type::executor_begin;
-    inline constexpr static object_type maxValue = object_type::executor_end;
-  };
+  AGT_forceinline static agt_status_t start_executor_on_current_thread(agt_executor_t exec) noexcept {
+    return exec->vptr->start(exec, true);
+  }
+
+  AGT_forceinline static agt_status_t acquire_executor_msg(agt_executor_t exec, const acquire_message_info& msgInfo, agt_message_t& msg) noexcept {
+    return exec->vptr->acquireMessage(exec, msgInfo, msg);
+  }
+
+  AGT_forceinline static void         release_executor_msg(agt_executor_t exec, agt_message_t msg) noexcept {
+    exec->vptr->releaseMessage(exec, msg);
+  }
+
+  AGT_forceinline static agt_status_t send_executor_msg(agt_executor_t exec, agt_message_t msg) noexcept {
+    return exec->vptr->commitMessage(exec, msg);
+  }
+
+
+
+  AGT_forceinline static agt_status_t acquire_basic_executor_msg() noexcept {}
+
+  AGT_forceinline static agt_status_t acquire_signal_executor_msg() noexcept {}
+
+
+
+
+
+
+
+
+
 
 
 
   class executor {
-    basic_executor* exec;
+    agt_executor_t exec;
   public:
 
     executor() = default;
-    executor(basic_executor* e) noexcept : exec(e) { }
-    executor(agt_executor_t e) noexcept : exec(reinterpret_cast<basic_executor*>(e)) { }
+    executor(agt_executor_t e) noexcept : exec(e) { }
 
     agt_status_t start(bool startOnCurrentThread) noexcept {
       if (has_started())
@@ -95,7 +123,7 @@ namespace agt {
     }
 
     [[nodiscard]] bool is_bound_to(agt_ctx_t ctx) const noexcept {
-      return *this == ctx->executor;
+      return exec == ctx->uexec;
     }
 
     [[nodiscard]] bool may_execute_direct(agt_ctx_t currentCtx = get_ctx()) const noexcept {
@@ -106,11 +134,11 @@ namespace agt {
         test(exec->flags, executor_flags::isOverlaidByProxy);
     }
 
-    [[nodiscard]] bool is_bound_to(agent_self* agent) const noexcept {
+    [[nodiscard]] bool is_bound_to(agt_self_t agent) const noexcept {
       return executor(agent->executor) == *this;
     }
 
-    agt_status_t attach_agent(agent_self* agent, async* optionalAsync = nullptr) noexcept {
+    /*agt_status_t attach_agent(agt_self_t agent, async* optionalAsync = nullptr) noexcept {
       if (is_bound_to(agent))
         return AGT_SUCCESS; // While this is kind of an error state, it's one that has the same end result as is desired.
 
@@ -138,7 +166,7 @@ namespace agt {
       return status;
     }
 
-    agt_status_t detach_agent(agent_self* agent, async* optionalAsync = nullptr) noexcept {
+    agt_status_t detach_agent(agt_self_t agent, async* optionalAsync = nullptr) noexcept {
       if (!is_bound_to(agent)) // ?? This shouldn't ever be the case, but just to be safe.....
         return AGT_ERROR_AGENT_IS_DETACHED;
 
@@ -165,10 +193,10 @@ namespace agt {
       if (status != AGT_SUCCESS)
         drop_message(msg);
       return status;
-    }
+    }*/
 
     // Unbinds the agent from the current executor, and subsequently rebinds it to the target executor. The operation is complete when the agent is totally rebound.
-    agt_status_t rebind_agent(agent_self* agent, executor targetExec, async* optionalAsync = nullptr) noexcept {
+    /*agt_status_t rebind_agent(agt_self_t  agent, executor targetExec, async* optionalAsync = nullptr) noexcept {
 
       if (!is_bound_to(agent)) // ?? This shouldn't ever be the case, but just to be safe.....
         return AGT_ERROR_AGENT_IS_DETACHED;
@@ -202,28 +230,17 @@ namespace agt {
         drop_message(msg);
       return status;
     }
+*/
 
-    agt_status_t block_agent(agent_self* agent, async& async) noexcept {
-      return exec->vptr->block(exec, agent, async, 0);
-    }
-
-    agt_status_t block_agent_until(agent_self* agent, async& async, agt_timestamp_t deadline) noexcept {
-      return exec->vptr->block(exec, agent, async, deadline);
-    }
-
-    void         yield(agent_self* agent) noexcept {
-      exec->vptr->yield(exec, agent);
-    }
-
-    agt_status_t acquire_message(const acquire_message_info& msgInfo, message& msg) noexcept {
+    agt_status_t acquire_message(const acquire_message_info& msgInfo, agt_message_t& msg) noexcept {
       return exec->vptr->acquireMessage(exec, msgInfo, msg);
     }
 
-    void         drop_message(message msg) noexcept {
+    void         drop_message(agt_message_t msg) noexcept {
       exec->vptr->releaseMessage(exec, msg);
     }
 
-    agt_status_t commit_message(message msg) noexcept {
+    agt_status_t commit_message(agt_message_t msg) noexcept {
       return exec->vptr->commitMessage(exec, msg);
     }
 
@@ -254,6 +271,8 @@ namespace agt {
 
   agt_status_t create_local_event_executor(agt_ctx_t ctx, const event_executor_create_info& createInfo, executor& exec) noexcept;
 
+
+  void destroy(local_event_executor* exec);
 }
 
 #endif //AGATE_CORE_EXEC_HPP
