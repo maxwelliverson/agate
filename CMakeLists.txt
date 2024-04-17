@@ -325,8 +325,12 @@ add_agate_module(
         core
             PRIVATE
             SOURCES
+                agents.cpp
                 async.cpp
+                channels.cpp
                 ctx.cpp
+                core_local.cpp
+                core_shared.cpp
                 error.cpp
                 exec.hpp
                 exec/local_event_executor.cpp
@@ -335,22 +339,31 @@ add_agate_module(
                 exec/local_parallel_executor.cpp
                 exec/local_user_executor.cpp
                 fiber.cpp
+                hazptr.cpp
+                impl/blocked_queue.cpp
                 impl/ctrie.cpp
+                impl/hazptr_manager.cpp
+                impl/monitor_list.cpp
+                impl/sized_pool.cpp
+                impl/spinlock.cpp
                 instance.cpp
                 # object_allocator.cpp
                 msg/message_queue.cpp
-                msg/broadcast_queue.cpp
+                # msg/broadcast_queue.cpp
                 msg/sender.cpp
                 msg/receiver.cpp
                 msg/message.cpp
                 msg/message_pool.cpp
-                msg/ring_queue.cpp
+                # msg/ring_queue.cpp
                 random.cpp
                 segment.cpp
                 shared.cpp
-                rcpool.cpp
-                rcmem.cpp
-                rcweak.cpp
+                # rcpool.cpp
+                # rcmem.cpp
+                # rcweak.cpp
+                task_queue.cpp
+                uexec.cpp
+                wait.cpp
             ASM_BASEDIR
                 asm
             ASM_SOURCES
@@ -366,7 +379,7 @@ add_agate_module(
         agents
             PRIVATE
             SOURCES
-                agents.cpp
+                # agents.cpp
                 dispatch.cpp
                 executor.cpp
                 send.cpp
@@ -539,7 +552,8 @@ if (Catch2_FOUND)
     target_compile_definitions(config-test-second PRIVATE AGATE_COMPILING_SECOND_DLL)
     target_compile_definitions(config-test-third PRIVATE AGATE_COMPILING_THIRD_DLL)
 
-    add_executable(tests test/catch/config.cpp test/catch/fibers.cpp)
+    add_executable(tests test/catch/config.cpp test/catch/fibers.cpp
+            test/catch/channels.cpp)
     target_link_libraries(tests PRIVATE agate config-test-first config-test-second config-test-third Catch2::Catch2WithMain)
     add_dependencies(tests agate.core agate.log)
 
@@ -599,7 +613,8 @@ target_sources(agate PUBLIC FILE_SET HEADERS BASE_DIRS include
         include/agate/async.h
         include/agate/channels.h
         include/agate/core.h
-        include/agate/exec.h
+        include/agate/uexec.h
+        include/agate/executor.h
         include/agate/fiber.h
         include/agate/init.h
         include/agate/log.h
