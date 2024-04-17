@@ -6,11 +6,15 @@
 
 #include "agate/atomic.hpp"
 #include "ctx.hpp"
+#include "exec.hpp"
 
 #include "agate/flags.hpp"
-#include "channels/message.hpp"
+#include "core/msg/message.hpp"
 #include "instance.hpp"
 #include "object.hpp"
+
+
+#include "exports.hpp"
 
 
 #include <cmath>
@@ -18,6 +22,8 @@
 
 
 using namespace agt;
+
+
 
 namespace {
 
@@ -36,6 +42,11 @@ namespace {
   agt::shared_async_data* get_shared_async_data(agt_ctx_t ctx, async_data_t data) noexcept {
     return nullptr; // TODO: Implement
   }
+
+
+
+
+  /*
 
 
   agt_u64_t async_dropped_responses(agt_u64_t i) noexcept {
@@ -86,12 +97,12 @@ namespace {
     ++data->epoch;
     // data->currentKey = (async_key_t)((std::underlying_type_t<async_key_t>)data->currentKey + 1);
     agt::atomicRelaxedStore(data->responseCounter, 0);
-  }
+  }*/
 
 
 
 
-  agt_status_t     async_data_status(agt::async_data* data, agt_u32_t expectedCount) noexcept {
+  /*agt_status_t     async_data_status(agt::async_data* data, agt_u32_t expectedCount) noexcept {
     if (expectedCount != 0) [[likely]] {
       agt_u64_t responseCount = agt::atomicLoad(data->responseCounter);
       if (async_total_responses(responseCount) >= expectedCount) {
@@ -115,7 +126,7 @@ namespace {
       return AGT_NOT_READY;
     }
 
-    return AGT_ERROR_NOT_BOUND;*/
+    return AGT_ERROR_NOT_BOUND;#1#
     return AGT_ERROR_NOT_YET_IMPLEMENTED;
   }
 
@@ -127,7 +138,7 @@ namespace {
       if (!data->responseCount.waitFor(expectedCount, timeout))
         return false;
     }
-    return true;*/
+    return true;#1#
     return AGT_ERROR_NOT_YET_IMPLEMENTED;
   }
 
@@ -136,7 +147,7 @@ namespace {
       if (!data->responseCount.waitFor(expectedCount, timeout))
         return false;
     }
-    return true;*/
+    return true;#1#
     return AGT_ERROR_NOT_YET_IMPLEMENTED;
   }
 
@@ -151,7 +162,7 @@ namespace {
     }
     else {
       ctxRefFreeAsyncData(ctxGetContextById(context, data->contextId), data);
-    }*/
+    }#1#
   }
 
   void             async_data_destroy(agt_ctx_t context, agt::shared_async_data* data, async_data_t handle) noexcept {
@@ -165,7 +176,7 @@ namespace {
     }
     else {
       ctxRefFreeAsyncData(ctxGetContextById(context, data->contextId), data);
-    }*/
+    }#1#
   }
 
   agt::async_data* create_async_data(agt_ctx_t context, agt_u64_t initialRefCount) noexcept {
@@ -193,12 +204,15 @@ namespace {
     return static_cast<async_data_t>(reinterpret_cast<uintptr_t>(data));
   }
 
+  async_data_t     to_handle(agt::local_async_data* data) noexcept {
+    return static_cast<async_data_t>(reinterpret_cast<uintptr_t>(data));
+  }
+
 
   // returns total responses
-  template <bool Dropped>
-  agt_u32_t async_respond(agt::async_data* asyncData) noexcept {
-    constexpr static auto Diff = Dropped ? DroppedResponse : ArrivedResponse;
-    return static_cast<agt_u32_t>(async_total_responses(atomicExchangeAdd(asyncData->responseCounter, Diff) + Diff));
+
+  AGT_forceinline agt_u32_t async_respond(agt::async_data* asyncData, agt_u64_t response) noexcept {
+    return static_cast<agt_u32_t>(async_total_responses(atomicExchangeAdd(asyncData->responseCounter, response) + response));
   }
 
 
@@ -257,6 +271,29 @@ namespace {
 
     return isComplete;
   }
+  */
+
+
+
+
+  void destroy_local_async_data(local_async_data* data) noexcept {
+    // TODO: If custom data types are added that require cleanup, indicate that in scData and do so here.
+    // if (data->scData & AGT_ASYNC_DATA_ALLOCATED_CALLBACK_DATA)
+      // agt::close_local(data->callbackData);
+    release(data);
+  }
+
+  void release_ownership_of_local_async_data(local_async_data* data) noexcept {
+    if (agt::impl::_release_ownership(data->rc)) {
+      // there are no other open references to data; it is safe to clear, need be.
+      // TODO: If custom data types are added that require cleanup, indicate that in scData and do so here.
+      // if (data->scData & AGT_ASYNC_DATA_ALLOCATED_CALLBACK_DATA)
+        // agt::close_local(data->callbackData);
+      // data->scData &= ~AGT_ASYNC_DATA_ALLOCATED_CALLBACK_DATA; // clear the flag
+    }
+
+  }
+
 }
 
 
@@ -264,6 +301,143 @@ namespace {
 
 
 
+
+
+
+
+
+namespace {
+
+
+  void try_release_async_data(agt::async& async, agt_status_t status) noexcept {
+    if (status != AGT_NOT_READY) {
+      if (!(status == AGT_SUCCESS && test(async.flags, eAsyncRetainsDataOnSuccess))) {
+        release_ownership_of_local_async_data(unsafe_handle_cast<local_async_data>(async.data));
+        reset(async.flags, eAsyncHasOwnershipOfData | eAsyncRetainsDataOnSuccess);
+      }
+    }
+  }
+}
+
+
+
+
+
+
+
+
+
+agt::local_async_data* agt::alloc_local_async_data(agt_ctx_t ctx, agt_u32_t weakRefs) noexcept {
+  auto data = alloc<local_async_data>(ctx);
+  _init(data->rc, weakRefs);
+  data->scData = 0;
+  // data->callbackData = nullptr;
+  // data->callback = callback;
+  // data->callbackData = callbackData;
+  return data;
+}
+
+agt::local_async_data* agt::recycle_local_async_data(agt_ctx_t ctx, async_data_t data_, agt_u32_t weakRefs, bool hasOwnership) noexcept {
+  auto data = unsafe_handle_cast<local_async_data>(data_);
+  if (!impl::_try_recycle(data->rc, weakRefs, hasOwnership)) // no need to release if recycle fails, cause recycling only fails if there's other owning references.
+    return alloc_local_async_data(ctx, weakRefs);
+  return data;
+}
+
+void                   agt::drop_local_async_data(async_data_t data_, bool hasOwnership) noexcept {
+  auto data = unsafe_handle_cast<local_async_data>(data_);
+  bool shouldRelease;
+  if (hasOwnership)
+    shouldRelease = impl::_drop_ownership(data->rc);
+  else
+    shouldRelease = impl::_drop_nonowner(data->rc);
+  if (shouldRelease)
+    destroy_local_async_data(data);
+}
+
+local_async_data*      agt::try_acquire_local_async(async_data_t data_, async_key_t key, bool& refCountIsZero) noexcept {
+  const auto data = unsafe_handle_cast<local_async_data>(data_);
+
+  if (!impl::_try_acquire(data->rc, key, refCountIsZero)) {
+    if (refCountIsZero)
+      destroy_local_async_data(data);
+    return nullptr;
+  }
+
+  return data;
+}
+
+bool                   agt::release_local_async(async_data_t data_, bool retain) noexcept {
+  const auto data = unsafe_handle_cast<local_async_data>(data_);
+  bool shouldRelease;
+
+  if (retain)
+    shouldRelease = impl::_release_ownership(data->rc);
+  else
+    shouldRelease = impl::_drop_ownership(data->rc);
+
+  if (shouldRelease)
+    destroy_local_async_data(data);
+
+  return shouldRelease;
+}
+
+
+
+
+
+agt::local_async_data* agt::local_async_bind(async& async, agt_u32_t weakRefs) noexcept {
+
+  auto ctx = async.ctx;
+
+  if (!ctx) [[unlikely]] {
+    ctx = get_ctx();
+    if (!ctx)
+      abort(); // EHHhHHHHH
+    async.ctx = ctx;
+  }
+
+  local_async_data* data;
+
+  if (test(async.flags, eAsyncBound)) { // already something bound...
+    data = recycle_local_async_data(ctx, async.data, weakRefs, test(async.flags, eAsyncHasOwnershipOfData));
+  }
+  else {
+    data = alloc_local_async_data(ctx, weakRefs);
+  }
+
+  AGT_assert( data != nullptr );
+
+  set_flags(async.flags, eAsyncBound | eAsyncHasOwnershipOfData);
+
+  async.data = to_handle(data);
+  // async.dataKey =
+  return data;
+}
+
+void agt::local_async_clear(async& async) noexcept {
+  if (test(async.flags, eAsyncHasOwnershipOfData)) {
+    auto data = unsafe_handle_cast<local_async_data>(async.data);
+    impl::_release_ownership(data->rc); // While this returns a boolean value, we still wish to keep the data even if no other references to it exist.
+  }
+  reset(async.flags, eAsyncHasOwnershipOfData);
+  async.status = AGT_ERROR_NOT_BOUND;
+}
+
+void agt::local_async_destroy(async& async) noexcept {
+  if (test(async.flags, eAsyncBound)) {
+    drop_local_async_data(async.data, test(async.flags, eAsyncHasOwnershipOfData));
+  }
+
+  if (test(async.flags, eAsyncMemoryIsOwned)) {
+    release(&async);
+  }
+}
+
+
+
+
+/*
 template <bool SharedIsEnabled>
 async_key_t agt::async_data_attach(agt_ctx_t ctx, async_data_t data) noexcept {
   local_async_data* localData;
@@ -309,6 +483,8 @@ bool        agt::async_arrive_with_result(agt_ctx_t ctx, async_data_t data, asyn
   return async_data_signal_response<SharedIsEnabled, false>(ctx, data, key, result);
 }
 
+
+
 template async_key_t agt::async_data_attach<true>(agt_ctx_t, async_data_t) noexcept;
 template async_key_t agt::async_data_attach<false>(agt_ctx_t, async_data_t) noexcept;
 template async_key_t agt::async_data_get_key<true>(agt_ctx_t, async_data_t) noexcept;
@@ -319,6 +495,7 @@ template bool        agt::async_arrive<true>(agt_ctx_t, async_data_t, async_key_
 template bool        agt::async_arrive<false>(agt_ctx_t, async_data_t, async_key_t) noexcept;
 template bool        agt::async_arrive_with_result<true>(agt_ctx_t, async_data_t, async_key_t, agt_u64_t) noexcept;
 template bool        agt::async_arrive_with_result<false>(agt_ctx_t, async_data_t, async_key_t, agt_u64_t) noexcept;
+*/
 
 
 
@@ -326,7 +503,7 @@ template bool        agt::async_arrive_with_result<false>(agt_ctx_t, async_data_
 
 
 
-void         agt::async_copy_to(const async& fromAsync, async& toAsync) noexcept {
+/*void         agt::async_copy_to(const async& fromAsync, async& toAsync) noexcept {
 
   AGT_assert(fromAsync.ctx == toAsync.ctx && "Cannot copy between agt_async_t objects from different contexts");
 
@@ -350,13 +527,7 @@ void         agt::async_copy_to(const async& fromAsync, async& toAsync) noexcept
       toAsync.status               = AGT_NOT_READY;
       async_data_attach_waiter(toAsync.ctx, toAsync.data);
     }
-    /*else if (fromAsync.desiredResponseCount != toAsync.desiredResponseCount) {
-      toAsync.desiredResponseCount = fromAsync.desiredResponseCount;
-      if (toAsync.status != AGT_NOT_READY) {
-        asyncDataAttachWaiter(toAsync.ctx, toAsync.data);
-        toAsync.status = AGT_NOT_READY;
-      }
-    }*/
+
     // Don't do anything otherwise. Because we already know fromAsync is still waiting,
     // toAsync is either already in the exact same state OR has already waited on the data object
     // and cached the results, which would be pointless and stupid to undo.
@@ -367,43 +538,14 @@ void         agt::async_copy_to(const async& fromAsync, async& toAsync) noexcept
     toAsync.status = fromAsync.status;
   }
 
-}
+}*/
 
 /*agt_async_data_t agt::asyncAttach(agt_async_t& async, agt_signal_t) noexcept {
 
 }*/
 
 
-
-void         agt::async_clear(async& async) noexcept {
-  if (std::exchange(async.status, AGT_ERROR_NOT_BOUND) == AGT_NOT_READY)
-    async_data_detach_waiter(async.ctx, async.data);
-}
-
-void         agt::async_destroy(async& async, bool wipeMemory) noexcept {
-
-  const auto refOffset = async.status == AGT_NOT_READY ? DecWaiterRef : DecNonWaiterRef;
-
-  if (auto data = handle_cast<local_async_data>(async.data)) [[likely]] {
-
-    if (atomicExchangeAdd(data->refCount, refOffset) + refOffset == 0)
-      async_data_destroy(async.ctx, data);
-  }
-  else {
-    auto sharedData = get_shared_async_data(async.ctx, async.data);
-
-    if (atomicExchangeAdd(sharedData->refCount, refOffset) + refOffset == 0)
-      async_data_destroy(async.ctx, sharedData, async.data);
-  }
-
-  // Important for future backwards compatibility that it clears async.structSize bytes only,
-  // given that someone could be using an older version of the header file but a newer version of the library
-  // where agt_async_t has been expanded. In this case, clearing sizeof(async) bytes would cause an out of
-  // bounds write. Hats off to Microsoft for this little trick.
-  if (wipeMemory)
-    std::memset(&async, 0, async.structSize);
-}
-
+/*
 std::pair<async_data_t, async_key_t> agt::async_attach_local(async& async, agt_u32_t expectedCount, agt_u32_t attachedCount) noexcept {
 
   // TODO: Optimize this function lmao
@@ -487,7 +629,7 @@ agt_status_t agt::async_wait(agt_async_t& async_, agt_timeout_t timeout) noexcep
   if (auto data = handle_cast<local_async_data>(async.data))
     status = async_data_wait(async.ctx, data, data->expectedResponses, timeout);
   else
-    status = async_data_wait(async.ctx, get_shared_async_data(async.ctx, async.data), 1 /* what the fuck is this 1??? It is a placeholder */, timeout);
+    status = async_data_wait(async.ctx, get_shared_async_data(async.ctx, async.data), 1 /* what the fuck is this 1??? It is a placeholder #1#, timeout);
 
   async.status = status;
 
@@ -506,7 +648,7 @@ agt_status_t agt::async_status(async& async) noexcept {
   if (auto data = handle_cast<local_async_data>(async.data))
     status = async_data_status(data, data->expectedResponses);
   else
-    status = async_data_status(get_shared_async_data(async.ctx, async.data), 1 /* ??? pls fix */);
+    status = async_data_status(get_shared_async_data(async.ctx, async.data), 1 /* ??? pls fix #1#);
 
   async.status = status;
   return status;
@@ -528,7 +670,7 @@ void         agt::init_async(agt_ctx_t context, agt_async_t& async_, agt_async_f
 
   async.ctx              = context;
   if (test(async.flags, eAsyncMemoryIsOwned))
-    async.structSize           = sizeof(agt::async)/*inst_get_builtin(context->instance, builtin_value::async_struct_size)*/;
+    async.structSize           = sizeof(agt::async)/*inst_get_builtin(context->instance, builtin_value::async_struct_size)#1#;
   async.data                 = asHandle(data);
   async.dataKey              = current_key(data);
   async.status               = AGT_ERROR_NOT_BOUND;
@@ -536,4 +678,106 @@ void         agt::init_async(agt_ctx_t context, agt_async_t& async_, agt_async_f
   // async.desiredResponseCount = 0;
 }
 
+
+
+
+agt_status_t agt::async_wait(async& async, enter_wait_callback_t enterWait, void *enterWaitUserData, async_callback_t wakeCallback, void* wakeData) noexcept {
+  return AGT_ERROR_NOT_YET_IMPLEMENTED;
+}
+*/
+
+
+
+
+
+agt_status_t agt::local_async_status(async& async, agt_u64_t* pResult) noexcept {
+  if (!test(async.flags, eAsyncHasOwnershipOfData))
+    return AGT_ERROR_NOT_BOUND;
+
+  AGT_invariant( async_data_is_attached(async.data) );
+  AGT_invariant( async.resolveCallback != nullptr );
+  const auto data = unsafe_handle_cast<local_async_data>(async.data);
+  // const auto dataObj = data->callbackData;
+
+  agt_status_t status = async.resolveCallback(&data->userData[0], pResult, async.resolveCallbackData);
+
+  try_release_async_data(async, status);
+
+  return status;
+}
+
+
+agt_async_t  AGT_stdcall agt::make_new_async(agt_ctx_t ctx, agt_async_flags_t flags) {
+  auto async = alloc<agt::async>(ctx);
+  async->structSize = static_cast<agt_u32_t>(sizeof(agt::async));
+  async->ctx = ctx;
+  async->flags = static_cast<agt::async_flags>(flags) | eAsyncMemoryIsOwned;
+  async->data = {};
+  async->status = AGT_ERROR_NOT_BOUND;
+  async->resolveCallback = nullptr;
+  async->resolveCallbackData = nullptr;
+  return async;
+}
+
+
+void         AGT_stdcall agt::copy_async_private(const async* from, async* to) {}
+void         AGT_stdcall agt::copy_async_shared(const async* from, async* to) {}
+
+
+
+
+
+
+
+namespace agt {
+
+
+
+
+
+  agt_status_t AGT_stdcall async_get_status_private(agt_async_t async, agt_u64_t* pResult) {
+    if (async == AGT_FORGET || async == AGT_SYNCHRONIZE) [[unlikely]]
+      return AGT_ERROR_INVALID_ARGUMENT;
+    return local_async_status(*static_cast<agt::async*>(async), pResult);
+  }
+  agt_status_t AGT_stdcall async_get_status_shared(agt_async_t async, agt_u64_t* pResult) {
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
+  }
+
+
+  agt_status_t AGT_stdcall async_wait_native_unit_private(agt_async_t async_, agt_u64_t* pResult, agt_timeout_t timeout) {
+    if (async_ == AGT_FORGET || async_ == AGT_SYNCHRONIZE) [[unlikely]]
+      return AGT_ERROR_INVALID_ARGUMENT;
+
+    const auto async = static_cast<agt::async*>(async_);
+
+    if (timeout == AGT_DO_NOT_WAIT)
+      return local_async_status(*async, pResult);
+
+    if (!test(async->flags, eAsyncHasOwnershipOfData))
+      return AGT_ERROR_NOT_BOUND;
+
+    const auto data = unsafe_handle_cast<local_async_data>(async->data);
+
+    agt_timestamp_t deadline;
+
+    if (timeout == AGT_WAIT)
+      deadline = 0;
+    else
+      deadline = now() + timeout;
+
+    agt_status_t status = wait_for_local_async(async->ctx, pResult, async->data, deadline, async->resolveCallback, async->resolveCallbackData);
+
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
+  }
+  agt_status_t AGT_stdcall async_wait_foreign_unit_private(agt_async_t async, agt_u64_t* pResult, agt_timeout_t timeout) {
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
+  }
+  agt_status_t AGT_stdcall async_wait_native_unit_shared(agt_async_t async, agt_u64_t* pResult, agt_timeout_t timeout) {
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
+  }
+  agt_status_t AGT_stdcall async_wait_foreign_unit_shared(agt_async_t async, agt_u64_t* pResult, agt_timeout_t timeout) {
+    return AGT_ERROR_NOT_YET_IMPLEMENTED;
+  }
+}
 

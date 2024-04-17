@@ -13,6 +13,9 @@ AGT_begin_c_namespace
 #define AGT_ASYNC_SET_MAX_SIZE 31
 
 
+// TIMEOUTS SHOULD ALL BE IN MICROSECONDS.
+
+
 /* =================[ Types ]================= */
 
 
@@ -40,12 +43,27 @@ typedef void (* AGT_stdcall agt_async_callback_t)(agt_ctx_t ctx, agt_status_t re
 
 // Once initialized, these public fields should be left untouched.
 typedef struct AGT_alignas(AGT_ASYNC_STRUCT_ALIGNMENT) agt_inline_async_t {
-  agt_ctx_t         ctx;
+  agt_u32_t         reserved0;
   agt_u32_t         structSize;
-  agt_u8_t          reserved[AGT_ASYNC_STRUCT_SIZE - sizeof(agt_ctx_t) - sizeof(agt_u32_t)];
+  agt_ctx_t         ctx;
+  agt_u8_t          reserved1[AGT_ASYNC_STRUCT_SIZE - 16];
 } agt_inline_async_t;
 
-#define AGT_INIT_INLINE_ASYNC(ctx) { ctx, (agt_u32_t)(sizeof(agt_inline_async_t)), { } }
+/**
+ * Used to initialize an inline async object.
+ * @param ctx
+ *
+ * Intended usage is as follows
+ *
+ * void some_operation(agt_ctx_t ctx) {
+ *    agt_inline_async_t inlineAsync = AGT_INIT_INLINE_ASYNC(ctx);
+ *    agt_async_t async = &inlineAsync;
+ * }
+ */
+#define AGT_INIT_INLINE_ASYNC(ctx) { 0, (agt_u32_t)(sizeof(agt_inline_async_t)), ctx, { } }
+
+// TODO: Decide which syntax is nicer...
+#define AGT_MAKE_ASYNC(ctx, inlineAsync) &(inlineAsync = { 0, (agt_u32_t)(sizeof(agt_inline_async_t)), ctx, { } })
 
 
 
@@ -54,8 +72,7 @@ typedef struct AGT_alignas(AGT_ASYNC_STRUCT_ALIGNMENT) agt_inline_async_t {
 /**
  * Initializes a new async object that can store/track the state of asynchronous operations.
  *
- * \param [in] ctx (optional) If ctx is null, the context bound to the current thread is taken.
- * \param [out] pAsync
+ * \param [in] ctx May be AGT_CURRENT_CTX or a valid reference to the current execution context.
  * \param [in] flags May consist of some valid bitwise combination of the following flags:
  *                   AGT_ONE_AND_DONE: indicates that this async object should be automatically
  *                   destroyed after its first successful wait operation.
@@ -63,22 +80,14 @@ typedef struct AGT_alignas(AGT_ASYNC_STRUCT_ALIGNMENT) agt_inline_async_t {
 AGT_async_api agt_async_t  AGT_stdcall agt_new_async(agt_ctx_t ctx, agt_async_flags_t flags) AGT_noexcept;
 
 /**
- * */
-AGT_async_api agt_async_t  AGT_stdcall agt_init_async(agt_inline_async_t* pInlineAsync, agt_async_flags_t flags) AGT_noexcept;
-
-/**
- * Sets pTo to track the same asynchronous operation as pFrom.
- * \param pFrom The source object
- * \param pTo   The destination object
- * \pre - pFrom must be initialized. \n
- *      - pTo does not need to have been initialized, but may be. \n
- *      - If pTo is uninitialized, the memory pointed to by pTo must have been zeroed. \n
- *      \code memset(pTo, 0, sizeof(*pTo));\endcode
- * \post - pTo is initialized. \n
- *       - If before the call, pTo had been bound to a different operation, that operation is abandonned as though by calling agt_clear_async. \n
- *       - If pFrom is bound to an operation, pTo is now bound to the same operation. \n
- *       - pFrom is unmodified
- * \note While this function copies state from pFrom to pTo, any further changes made to pFrom after this call returns are not reflected in pTo.
+ * The target object is bound to the async operation currently bound to the source object.
+ * \param from The source object
+ * \param to   The destination object
+ * \post - The target object is initialized. \n
+ *       - If before the call, the target object had been bound to a different operation, that operation is abandonned as though by calling agt_clear_async. \n
+ *       - If the source object is bound to an operation, the target object is now bound to the same operation. \n
+ *       - The source object is unmodified.
+ * \note While this function copies state from the source to the target, any further changes made to the source following this call are not reflected in the target.
  * */
 AGT_async_api void         AGT_stdcall agt_copy_async(agt_async_t from, agt_async_t to) AGT_noexcept;
 
@@ -107,6 +116,8 @@ AGT_async_api agt_status_t AGT_stdcall agt_async_status(agt_async_t async, agt_u
 // AGT_async_api agt_status_t AGT_stdcall agt_async_status_all(const agt_async_t* pAsyncs, agt_size_t asyncCount, agt_status_t* pStatuses, agt_u64_t* pResults) AGT_noexcept;
 
 AGT_async_api agt_status_t AGT_stdcall agt_wait(agt_async_t async, agt_u64_t* pResult, agt_timeout_t timeout) AGT_noexcept;
+
+
 AGT_async_api agt_status_t AGT_stdcall agt_wait_all(const agt_async_t* pAsyncs, agt_size_t asyncCount, agt_timeout_t timeout) AGT_noexcept;
 AGT_async_api agt_status_t AGT_stdcall agt_wait_any(const agt_async_t* pAsyncs, agt_size_t asyncCount, agt_size_t* pIndex, agt_timeout_t timeout) AGT_noexcept;
 
