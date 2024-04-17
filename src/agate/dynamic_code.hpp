@@ -7,6 +7,7 @@
 
 #include "config.hpp"
 
+#include "dictionary.hpp"
 #include "vector.hpp"
 
 #include <string_view>
@@ -133,73 +134,175 @@ namespace agt::dc {
 
   namespace x64 {
     enum gp_reg {
-      al,
-      bl,
-      cl,
-      dl,
-      sil,
-      dil,
-      bpl,
-      spl,
-      r9b,
-      r10b,
-      r11b,
-      r12b,
-      r13b,
-      r14b,
-      r15b,
+       al,  cl,  dl,  bl, sil, dil, spl,  bpl, r9b, r10b, r11b, r12b, r13b, r14b, r15b,
 
-      ax,
-      bx,
-      cx,
-      dx,
-      si,
-      di,
-      bp,
-      sp,
-      r9w,
-      r10w,
-      r11w,
-      r12w,
-      r13w,
-      r14w,
-      r15w,
+       ax,  cx,  dx,  bx,  si,  di,  sp,  bp,  r9w, r10w, r11w, r12w, r13w, r14w, r15w,
 
-      eax,
-      ebx,
-      ecx,
-      edx,
-      esi,
-      edi,
-      ebp,
-      esp,
-      r9d,
-      r10d,
-      r11d,
-      r12d,
-      r13d,
-      r14d,
-      r15d,
+      eax, ecx, edx, ebx, esi, edi, esp, ebp,  r9d, r10d, r11d, r12d, r13d, r14d, r15d,
 
-      rax,
-      rbx,
-      rcx,
-      rdx,
-      rsi,
-      rdi,
-      rbp,
-      rsp,
-      r9,
-      r10,
-      r11,
-      r12,
-      r13,
-      r14,
-      r15,
+      rax, rcx, rdx, rbx, rsi, rdi, rsp, rbp,  r9,  r10,  r11,  r12,  r13,  r14,  r15,
     };
 
-    enum avx_reg {
+    enum xmm_reg {
+      xmm0,
+      xmm1,
+      xmm2,
+      xmm3,
+      xmm4,
+      xmm5,
+      xmm6,
+      xmm7,
+      xmm8,
+      xmm9,
+      xmm10,
+      xmm11,
+      xmm12,
+      xmm13,
+      xmm14,
+      xmm15
+    };
 
+    enum ymm_reg {
+      ymm0,
+      ymm1,
+      ymm2,
+      ymm3,
+      ymm4,
+      ymm5,
+      ymm6,
+      ymm7,
+      ymm8,
+      ymm9,
+      ymm10,
+      ymm11,
+      ymm12,
+      ymm13,
+      ymm14,
+      ymm15
+    };
+
+
+
+    class function_builder;
+
+    class module_builder {
+      friend class function_builder;
+      class impl;
+    public:
+
+    };
+
+    class function_builder {
+      friend class module_builder;
+      class impl;
+
+    public:
+
+      explicit function_builder(module_builder& module) noexcept;
+      function_builder(module_builder& module, std::string_view name) noexcept;
+
+      function_builder(function_builder&& other) noexcept
+          : pImpl(std::exchange(other.pImpl, nullptr)) { }
+
+
+
+      function_builder(const function_builder&) = delete;
+      function_builder& operator=(const function_builder&) = delete;
+      function_builder& operator=(function_builder&&) noexcept = delete;
+
+      ~function_builder();
+
+
+
+      function_builder& mov(gp_reg dst, gp_reg src) noexcept;
+      function_builder& mov(gp_reg dst, uint64_t imm) noexcept;
+
+      function_builder& load(gp_reg dst, const void* address) noexcept;
+
+      function_builder& load(gp_reg dst, gp_reg srcAddress, size_t offset = 0) noexcept;
+
+      function_builder& loadIndexed(gp_reg dst, const void* address, gp_reg index, int stride) noexcept;
+
+      function_builder& loadIndexed(gp_reg dst, const void* address, size_t offset, gp_reg index, int stride) noexcept;
+
+      function_builder& store(void* address, gp_reg src) noexcept;
+
+      function_builder& store(gp_reg dstAddress, gp_reg src, size_t offset = 0) noexcept;
+
+      function_builder& storeIndexed(void* address, gp_reg src, gp_reg index, int stride) noexcept;
+
+      function_builder& storeIndexed(gp_reg dstAddress, gp_reg src, size_t offset, gp_reg index, int stride) noexcept;
+
+
+
+      function_builder& add(gp_reg dst, gp_reg src) noexcept;
+      function_builder& add(gp_reg dst, uint64_t imm) noexcept;
+
+      function_builder& imul(gp_reg dst, gp_reg src) noexcept;
+      function_builder& imul(gp_reg dst, uint64_t imm) noexcept;
+
+      function_builder& idiv(gp_reg dst, gp_reg src) noexcept;
+      function_builder& idiv(gp_reg dst, uint64_t imm) noexcept;
+
+      function_builder& shiftRight(gp_reg dst, gp_reg src) noexcept;
+      function_builder& shiftRight(gp_reg dst, uint32_t imm) noexcept;
+
+      function_builder& shiftLeft(gp_reg dst, gp_reg src) noexcept;
+      function_builder& shiftLeft(gp_reg dst, uint32_t imm) noexcept;
+
+      function_builder& popcount(gp_reg dst, gp_reg src) noexcept;
+
+
+
+      function_builder& moveIf(reg dst, reg src, unary_cmp_op cmpOp, reg cmpReg) noexcept {
+
+      }
+
+      function_builder& moveIf(reg dst, reg src, binary_cmp_op cmpOp, reg leftCmpReg, reg rightCmpReg) noexcept {
+
+      }
+
+
+
+
+      function_builder& jmp(std::string_view label) noexcept {}
+      function_builder& jmp(reg address) noexcept {}
+      function_builder& jmp(const void* address) noexcept {}
+
+      function_builder& jmpIf(std::string_view label, unary_cmp_op cmpOp, reg cmpReg) noexcept {
+
+      }
+      function_builder& jmpIf(reg address, unary_cmp_op cmpOp, reg cmpReg) noexcept {
+
+      }
+      function_builder& jmpIf(const void* address, unary_cmp_op cmpOp, reg cmpReg) noexcept {
+
+      }
+
+      function_builder& jmpIf(std::string_view label, binary_cmp_op cmpOp, reg leftCmpReg, reg rightCmpReg) noexcept {
+
+      }
+      function_builder& jmpIf(reg address, binary_cmp_op cmpOp, reg leftCmpReg, reg rightCmpReg) noexcept {
+
+      }
+      function_builder& jmpIf(const void* address, binary_cmp_op cmpOp, reg leftCmpReg, reg rightCmpReg) noexcept {
+
+      }
+
+
+      function_builder& call(std::string_view func) noexcept;
+      function_builder& call(gp_reg r) noexcept;
+      function_builder& call(const void* address) noexcept;
+
+      function_builder& ret() noexcept;
+
+
+
+      function_builder& push(gp_reg src) noexcept;
+      function_builder& pop(gp_reg dst) noexcept;
+
+    private:
+      impl* pImpl;
     };
 
   }
