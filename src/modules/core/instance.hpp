@@ -30,6 +30,9 @@ struct agt_instance_st {
   const agt_value_type_t*    attrTypes;
   const agt_value_t*         attrValues;
   size_t                     attrCount;
+  ratio_multiplier           clockToNsRatio;
+  ratio_multiplier           nsToClockRatio;
+  agt::impl::hazptr_manager  hazptrManager;
   agt_error_handler_t        errorHandler;
   void*                      errorHandlerUserData;
   agt_internal_log_handler_t logCallback;
@@ -42,8 +45,7 @@ struct agt_instance_st {
   agt_size_t                 defaultMaxObjectSize;
 
 
-  ratio_multiplier           tscToNs;
-  ratio_multiplier           nsToTsc;
+
 
   agt_u32_t                  instanceNameOffset;
   agt_u32_t                  instanceNameLength;

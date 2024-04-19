@@ -119,7 +119,7 @@ namespace {
     /*if (expectedCount != 0) [[likely]] {
       agt_u64_t responseCount = agt::impl::atomic_load(data->responseCounter);
       if (totalResponses(responseCount) >= expectedCount) {
-        // FIXME: agt::impl::atomic_exchange_add(asyncData->refCount, DetatchWaiter);
+        // FIXME: agt::atomic_exchange_add(asyncData->refCount, DetatchWaiter);
         //        The above line may or may not need to be here depending on when waiters are attached, so to speak
         return hasDroppedResponses(responseCount) ? AGT_ERROR_PARTNER_DISCONNECTED : AGT_SUCCESS;
       }

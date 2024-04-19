@@ -147,6 +147,7 @@ namespace agt {
 
     hazptr,
     hazptr_domain,
+    external_hazptr_object,
 
 
     // unsafe_fiber,

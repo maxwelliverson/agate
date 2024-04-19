@@ -370,15 +370,40 @@ namespace agt {
   agt_u32_t atomic_exchange_and(agt_u32_t& value, agt_u32_t newValue) noexcept;
   agt_u64_t atomic_exchange_and(agt_u64_t& value, agt_u64_t newValue) noexcept;
 
+  void      atomic_and(agt_u8_t& value, agt_u8_t newValue)   noexcept;
+  void      atomic_and(agt_u16_t& value, agt_u16_t newValue) noexcept;
+  void      atomic_and(agt_u32_t& value, agt_u32_t newValue) noexcept;
+  void      atomic_and(agt_u64_t& value, agt_u64_t newValue) noexcept;
+
   agt_u8_t  atomic_exchange_or(agt_u8_t&  value, agt_u8_t newValue) noexcept;
   agt_u16_t atomic_exchange_or(agt_u16_t& value, agt_u16_t newValue) noexcept;
   agt_u32_t atomic_exchange_or(agt_u32_t& value, agt_u32_t newValue) noexcept;
   agt_u64_t atomic_exchange_or(agt_u64_t& value, agt_u64_t newValue) noexcept;
 
+  void      atomic_or(agt_u8_t&  value, agt_u8_t newValue) noexcept;
+  void      atomic_or(agt_u16_t& value, agt_u16_t newValue) noexcept;
+  void      atomic_or(agt_u32_t& value, agt_u32_t newValue) noexcept;
+  void      atomic_or(agt_u64_t& value, agt_u64_t newValue) noexcept;
+
   agt_u8_t  atomic_exchange_xor(agt_u8_t&  value, agt_u8_t newValue) noexcept;
   agt_u16_t atomic_exchange_xor(agt_u16_t& value, agt_u16_t newValue) noexcept;
   agt_u32_t atomic_exchange_xor(agt_u32_t& value, agt_u32_t newValue) noexcept;
   agt_u64_t atomic_exchange_xor(agt_u64_t& value, agt_u64_t newValue) noexcept;
+
+  void      atomic_xor(agt_u8_t&  value, agt_u8_t newValue) noexcept;
+  void      atomic_xor(agt_u16_t& value, agt_u16_t newValue) noexcept;
+  void      atomic_xor(agt_u32_t& value, agt_u32_t newValue) noexcept;
+  void      atomic_xor(agt_u64_t& value, agt_u64_t newValue) noexcept;
+
+  agt_u8_t  atomic_exchange_nand(agt_u8_t&  value, agt_u8_t  newValue) noexcept;
+  agt_u16_t atomic_exchange_nand(agt_u16_t& value, agt_u16_t newValue) noexcept;
+  agt_u32_t atomic_exchange_nand(agt_u32_t& value, agt_u32_t newValue) noexcept;
+  agt_u64_t atomic_exchange_nand(agt_u64_t& value, agt_u64_t newValue) noexcept;
+
+  void      atomic_nand(agt_u8_t&  value, agt_u8_t newValue) noexcept;
+  void      atomic_nand(agt_u16_t& value, agt_u16_t newValue) noexcept;
+  void      atomic_nand(agt_u32_t& value, agt_u32_t newValue) noexcept;
+  void      atomic_nand(agt_u64_t& value, agt_u64_t newValue) noexcept;
 
   
   namespace impl {

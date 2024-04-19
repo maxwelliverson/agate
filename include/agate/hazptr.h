@@ -9,7 +9,7 @@
 
 AGT_begin_c_namespace
 
-#define AGT_HAZPTR_DEFAULT_DOMAIN ((agt_hazptr_domain_t)AGT_NULL_HANDLE)
+#define AGT_DEFAULT_HAZPTR_DOMAIN ((agt_hazptr_domain_t)AGT_NULL_HANDLE)
 #define AGT_NULL_HAZPTR ((agt_hazptr_t)AGT_NULL_HANDLE)
 
 
@@ -42,8 +42,9 @@ void         AGT_stdcall agt_retire_hazptr_obj(agt_ctx_t ctx, void* obj, agt_haz
 
 
 
+
 // The following functions all have basically no error checking, because they are intended to be *fast*
-AGT_core_api agt_hazptr_t AGT_stdcall agt_new_hazptr(agt_ctx_t ctx, agt_hazptr_domain_t domain) AGT_noexcept;
+AGT_core_api agt_hazptr_t AGT_stdcall agt_new_hazptr(agt_ctx_t ctx) AGT_noexcept;
 
 AGT_core_api void         AGT_stdcall agt_destroy_hazptr(agt_ctx_t ctx, agt_hazptr_t hazptr) AGT_noexcept;
 

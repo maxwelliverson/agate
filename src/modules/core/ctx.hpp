@@ -72,10 +72,10 @@ struct agt_ctx_st {
   agt::fctx*                     fctx; // null if this thread isn't using fibers
   agt_instance_t                 instance;
   uintptr_t                      threadId;
+  agt::impl::hazptr_ctx_cache    hazptrCache;
   bool                           fibersAreLocked;
   agt_ctx_t*                     pLocalCtxAddress;
   const agt::export_table*       exports;
-  agt::integer_divisor           timestampFrequencyRatio; //
   agt::reg_impl::registry_cache  registryCache;
   agt::alloc_impl::ctx_allocator allocator;
 };
@@ -84,7 +84,7 @@ struct agt_ctx_st {
 
 
 template<size_t Size>
-agt::impl::sized_pool&           agt::impl::get_ctx_pool(agt_ctx_t ctx) noexcept {
+agt::impl::sized_pool& agt::impl::get_ctx_pool(agt_ctx_t ctx) noexcept {
   // constexpr static size_t PoolIndex = alloc_impl::get_pool_index(Size);
   AGT_invariant( ctx != nullptr );
 
@@ -144,9 +144,6 @@ namespace agt {
   inline static agt_status_t suspend_for(agt_ctx_t ctx, agt_timeout_t timeout) noexcept {
     return ctx->uexecVPtr->suspend_for(ctx, ctx->ctxexec, timeout);
   }
-
-
-
 }
 
 

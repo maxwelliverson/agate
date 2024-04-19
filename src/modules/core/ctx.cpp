@@ -4,6 +4,8 @@
 
 #include "ctx.hpp"
 
+#include "uexec.hpp"
+
 #include "init.hpp"
 
 
@@ -125,15 +127,19 @@ namespace agt {
 
     ctx->refCount = 1;
     ctx->flags = 0;
-    ctx->executor = nullptr;
-    ctx->boundAgent = nullptr;
-    ctx->currentMessage = nullptr;
+    ctx->uexec = nullptr;
+    ctx->uexecVPtr = nullptr;
+    ctx->ctxexec = nullptr;
+    ctx->task = nullptr;
+    // ctx->executor = nullptr;
+    // ctx->boundAgent = nullptr;
+    // ctx->currentMessage = nullptr;
     // ctx->boundFiber = nullptr;
     ctx->instance = instance;
     ctx->threadId = get_thread_id();
     ctx->exports = instance->exports;
     ctx->pLocalCtxAddress = &tl_threadCtx;
-    ctx->timestampFrequencyRatio = instance->timeoutDivisor;
+    // ctx->timestampFrequencyRatio = instance->timeoutDivisor;
 
 
     atomic_relaxed_increment(instance->refCount);
@@ -147,6 +153,8 @@ namespace agt {
       // manager.reportError("agt_ctx_t allocator initialization failed.");
       return nullptr;
     }
+
+    bind_default_uexec(ctx);
 
     std::atomic_thread_fence(std::memory_order_release);
 

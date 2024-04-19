@@ -22,7 +22,7 @@ namespace agt {
 
   // Returns time in ns
   [[nodiscard]] AGT_forceinline agt_timestamp_t now(agt_instance_t instance) noexcept {
-    return multiply(static_cast<agt_u64_t>(hwnow()), instance->tscToNs);
+    return multiply(static_cast<agt_u64_t>(hwnow()), instance->clockToNsRatio);
   }
 
   [[nodiscard]] AGT_forceinline agt_timestamp_t now(agt_ctx_t ctx) noexcept {
@@ -32,7 +32,7 @@ namespace agt {
 
 
   [[nodiscard]] AGT_forceinline hwtime         add_duration(agt_instance_t instance, hwtime time, agt_duration_t duration) noexcept {
-    return static_cast<hwtime>(std::to_underlying(time) + multiply(duration, instance->nsToTsc));
+    return static_cast<hwtime>(std::to_underlying(time) + multiply(duration, instance->nsToClockRatio));
   }
 
   [[nodiscard]] AGT_forceinline hwtime         add_duration(agt_ctx_t ctx, hwtime time, agt_duration_t duration) noexcept {
@@ -40,7 +40,7 @@ namespace agt {
   }
 
   [[nodiscard]] AGT_forceinline hwtime         minus_duration(agt_instance_t instance, hwtime time, agt_duration_t duration) noexcept {
-    return static_cast<hwtime>(std::to_underlying(time) - multiply(duration, instance->nsToTsc));
+    return static_cast<hwtime>(std::to_underlying(time) - multiply(duration, instance->nsToClockRatio));
   }
 
   [[nodiscard]] AGT_forceinline hwtime         minus_duration(agt_ctx_t ctx, hwtime time, agt_duration_t duration) noexcept {
@@ -50,7 +50,7 @@ namespace agt {
 
 
   [[nodiscard]] AGT_forceinline agt_duration_t duration_between(agt_instance_t instance, hwtime start, hwtime end) noexcept {
-    return multiply(std::to_underlying(end) - std::to_underlying(start), instance->tscToNs);
+    return multiply(std::to_underlying(end) - std::to_underlying(start), instance->clockToNsRatio);
   }
 
   [[nodiscard]] AGT_forceinline agt_duration_t duration_between(agt_ctx_t ctx, hwtime start, hwtime end) noexcept {

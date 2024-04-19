@@ -342,7 +342,6 @@ add_agate_module(
                 hazptr.cpp
                 impl/blocked_queue.cpp
                 impl/ctrie.cpp
-                impl/hazptr_manager.cpp
                 impl/monitor_list.cpp
                 impl/sized_pool.cpp
                 impl/spinlock.cpp

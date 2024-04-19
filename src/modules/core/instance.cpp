@@ -146,6 +146,8 @@ namespace agt {
       delete[] instance->attrTypes;
       delete[] instance->attrValues;
 
+      impl::destroy_hazptr_manager(instance->hazptrManager);
+
       delete instance;
 
       if (invokedOnThreadExit)
@@ -186,10 +188,11 @@ namespace agt {
 
     agt::impl::init_monitor_list_local(inst, inst->monitorList, 512, attr::thread_count(inst));
 
+    agt::impl::init_hazptr_manager(inst->hazptrManager);
 
     auto [ tscToNsNum, tscToNsDenom ] = get_tsc_to_ns_ratio();
-    precompile_ratio(inst->tscToNs, tscToNsNum, tscToNsDenom);
-    precompile_ratio(inst->nsToTsc, tscToNsDenom, tscToNsNum);
+    precompile_ratio(inst->clockToNsRatio, tscToNsNum, tscToNsDenom);
+    precompile_ratio(inst->nsToClockRatio, tscToNsDenom, tscToNsNum);
 
     /*const auto nativeDurationUnit = pAttrValues[AGT_ATTR_NATIVE_DURATION_UNIT_SIZE_NS];
     const auto durationUnit = pAttrValues[AGT_ATTR_DURATION_UNIT_SIZE_NS];

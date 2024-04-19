@@ -167,6 +167,13 @@ namespace agt {
 
 
   namespace impl {
+
+    template <typename T, typename ...Args>
+    concept has_adl_destroy = std::derived_from<T, object> && requires(T* obj, Args&& ...args)
+    {
+      { destroy(obj, std::forward<Args>(args)...) } noexcept -> std::same_as<void>;
+    };
+
     template <typename T>
     struct default_destroy {
       inline constexpr static bool is_default_impl = true;
@@ -198,33 +205,6 @@ namespace agt {
     struct object_type_range;
   }
 
-
-
-  template <typename T,
-            typename Dtor = impl::default_destroy<T>,
-            thread_safety SafetyModel = thread_user_safe>
-  class owner_ref;
-
-  template <typename T, typename Dtor = impl::default_destroy<T>>
-  using safe_owner_ref = owner_ref<T, Dtor, thread_safe>;
-
-  template <typename T, typename Dtor = impl::default_destroy<T>>
-  using unsafe_owner_ref = owner_ref<T, Dtor, thread_unsafe>;
-
-  template <typename T,
-            typename U = void,
-            typename Dtor = impl::default_destroy<T>,
-            thread_safety SafetyModel = thread_user_safe>
-  class maybe_ref;
-
-  template <typename T, typename U = void,
-            typename Dtor = impl::default_destroy<T>>
-  using unsafe_maybe_ref = maybe_ref<T, U, Dtor, thread_unsafe>;
-
-  template <typename T,
-            typename U = void,
-            typename Dtor = impl::default_destroy<T>>
-  using safe_maybe_ref = maybe_ref<T, U, Dtor, thread_safe>;
 }
 
 

@@ -6,44 +6,101 @@
 #define AGATE_INTERNAL_CORE_HAZPTR_HPP
 
 #include "config.hpp"
-#include "impl/object_defs.hpp"
-
-AGT_api_object(agt_hazptr_st, hazptr, extends(agt::object), aligned(AGT_CACHE_LINE)) {
-  uint32_t       bits;
-  const void*    ptr;
-  agt_hazptr_st* next;
-  agt_hazptr_st* nextAvail;
-};
-
-
-AGT_api_object(agt_hazptr_domain_st, hazptr_domain) {
-
-};
-
-
+#include "impl/hazptr_def.hpp"
 
 namespace agt {
-  struct hazptr_base;
-  struct hazptr_obj_list;
 
-  struct hazptr_obj {
-    void      (* reclaimFunc)(agt_ctx_t ctx, hazptr_obj* obj, hazptr_obj_list& );
-    hazptr_base* nextHazptrObj;
-    uintptr_t    domainTag;
+  namespace impl {
+    void do_retire_hazard(agt_ctx_t ctx, hazard_obj* hazard) noexcept;
+
+    template <typename ObjectType>
+    inline void reclaim_callback(agt_ctx_t ctx, hazard_obj* obj, hazard_obj_sized_list& children) noexcept {
+      if constexpr (impl::has_adl_destroy<ObjectType, agt_ctx_t, hazard_obj_sized_list&>)
+        release(unsafe_nonnull_object_cast<ObjectType>(obj), ctx, children);
+      else if constexpr (impl::has_adl_destroy<ObjectType, agt_ctx_t>)
+        release(unsafe_nonnull_object_cast<ObjectType>(obj), ctx);
+      else if constexpr (impl::has_adl_destroy<ObjectType, hazard_obj_sized_list&>)
+        release(unsafe_nonnull_object_cast<ObjectType>(obj), children);
+      else
+        release(unsafe_nonnull_object_cast<ObjectType>(obj));
+    }
+  }
+
+
+  agt_hazptr_t make_hazptr(agt_ctx_t ctx) noexcept;
+
+  void         make_hazptrs(agt_ctx_t ctx, std::span<agt_hazptr_t> hazptrs) noexcept;
+
+  void         drop_hazptr(agt_ctx_t ctx, agt_hazptr_t hazptr) noexcept;
+
+  void         drop_hazptrs(agt_ctx_t ctx, std::span<const agt_hazptr_t> hazptrs) noexcept;
+
+  template <std::derived_from<hazard_obj> T>
+  inline static bool try_protect(agt_hazptr_t hazptr, T*& value, T* const & hazard) noexcept {
+    T* prev = value;
+    atomic_store(hazptr->ptr, prev);
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+    value = atomic_load(hazard);
+    if (prev == value) [[unlikely]] {
+      atomic_store(hazptr->ptr, nullptr);
+      return false;
+    }
+    return true;
+  }
+
+  template <std::derived_from<hazard_obj> T>
+  inline static T*   protect(agt_hazptr_t hazptr, T* const & hazard) noexcept {
+    auto value = atomic_relaxed_load(hazard);
+    while (!try_protect(hazptr, value, hazard));
+    return value;
+  }
+
+  inline static void reset_hazptr(agt_hazptr_t hazptr) noexcept {
+    atomic_store(hazptr->ptr, nullptr);
+  }
+
+
+  template <std::derived_from<hazard_obj> ObjectType>
+  inline static void retire(agt_ctx_t ctx, ObjectType* obj) noexcept {
+    AGT_invariant( obj != nullptr );
+    obj->reclaimFunc = &impl::reclaim_callback<ObjectType>;
+    obj->nextHazptrObj = nullptr;
+    obj->domainTag = 0;
+    impl::do_retire_hazard(ctx, obj);
+  }
+
+
+  // This should only be used on the stack, eg. to accumulate entries for retiring while enumerating over a list
+  class hazard_retire_list {
+    agt_ctx_t             m_ctx;
+    agt_hazptr_domain_t   m_domain;
+    hazard_obj_sized_list m_list;
+  public:
+    explicit hazard_retire_list(agt_ctx_t ctx, agt_hazptr_domain_t domain = AGT_DEFAULT_HAZPTR_DOMAIN) noexcept
+        : m_ctx(ctx), m_domain(domain), m_list{} { }
+
+    ~hazard_retire_list() {
+      flush();
+    }
+
+    template <std::derived_from<hazard_obj> ObjectType>
+    inline void push(ObjectType* obj) noexcept {
+      AGT_invariant( obj != nullptr );
+      obj->reclaimFunc   = &impl::reclaim_callback<ObjectType>;
+      obj->domainTag     = reinterpret_cast<uintptr_t>(m_domain);
+      agt::push(m_list, obj);
+    }
+
+
+    // Useful if the executing ctx might change over the course of whatever algorithm is running
+    void set_ctx(agt_ctx_t ctx) noexcept {
+      m_ctx = ctx;
+    }
+
+    void flush() noexcept;
   };
 
-
-  struct hazptr_obj_list {
-
-  };
-
-  struct hazptr_base : object {
-    void      (* reclaimFunc)(agt_ctx_t ctx, hazptr_base* obj, hazptr_obj_list& );
-    hazptr_base* nextHazptrObj;
-    uintptr_t    domainTag;
-  };
-
-
+  void         retire_user_hazard(agt_ctx_t ctx, void* obj, agt_hazptr_domain_t domain, agt_hazptr_retire_func_t retireFunc, void* userData) noexcept;
 }
 
 #endif//AGATE_INTERNAL_CORE_HAZPTR_HPP

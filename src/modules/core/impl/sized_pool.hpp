@@ -489,11 +489,7 @@ namespace agt {
     }*/
 
 
-    template <typename T, typename ...Args>
-    concept has_adl_destroy = std::derived_from<T, object> && requires(T* obj, Args&& ...args)
-    {
-      { destroy(obj, std::forward<Args>(args)...) } noexcept -> std::same_as<void>;
-    };
+
 
 
 
@@ -510,10 +506,7 @@ namespace agt {
 
 
     template <typename ObjectType>
-    AGT_forceinline inline static ObjectType*  ctx_pool_alloc(agt_ctx_t ctx, sized_pool& pool) noexcept {
-
-      object* obj = impl::pool_alloc(ctx, pool);
-
+    AGT_forceinline static ObjectType* init_object(object* obj) noexcept {
       if constexpr (std::derived_from<ObjectType, rc_object>) {
         auto rcObj = static_cast<rc_object*>(obj);
         if constexpr (std::is_trivially_default_constructible_v<ObjectType>) {
@@ -548,6 +541,11 @@ namespace agt {
       }
     }
 
+    template <typename ObjectType>
+    AGT_forceinline inline static ObjectType*  ctx_pool_alloc(agt_ctx_t ctx, sized_pool& pool) noexcept {
+      return init_object<ObjectType>(impl::pool_alloc(ctx, pool));
+    }
+
 
     template <typename ObjectType, typename ...Args>
     AGT_forceinline inline static ObjectType*  recycle_rc_object(ObjectType* obj, sized_pool& pool, Args&& ...args) noexcept {
@@ -575,7 +573,7 @@ namespace agt {
         if constexpr (has_adl_destroy<ObjectType, Args...>) {
           destroy(obj, std::forward<Args>(args)...);
         }
-        return &obj;
+        return init_object<ObjectType>(&obj);
       }
 
       if (chunk->threadId == get_thread_id()) [[likely]]
@@ -606,7 +604,7 @@ namespace agt {
   AGT_forceinline inline static ObjectType* alloc(agt_ctx_t ctx) noexcept {
     static_assert(std::default_initializable<ObjectType>);
 
-    auto& pool = impl::get_ctx_pool<sizeof(ObjectType)>(ctx);
+    // auto& pool = impl::get_ctx_pool<sizeof(ObjectType)>(ctx);
 
     return impl::ctx_pool_alloc<ObjectType>(ctx, impl::get_ctx_pool<sizeof(ObjectType)>(ctx));
   }
