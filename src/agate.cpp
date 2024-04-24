@@ -12,7 +12,7 @@
 #include "init.hpp"
 
 #include "agate/environment.hpp"
-#include "agate/integer_division.hpp"
+#include "agate/ratio_multiplier.hpp"
 // #include "agate/module.hpp"
 #include "agate/sys_string.hpp"
 

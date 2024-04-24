@@ -5,8 +5,8 @@
 #ifndef AGATE_INTERNAL_CORE_TIME_HPP
 #define AGATE_INTERNAL_CORE_TIME_HPP
 
+#include "agate/ratio_multiplier.hpp"
 #include "config.hpp"
-#include "agate/integer_division.hpp"
 #include "instance.hpp"
 
 #include <immintrin.h>

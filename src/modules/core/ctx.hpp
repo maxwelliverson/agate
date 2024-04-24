@@ -8,10 +8,9 @@
 #include "config.hpp"
 
 #include "agate/align.hpp"
+#include "agate/ratio_multiplier.hpp"
 #include "error.hpp"
 #include "instance.hpp"
-#include "agate/integer_division.hpp"
-
 
 
 #include <bit>

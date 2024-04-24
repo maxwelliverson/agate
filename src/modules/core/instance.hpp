@@ -8,14 +8,13 @@
 #include "config.hpp"
 
 #include "agate/flags.hpp"
-#include "agate/integer_division.hpp"
+#include "agate/ratio_multiplier.hpp"
 #include "agate/version.hpp"
 #include "export_table.hpp"
 #include "impl/allocator.hpp"
-#include "impl/registry.hpp"
-#include "impl/monitor_list.hpp"
 #include "impl/hazptr_manager.hpp"
-
+#include "impl/monitor_list.hpp"
+#include "impl/registry.hpp"
 
 
 extern "C" {
