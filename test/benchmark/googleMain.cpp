@@ -8,7 +8,7 @@
 #include "agate/fiber.h"
 #include "agate/init.h"
 
-#include "agate/integer_division.hpp"
+#include "agate/ratio_multiplier.hpp"
 
 
 #include <benchmark/benchmark.h>
@@ -436,19 +436,6 @@ BENCHMARK_FIBER_FUNC(fiber_create,              "new-fiber");
 
 BENCHMARK(BM_threads)->Name("thread-switch")->UseManualTime();
 BENCHMARK(BM_createThread)->Name("thread-create")->UseManualTime();
-
-
-
-
-static void BM_nopx4_op(benchmark::State& state) {
-  for (auto _ : state) {
-    bm_nopx4_op(state.range());
-    benchmark::ClobberMemory();
-  }
-  state.SetComplexityN(state.range());
-}
-
-// BENCHMARK(BM_nopx4_op)->RangeMultiplier(2)->Range(0x1<<7, 0x1<<14)->Complexity(benchmark::oN);
 
 
 BENCHMARK_MAIN();
