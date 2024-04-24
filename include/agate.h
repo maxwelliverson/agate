@@ -19,6 +19,7 @@
 #include <agate/channels.h>
 #include <agate/executor.h>
 #include <agate/fiber.h>
+#include <agate/futex.h>
 #include <agate/hazptr.h>
 #include <agate/log.h>
 #include <agate/naming.h>
