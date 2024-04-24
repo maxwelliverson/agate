@@ -611,7 +611,8 @@ namespace agt {
 
   template <typename ObjectType>
   AGT_forceinline inline static ObjectType* alloc_dyn(agt_ctx_t ctx, size_t size) noexcept {
-    static_assert(std::default_initializable<ObjectType>);
+    // static_assert(std::default_initializable<ObjectType>);
+    static_assert(std::constructible_from<ObjectType>);
 
     auto& pool = impl::get_ctx_pool<sizeof(ObjectType)>(ctx);
 

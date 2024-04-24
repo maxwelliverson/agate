@@ -75,7 +75,7 @@ namespace agt {
 
   template <typename T>
   class atomic_epoch_ptr {
-    using tagged_type = tagged_atomic<T*, agt_u32_t>;
+    using tagged_type = tagged_value<T*, agt_u32_t>;
   public:
 
     using stored_type = epoch_ptr<T>;
@@ -88,51 +88,10 @@ namespace agt {
     atomic_epoch_ptr(pointer p, epoch_type epoch) noexcept : m_value(p, epoch) { }
 
 
-    [[nodiscard]] stored_type load() const noexcept {
-      return m_value.load();
-    }
 
-    [[nodiscard]] stored_type relaxedLoad() const noexcept {
-      return m_value.relaxedLoad();
-    }
-
-    void        store(stored_type newValue) noexcept {
-      m_value.store(newValue.m_value);
-    }
-
-    void        relaxedStore(stored_type tagged) noexcept {
-      m_value.relaxedStore(tagged.m_value);
-    }
-
-    [[nodiscard]] stored_type exchange(stored_type newValue) noexcept {
-      return m_value.exchange(newValue.m_value);
-    }
-
-    // May be called with a value_type second argument,
-    // given that tagged_type is implicitly convertible from value_type.
-    bool        compareAndSwap(stored_type& expectedOrCaptured, stored_type newValue) noexcept {
-      return m_value.compareAndSwap(expectedOrCaptured.m_value, newValue.m_value);
-    }
-    bool        compareAndSwapWeak(stored_type& expectedOrCaptured, stored_type newValue) noexcept {
-      return m_value.compareAndSwapWeak(expectedOrCaptured.m_value, newValue.m_value);
-    }
-
-
-
-    void wakeOne() const noexcept;
-
-    void wakeAll() const noexcept;
-
-    void wait(agt_u32_t epoch) const noexcept;
-
-    bool waitUntil(agt_u32_t epoch, deadline dl) const noexcept;
-
-    void waitAndLoad(stored_type& value) const noexcept;
-
-    bool waitAndLoadUntil(stored_type& value, deadline dl) const noexcept;
 
     [[nodiscard]] epoch_type epoch() const noexcept {
-      return m_value.load();
+      return m_value.tag();
     }
 
 

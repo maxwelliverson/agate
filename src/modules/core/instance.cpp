@@ -6,6 +6,7 @@
 #include "instance.hpp"
 #include "attr.hpp"
 #include "time.hpp"
+#include "ctx.hpp"
 
 #if AGT_system_windows
 #define NOMINMAX
@@ -146,7 +147,7 @@ namespace agt {
       delete[] instance->attrTypes;
       delete[] instance->attrValues;
 
-      impl::destroy_hazptr_manager(instance->hazptrManager);
+      impl::destroy_hazptr_manager(instance);
 
       delete instance;
 

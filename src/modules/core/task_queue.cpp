@@ -7,7 +7,10 @@
 #include "core/object.hpp"
 #include "core/ctx.hpp"
 
+#include "agate/on_scope_exit.hpp"
 #include "agate/vector.hpp"
+
+#include "hazptr.hpp"
 
 
 AGT_object(task_queue_vec) {
@@ -15,7 +18,21 @@ AGT_object(task_queue_vec) {
   agt::blocked_task* tasks[];
 };
 
+
+namespace agt {
+  AGT_object(spsc_signal_waiter_vec, extends(agt::hazard_obj)) {
+    agt_i32_t           capacity;
+    agt_i32_t           count; // signed for sake of consistency with use of signed values in the wake functions.
+    agt::signal_waiter* waiters[];
+  };
+}
+
+
+
 namespace {
+  inline constexpr uintptr_t SetByReceiverBit = 0x2;
+  inline constexpr uintptr_t ValueIsVecBit    = 0x1;
+  inline constexpr uintptr_t VecMask          = ~(SetByReceiverBit | ValueIsVecBit);
   inline constexpr uintptr_t IsMultiValueBit  = 0x1;
   inline constexpr uint32_t  InitialMultiSize = 2;
 
@@ -42,7 +59,7 @@ namespace {
   }
 
 
-  AGT_forceinline task_queue atomic_load(const task_queue& src) noexcept {
+  AGT_forceinline task_queue atomic_load_tq(const task_queue& src) noexcept {
     union {
       uint64_t   u64[2];
       task_queue queue;
@@ -52,11 +69,6 @@ namespace {
     u64[1] = agt::atomic_relaxed_load(srcPtr[1]);
     return queue;
   }
-
-  AGT_forceinline bool atomic_cas(task_queue& var, task_queue& prevVal, const task_queue& newVal) noexcept {
-    return agt::atomic_try_replace_16bytes(&var, &prevVal, &newVal);
-  }
-
 
   AGT_forceinline bool atomic_update_counter(uint32_t& target, uint32_t newValue) noexcept {
     uint32_t prev = atomic_relaxed_load(target);
@@ -68,16 +80,44 @@ namespace {
     } while(!atomic_cas(target, prev, newValue));
     return true;
   }
+
+  AGT_forceinline void init_waiter(agt_ctx_t ctx, signal_waiter& waiter) noexcept {
+    waiter.resume  = ctx->uexecVPtr->resume;
+    waiter.ctxexec = ctx->ctxexec;
+    waiter.task    = *static_cast<const agt_utask_t*>(waiter.ctxexec);
+  }
 }
+
+
+
 
 
 void agt::blocked_task_init(agt_ctx_t ctx, blocked_task& task) noexcept {
   AGT_invariant( ctx != nullptr );
+  task.next = nullptr;
   task.execCtxData   = ctx->ctxexec;
   task.task          = static_cast<agt_ctxexec_header_t*>(ctx->ctxexec)->activeTask;
   task.pfnResumeTask = ctx->uexecVPtr->resume;
 }
 
+
+bool agt::impl::task_queue_contains(const agt::unsafe_task_queue& queue, const agt::blocked_task &task) noexcept {
+
+  if (queue.size == 0)
+    return false;
+
+  if (auto vec = try_as_vec(queue.value)) {
+    for (uint32_t i = 0; i < queue.size; ++i) {
+      if (vec->tasks[i] == &task) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  AGT_invariant(queue.size == 1);
+  return as_task(queue.value) == &task;
+}
 
 void agt::impl::task_queue_insert(agt_ctx_t ctx, unsafe_task_queue& queue, blocked_task& task) noexcept {
   if (queue.value == 0) [[likely]] {
@@ -175,6 +215,8 @@ void agt::wake_all(agt_ctx_t ctx, unsafe_task_queue &queue) noexcept {
 
   if (queue.size == 0)
     return;
+
+  AGT_resolve_ctx(ctx);
 
   if (auto vec = try_as_vec(queue.value)) {
     for (uint32_t i = 0; i < queue.size; ++i) {
@@ -285,7 +327,9 @@ bool agt::wake_all(agt_ctx_t ctx, unsafe_task_queue &queue, task_queue_predicate
 
 void agt::insert(agt_ctx_t ctx, task_queue &queue, blocked_task &task) noexcept {
   task_queue prev, next;
-  prev = atomic_load(queue);
+
+  prev.task = atomic_load(queue.task);
+  // prev = atomic_load(queue);
 
   task_queue_vec* vec;
   task_queue_vec* prevVec;
@@ -519,4 +563,282 @@ void agt::wake(signal_task_queue &queue, int32_t n) noexcept {
   atomic_store(r->head, message->next);
   auto newTail = &message->next;
   atomic_try_replace(*r->pTail, newTail, &r->head);*/
+}
+
+
+
+namespace {
+
+  void vec_erase(agt_ctx_t ctx, agt::spsc_signal_waiter_vec*& newVec, agt::spsc_signal_waiter_vec* prevVec, int32_t index) noexcept {
+    AGT_invariant( prevVec != nullptr );
+    const auto newSize = prevVec->count - 1;
+    AGT_invariant( newSize > 1 );
+
+    if (!newVec) [[likely]] {
+      newVec = alloc_dyn<agt::spsc_signal_waiter_vec>(ctx, sizeof(agt::spsc_signal_waiter_vec) + (sizeof(void*) * newSize));
+      newVec->capacity = static_cast<agt_i32_t>(newSize);
+    }
+    AGT_invariant( newSize <= newVec->capacity );
+
+    newVec->count = newSize;
+
+    int32_t i;
+    for (i = 0; i < index; ++i)
+      newVec->waiters[i] = prevVec->waiters[i];
+    for (; i < newSize; ++i)
+      newVec->waiters[i] = prevVec->waiters[i + 1];
+  }
+
+
+  // This is safe from any weird shit because there is a maximum of 1 thread calling remove concurrently.
+  // The potential scenarios are:
+  //   a) This hasn't been removed, and there's no contention. Removal succeeds.
+  //   b) Another thread tries waking this before the removal can complete, in which case it fails.
+  bool remove_waiter(agt_ctx_t ctx, spsc_signal_queue& queue, signal_waiter& waiter) noexcept {
+
+    agt::spsc_signal_waiter_vec* nextVec = nullptr;
+    agt::spsc_signal_waiter_vec* freeVec = nullptr;
+    agt_hazptr_t hazptr = nullptr;
+
+    on_scope_exit {
+        if (freeVec)
+          release(freeVec);
+        if (hazptr)
+          drop_hazptr(ctx, hazptr);
+    };
+
+    auto bits = atomic_load(queue.value);
+
+    do {
+      uintptr_t nextBits;
+      freeVec = nextVec;
+
+      if ((bits & ValueIsVecBit) == 0) [[likely]] {
+        if (bits == 0 || bits != reinterpret_cast<uintptr_t>(&waiter)) [[unlikely]]
+          return false;
+
+        nextBits = 0;
+      }
+      else {
+        const auto vec = reinterpret_cast<agt::spsc_signal_waiter_vec*>(bits & VecMask);
+        AGT_invariant( vec != nullptr );
+        if (hazptr == nullptr) [[likely]]
+          hazptr = make_hazptr(ctx);
+        set_hazptr(hazptr, vec);
+        std::atomic_thread_fence(std::memory_order_seq_cst);
+        auto newVec = atomic_load(queue.value);
+        if (newVec != bits) [[unlikely]] {
+          bits = newVec;
+          continue; // retry, don't immediately reset hazptr, cause we will most likely be setting it again very quickly, and if not, definitely upon function exit.
+        }
+
+        AGT_assert( vec->count > 1 );
+
+        // vec is now protected!
+
+        if (vec->count == 2) {
+          signal_waiter* nextWaiter;
+          if (vec->waiters[0] == &waiter)
+            nextWaiter = vec->waiters[1];
+          else if (vec->waiters[1] == &waiter)
+            nextWaiter = vec->waiters[0];
+          else [[unlikely]]
+            return false;
+          nextBits = reinterpret_cast<uintptr_t>(nextWaiter);
+        }
+        else {
+          bool found = false;
+          for (int32_t i = 0; i < vec->count; ++i) {
+            if (vec->waiters[i] == &waiter) {
+              vec_erase(ctx, nextVec, vec, i);
+              found = true;
+              break;
+            }
+          }
+          if (!found)
+            return false;
+
+          freeVec = nullptr;
+          nextBits = reinterpret_cast<uintptr_t>(nextVec) | ValueIsVecBit;
+        }
+      }
+
+      uintptr_t prevBits = bits;
+
+      do {
+        if (atomic_cas(queue.value, bits, nextBits))
+          return true;
+      } while(bits == prevBits);
+
+    } while(true);
+  }
+
+  void insert(agt_ctx_t ctx, spsc_signal_queue& queue, signal_waiter& waiter) noexcept {
+
+  }
+
+  // Maybe try with hazard pointers and vec????
+
+  void vec_pop_n(agt_ctx_t ctx, agt::spsc_signal_waiter_vec*& newVec, agt::spsc_signal_waiter_vec* prevVec, int32_t popCount) noexcept {
+    AGT_invariant( prevVec != nullptr );
+    const auto newSize = prevVec->count - popCount;
+    AGT_invariant( newSize > 0 );
+    bool shouldAllocateNewVec = false;
+
+    if (!newVec) [[likely]]
+      shouldAllocateNewVec = true;
+    else if (newVec->capacity < newSize) [[unlikely]] {
+      shouldAllocateNewVec = true;
+      release(newVec);
+    }
+
+    if (shouldAllocateNewVec) {
+      const auto newCapacity = align_to<4>(static_cast<agt_u32_t>(newSize));
+      newVec = alloc_dyn<agt::spsc_signal_waiter_vec>(ctx, sizeof(agt::spsc_signal_waiter_vec) + (sizeof(void*) * newCapacity));
+      newVec->capacity = static_cast<agt_i32_t>(newCapacity);
+    }
+
+    newVec->count = newSize;
+
+    for (auto i = 0; i < newSize; ++i)
+      newVec->waiters[i] = prevVec->waiters[popCount + i];
+  }
+
+  inline void wake(agt_ctx_t ctx, const signal_waiter* waiter) noexcept {
+    waiter->resume(ctx, waiter->ctxexec, waiter->task);
+  }
+}
+
+
+void agt::signal(agt_ctx_t ctx, spsc_signal_queue& queue, int32_t n) noexcept {
+  AGT_invariant( n > 0 );
+  auto waiterCount = atomic_exchange_sub(queue.size, n);
+
+  if (waiterCount > 0) {
+    n = std::min(waiterCount, n); // have to cap by waiterCount if the new size is negative to ensure this call results in exactly n wakes.
+
+    agt::spsc_signal_waiter_vec* vec     = nullptr;
+    agt::spsc_signal_waiter_vec* nextVec = nullptr;
+    agt::spsc_signal_waiter_vec* freeVec;
+    signal_waiter* loneWaiter            = nullptr;
+    agt_hazptr_t hazptr                  = nullptr;
+
+    on_scope_exit {
+      if (hazptr != nullptr)
+        drop_hazptr(ctx, hazptr);
+      if (freeVec)
+        release(freeVec); // no need to retire; it was never used, so nobody else could have ever acquired it.
+    };
+
+    auto bits = atomic_load(queue.value);
+
+    do {
+      uintptr_t nextBits;
+      freeVec = nextVec;
+
+      if ((bits & ValueIsVecBit) == 0) [[likely]] {
+        if (bits == 0) [[unlikely]] // generally pretty unlikely that any of the waiters will have timed out between now and when the value of n was calculated, but it is possible.
+          return;
+
+        // bits is a single waiter, n >= 1, therefore we simply try replacing with zero.
+        nextBits = 0;
+        loneWaiter = reinterpret_cast<signal_waiter*>(bits);
+        // This is expected to be the common path, so set loneWaiter, don't reset prevVec.
+        // Instead, in the vec path, we set prevVec, and reset loneWaiter,
+        // then, outside of the loop, we check if loneWaiter is set to determine which path was taken.
+      }
+      else {
+        vec = reinterpret_cast<agt::spsc_signal_waiter_vec*>(bits & VecMask);
+        AGT_invariant( vec != nullptr );
+        if (hazptr == nullptr) [[likely]]
+          hazptr = make_hazptr(ctx);
+        set_hazptr(hazptr, vec);
+        std::atomic_thread_fence(std::memory_order_seq_cst);
+        auto newVec = atomic_load(queue.value);
+        if (newVec != bits) [[unlikely]] {
+          bits = newVec;
+          continue; // retry, don't immediately reset hazptr, cause we will most likely be setting it again very quickly, and if not, definitely by the end of the function.
+        }
+        loneWaiter = nullptr;
+
+        // vec is now protected, and may be safely read from (but not written to).
+        if (n >= vec->count) {
+          nextBits = 0;
+        }
+        else if (vec->count - n == 1) {
+          nextBits = reinterpret_cast<uintptr_t>(vec->waiters[n]);
+        }
+        else {
+          vec_pop_n(ctx, nextVec, vec, n);
+          freeVec = nullptr;
+          nextBits = reinterpret_cast<uintptr_t>(nextVec) | ValueIsVecBit;
+        }
+      }
+
+      uintptr_t prevBits = bits;
+
+      do {
+
+        if (atomic_cas(queue.value, bits, nextBits)) { // Success; now we actually wake the waiters we've popped from the queue.
+
+          if (loneWaiter != nullptr) [[likely]] {
+            ::wake(ctx, loneWaiter);
+          }
+          else {
+            AGT_invariant( vec != nullptr );
+            for (auto i = 0; i < n; ++i)
+              ::wake(ctx, vec->waiters[i]);
+            retire(ctx, vec);
+          }
+          return;
+        }
+
+      } while(bits == prevBits);
+
+    } while(true);
+
+
+
+  }
+}
+
+
+bool agt::wait(agt_ctx_t ctx, spsc_signal_queue& queue, agt_timeout_t timeout) noexcept {
+
+  auto queueSize = atomic_relaxed_load(queue.size);
+  if ( queueSize < 0 ) {
+    atomic_relaxed_increment(queue.size);
+    return true;
+  }
+
+  if (timeout == AGT_DO_NOT_WAIT) [[unlikely]]
+    return false;
+
+  signal_waiter waiter;
+  init_waiter(ctx, waiter);
+
+  ::insert(ctx, queue, waiter);
+
+  while (!atomic_cas(queue.size, queueSize, queueSize + 1)) {
+    if ( queueSize < 0 ) [[unlikely]] {
+      remove_waiter(ctx, queue, waiter); // we don't care whether or not this succeeds
+      atomic_relaxed_increment(queue.size);
+      return true;
+    }
+  }
+
+
+  if (timeout != AGT_WAIT) {
+    if (!suspend_for(ctx, timeout) && remove_waiter(ctx, queue, waiter)) {
+      atomic_decrement(queue.size); //
+      return false;
+    }
+  }
+  else {
+    suspend(ctx);
+  }
+
+  // AGT_assert( !impl::task_queue_contains(queue, task) );
+
+  return true;
 }

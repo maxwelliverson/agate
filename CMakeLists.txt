@@ -40,7 +40,7 @@ set(AGATE_VERSION_STRING "${AGATE_VERSION_MAJOR}.${AGATE_VERSION_MINOR}.${AGATE_
 project(agate LANGUAGES CXX ASM_MASM VERSION ${AGATE_VERSION_STRING})
 
 set(CMAKE_C_STANDARD 17)
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 26)
 
 
 if (DEFINED AGATE_RELWITHDEBINFO_BUILD)
@@ -340,11 +340,9 @@ add_agate_module(
                 exec/local_user_executor.cpp
                 fiber.cpp
                 hazptr.cpp
-                impl/blocked_queue.cpp
                 impl/ctrie.cpp
                 impl/monitor_list.cpp
                 impl/sized_pool.cpp
-                impl/spinlock.cpp
                 instance.cpp
                 # object_allocator.cpp
                 msg/message_queue.cpp
@@ -353,7 +351,7 @@ add_agate_module(
                 msg/receiver.cpp
                 msg/message.cpp
                 msg/message_pool.cpp
-                # msg/ring_queue.cpp
+                msg/ring_queue.cpp
                 random.cpp
                 segment.cpp
                 shared.cpp
@@ -583,6 +581,7 @@ target_include_directories(gbenchmarks PRIVATE include)
 target_link_libraries(gbenchmarks PRIVATE agate $<COMPILE_ONLY:agate-common> benchmark::benchmark)
 add_dependencies(gbenchmarks agate.core)
 target_link_options(gbenchmarks PRIVATE $<$<CONFIG:Release>:/LTCG>)
+target_include_directories(gbenchmarks PRIVATE src)
 
 
 

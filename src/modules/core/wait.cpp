@@ -25,20 +25,12 @@ namespace {
     impl::attach_monitor(ctx, instance->monitorList, address, monitorExec);
 
 
-    if (timeout == AGT_WAIT) {
+    if (timeout == AGT_WAIT)
       suspend(ctx);
-      return AGT_SUCCESS;
-    }
+    else if (!suspend_for(ctx, timeout) && impl::remove_monitor(ctx, monitorExec))
+      return AGT_TIMED_OUT;
 
-    agt_status_t status = suspend_for(ctx, timeout);
-
-    // if status == AGT_SUCCESS
-    if (status != AGT_SUCCESS) {
-      if (!impl::remove_monitor(ctx, monitorExec) && status == AGT_TIMED_OUT) // If it fails to remove the monitor, that means it was *already* removed, in which case this was actually a *success*, even though it may have reached the timeout. If the status code is something else, there was an actual error, and we wish to report this back.
-        status = AGT_SUCCESS;
-    }
-
-    return status;
+    return AGT_SUCCESS;
   }
 }
 

@@ -11,6 +11,8 @@
 
 namespace agt {
 
+  agt_message_t try_receive_local_mpsc(receiver_t receiver) noexcept;
+
   agt_status_t receive_local_spsc(receiver_t receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept;
   agt_status_t receive_local_mpsc(receiver_t receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept;
   agt_status_t receive_local_spmc(receiver_t receiver,  agt_message_t& message, agt_timeout_t timeout) noexcept;

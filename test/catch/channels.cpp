@@ -219,7 +219,7 @@ TEST_CASE("Private channel can send and receive messages", "[channels]") {
   REQUIRE( status == AGT_ERROR_NO_MESSAGES );
 
 
-  status = agt_acquire_msg(sender, SrcMessageLength, &srcMsgBuffer, 0);
+  status = agt_acquire_msg(sender, SrcMessageLength, &srcMsgBuffer);
 
   REQUIRE( status == AGT_SUCCESS );
   REQUIRE( srcMsgBuffer != nullptr );
@@ -294,7 +294,7 @@ TEST_CASE("Private channel messages are FIFO ordered.", "[channels]") {
     }
 
     void* msg = nullptr;
-    status = agt_acquire_msg(sender, msgLength, &msg, 0);
+    status = agt_acquire_msg(sender, msgLength, &msg);
 
     REQUIRE( status == AGT_SUCCESS );
     REQUIRE( msg != nullptr );

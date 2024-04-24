@@ -70,9 +70,31 @@ namespace agt {
     agt_message_t*    tail;
     private_receiver* receiver; // If receiver dies, it sets this variable to null.
     agt_u32_t         maxSenders;
-    agt_u32_t         maxReceivers; // This is stored in the sender for data packing purposes. This way, both sender and receiver are exactly 32 bytes.
+    agt_u32_t         maxReceivers; // This is stored in the sender for data packing purposes.
+    unsafe_signal_task_queue waiters;
   };
 
+  struct spsc_channel_msg {
+    spsc_channel_msg* next;
+    size_t            size;
+  };
+
+
+  struct spsc_channel_waiter {
+    void              (* resume)(agt_ctx_t ctx, agt_ctxexec_t prevCtxExec, agt_utask_t task);
+    agt_ctxexec_t        ctxexec;
+    agt_utask_t          task;
+    spsc_channel_msg*    msg;
+  };
+
+  struct spsc_channel : rc_object {
+    agt_msg_pool_t     msgPool;
+    spsc_channel_msg*  head;
+    spsc_channel_msg** tail;
+    agt_ctx_t          senderCtx;
+    agt_ctx_t          receiverCtx;
+    uintptr_t          waiterQueue;
+  };
 
 
   // Have a local blocked_queue specialized for spsc use here (note that spsc does not necessarily mean that there can only be one waiter, as it's multiplexed by executor).
@@ -100,6 +122,7 @@ namespace agt {
     agt_message_t*  tail;
     agt_u32_t       senderCount;
     agt_bool_t      isAlive;
+    agt_ctx_t       ctx;
   };
 
   AGT_object(local_mpsc_sender) {
@@ -124,8 +147,8 @@ namespace agt {
 
 
   AGT_object(local_mpmc_queue, ref_counted) {
-    atomic_epoch_ptr<message>                   head;
-    atomic_epoch_ptr<atomic_epoch_ptr<message>> tail;
+    agt_message_t head;
+    agt_message_t* tail;
     agt_u32_t      senderCount;
     agt_u32_t      receiverCount;
     agt_msg_pool_t msgPool;

@@ -71,86 +71,6 @@ namespace agt {
       int       m_vid     = 0;
       agt_u32_t m_padding = 0;
     };
-
-    template <size_t N>
-    bool atomic_cas(tagged_storage<N>& self, tagged_storage<N>& compare, tagged_storage<N> newValue) noexcept {
-      if constexpr (N == 8) {
-        return atomic_try_replace_16bytes(&self, &compare, &newValue);
-      }
-      else {
-        return atomic_try_replace(reinterpret_cast<agt_u64_t&>(self),
-                                     reinterpret_cast<agt_u64_t&>(compare),
-                                     *reinterpret_cast<agt_u64_t*>(&newValue));
-      }
-    }
-    template <size_t N>
-    bool atomic_cas_weak(tagged_storage<N>& self, tagged_storage<N>& compare, tagged_storage<N> newValue) noexcept {
-      if constexpr (N == 8) {
-        return atomic_cas_16bytes(&self, &compare, &newValue);
-      }
-      else {
-        return atomic_cas(reinterpret_cast<agt_u64_t&>(self),
-                                         reinterpret_cast<agt_u64_t&>(compare),
-                                         *reinterpret_cast<agt_u64_t*>(&newValue));
-      }
-    }
-
-    template <size_t N>
-    [[nodiscard]] tagged_storage<N> atomic_load(const tagged_storage<N>& self) noexcept {
-      if constexpr (N == 8) {
-        tagged_storage<N> loaded{};
-        atomic_cas(const_cast<tagged_storage<N>&>(self), loaded, loaded);
-        return loaded;
-      }
-      else {
-        return std::bit_cast<tagged_storage<N>>(atomic_load(reinterpret_cast<const agt_u64_t&>(self)));
-      }
-
-    }
-    template <size_t N>
-    [[nodiscard]] tagged_storage<N> atomic_relaxed_load(const tagged_storage<N>& self) noexcept {
-      if constexpr (N == 8) {
-        return atomic_load(self);
-      }
-      else {
-        return std::bit_cast<tagged_storage<N>>(atomic_relaxed_load(reinterpret_cast<const agt_u64_t&>(self)));
-      }
-    }
-
-    template <size_t N>
-    [[nodiscard]] tagged_storage<N> atomic_exchange(tagged_storage<N>& self, tagged_storage<N> tagged) noexcept {
-      if constexpr (N == 8) {
-        tagged_storage<N> compareValue = atomic_relaxed_load(self);
-        while (!atomic_cas_weak(self, compareValue, tagged));
-        return compareValue;
-      }
-      else {
-        return std::bit_cast<tagged_storage<N>>(
-            atomic_exchange(reinterpret_cast<agt_u64_t&>(self),
-                           *reinterpret_cast<const agt_u64_t*>(&tagged)));
-      }
-    }
-
-
-    template <size_t N>
-    void atomic_store(tagged_storage<N>& self, tagged_storage<N> tagged) noexcept {
-      if constexpr (N == 8) {
-        tagged_storage<N> compareValue = atomic_relaxed_load(self);
-        while (!atomic_cas_weak(self, compareValue, tagged));
-      }
-      else {
-        atomic_store(reinterpret_cast<agt_u64_t&>(self), *reinterpret_cast<const agt_u64_t*>(&tagged));
-      }
-    }
-    template <size_t N>
-    void atomic_relaxed_store(tagged_storage<N>& self, tagged_storage<N> tagged) noexcept {
-      if constexpr (N == 8) {
-        atomic_store(self, tagged);
-      }
-      else {
-        atomic_relaxed_store(reinterpret_cast<agt_u64_t&>(self), *reinterpret_cast<const agt_u64_t*>(&tagged));
-      }
-    }
   }
 
   template <typename T, typename Tag = int>
@@ -236,7 +156,7 @@ namespace agt {
     storage_type m_storage = {};
   };
 
-  template <typename T, typename Tag>
+  /*template <typename T, typename Tag>
   class tagged_atomic {
     friend tagged_value<T, Tag>;
   public:
@@ -252,17 +172,17 @@ namespace agt {
     explicit tagged_atomic(tagged_type tagged) noexcept : m_storage(tagged) { }
 
     tagged_type load() const noexcept {
-      return tagged_type(impl::atomic_load(m_storage));
+      return tagged_type(atomic_load(m_storage));
     }
-    tagged_type relaxedLoad() const noexcept {
-      return tagged_type(impl::atomic_relaxed_load(m_storage));
+    tagged_type relaxed_load() const noexcept {
+      return tagged_type(atomic_relaxed_load(m_storage));
     }
 
     void        store(tagged_type tagged) noexcept {
-      impl::atomic_store(m_storage, tagged.m_storage);
+      atomic_store(m_storage, tagged.m_storage);
     }
     void        relaxedStore(tagged_type tagged) noexcept {
-      impl::atomic_relaxed_store(m_storage, tagged.m_storage);
+      atomic_relaxed_store(m_storage, tagged.m_storage);
     }
 
     tagged_type exchange(tagged_type newValue) noexcept {
@@ -278,34 +198,11 @@ namespace agt {
       return impl::atomic_cas_weak(m_storage, expectedOrCaptured.m_storage, newValue.m_storage);
     }
 
-
-    void        notifyOne() const noexcept {}
-    void        notifyAll() const noexcept {}
-
-    void        wait() const noexcept {}
-
-    void        tagNotifyOne() const noexcept {
-      atomicNotifyOne(const_cast<void*>(static_cast<const void*>(std::addressof(m_storage.m_vid))));
-    }
-    void        tagNotifyAll() const noexcept {
-      atomicNotifyAll(const_cast<void*>(static_cast<const void*>(std::addressof(m_storage.m_vid))));
-    }
-
-    void        tagWait(tag_type val = {}) const noexcept {
-
-    }
-    bool        tagWaitFor(tag_type val = {}) const noexcept {
-
-    }
-    bool        tagWaitUntil(tag_type val = {}) const noexcept {
-
-    }
-
   private:
     using storage_type = impl::tagged_storage<sizeof(T)>;
 
     storage_type m_storage;
-  };
+  };*/
 
 
   template <typename T, typename Tag>

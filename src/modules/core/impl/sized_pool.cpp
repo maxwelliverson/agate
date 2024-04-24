@@ -4,6 +4,8 @@
 
 #include "sized_pool.hpp"
 
+#include "core/ctx.hpp"
+
 
 void agt::impl::_push_new_solo_pool_chunk(agt_ctx_t ctx, sized_pool &pool, agt_flags32_t flags) noexcept {
   constexpr static size_t ChunkAlignment  = AGT_CACHE_LINE;
@@ -292,11 +294,18 @@ bool agt::impl::_resolve_all_deferred_ops(sized_pool &pool) noexcept {
 
 namespace {
   AGT_forceinline agt::impl::sized_pool& get_partner_pool(agt::impl::sized_pool& pool) noexcept {
-    return *reinterpret_cast<agt::impl::sized_pool*>(reinterpret_cast<char*>(&pool) + pool.pairedPoolOffset);
+    return (&pool)[pool.pairedPoolOffset];
+    // return *reinterpret_cast<agt::impl::sized_pool*>(reinterpret_cast<char*>(&pool) + pool.pairedPoolOffset);
   }
 
   AGT_forceinline size_t stack_size(agt::impl::sized_pool& pool) noexcept {
     return pool.stackHead - pool.stackBase;
+  }
+
+  inline void _release_paired_chunk(agt::impl::pool_chunk_t chunk) noexcept {
+    chunk->flags |= agt::impl::CHUNK_IS_DISCARDED_FLAGS;
+    if (_get_partner_chunk(chunk)->flags & agt::impl::CHUNK_IS_DISCARDED_FLAGS)
+      _release_chunk(chunk);
   }
 }
 
@@ -306,14 +315,10 @@ void impl::_pop_stack(sized_pool& pool) noexcept  {
 
   const ptrdiff_t stackCapacity = pool.stackTop - pool.stackBase;
 
-  if (pool.pairedPoolOffset == 0) {
+  if (pool.pairedPoolOffset == 0)
     _release_chunk(freedChunk);
-  }
-  else {
-    freedChunk->flags |= CHUNK_IS_DISCARDED_FLAGS;
-    if (_get_partner_chunk(freedChunk)->flags & CHUNK_IS_DISCARDED_FLAGS)
-      _release_chunk(freedChunk);
-  }
+  else
+    _release_paired_chunk(freedChunk);
 
   // Shrink the stack capacity by half if stack size is 1/4th of the current capacity.
   if (pool.stackHead - pool.stackBase == stackCapacity / 4) [[unlikely]]
@@ -331,7 +336,7 @@ impl::pool_chunk_t impl::_get_free_chunk_from_partner(sized_pool &pool) noexcept
       auto chunk = _get_partner_chunk(partnerChunk);
       if (chunk->flags & CHUNK_IS_DISCARDED_FLAGS) {
         AGT_assert( _chunk_is_empty(chunk) );
-        chunk->flags & ~CHUNK_IS_DISCARDED_FLAGS; // unset discarded flag
+        chunk->flags &= ~CHUNK_IS_DISCARDED_FLAGS; // unset discarded flag
         return chunk;
       }
     }
@@ -382,26 +387,11 @@ void    agt::impl::pool_free(object &obj, pool_chunk_t chunk) noexcept  {
 }
 
 void    agt::impl::destroy_pool(sized_pool& pool) noexcept {
-  bool shouldReleaseAllChunks = true;
 
-  if (pool.pairedPoolOffset != 0) {
-    auto& partnerPool = get_partner_pool(pool);
-    if (partnerPool.slotSize < pool.slotSize) {
-      // pool is the large pool, only release the chunks that the partner pool has already discarded.
-      shouldReleaseAllChunks = false;
-      for (auto pChunk = pool.stackHead; pool.stackBase < pChunk;) {
-        auto chunk = *--pChunk;
-        if (_get_partner_chunk(chunk)->flags & CHUNK_IS_DISCARDED_FLAGS)
-          _release_chunk(chunk);
-      }
-    }
-  }
+  auto releaseFn = pool.pairedPoolOffset == 0 ? &_release_chunk : &_release_paired_chunk;
 
-
-  if (shouldReleaseAllChunks) {
-    for (auto pChunk = pool.stackHead; pool.stackBase < pChunk;)
-      _release_chunk(*--pChunk);
-  }
+  for (auto pChunk = pool.stackHead; pool.stackBase < pChunk;)
+    releaseFn(*--pChunk);
 
   std::free(pool.stackBase);
 }

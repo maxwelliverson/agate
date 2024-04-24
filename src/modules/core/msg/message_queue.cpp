@@ -26,18 +26,6 @@
 
 
 
-
-
-
-
-message agt::try_receive(private_receiver* receiver) noexcept {
-  return nullptr;
-}
-message agt::try_receive(local_mpsc_receiver* receiver) noexcept {
-  return nullptr;
-}
-
-
 #if 0
 agt::basic_message* agt::dequeueLocalSPSC(message_queue_t queue, agt_timeout_t  timeout) noexcept {
   AGT_assert( AGT_queue_kind(queue) == local_spsc_queue_kind );

@@ -315,6 +315,11 @@ namespace agt {
   agt_u32_t atomic_relaxed_increment(agt_u32_t& value) noexcept;
   agt_u64_t atomic_relaxed_increment(agt_u64_t& value) noexcept;
 
+  template <std::signed_integral I>
+  inline static I atomic_relaxed_increment(I& value) noexcept {
+    return std::bit_cast<I>(atomic_relaxed_increment(*reinterpret_cast<std::make_unsigned_t<I>*>(&value)));
+  }
+
   agt_u8_t  atomic_decrement(agt_u8_t& value) noexcept;
   agt_u16_t atomic_decrement(agt_u16_t& value) noexcept;
   agt_u32_t atomic_decrement(agt_u32_t& value) noexcept;

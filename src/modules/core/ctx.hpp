@@ -141,7 +141,7 @@ namespace agt {
     ctx->uexecVPtr->suspend(ctx, ctx->ctxexec);
   }
 
-  inline static agt_status_t suspend_for(agt_ctx_t ctx, agt_timeout_t timeout) noexcept {
+  inline static bool         suspend_for(agt_ctx_t ctx, agt_timeout_t timeout) noexcept {
     return ctx->uexecVPtr->suspend_for(ctx, ctx->ctxexec, timeout);
   }
 }

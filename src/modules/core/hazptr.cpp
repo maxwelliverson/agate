@@ -500,7 +500,7 @@ void agt::drop_hazptr(agt_ctx_t ctx, agt_hazptr_t hazptr) noexcept {
 
   auto& cache = ctx->hazptrCache;
 
-  atomic_store(hazptr->ptr, nullptr);
+  reset_hazptr(hazptr);
 
   if (cache.count < std::size(cache.hazptrs)) [[likely]] {
     cache.hazptrs[cache.count++] = hazptr;

@@ -62,6 +62,8 @@ namespace agt {
   void         AGT_stdcall clear_async(agt_async_t async);
   void         AGT_stdcall destroy_async(agt_async_t async);
 
+  void AGT_stdcall         destroy_async_local(agt_async_t async) noexcept;
+
   agt_status_t AGT_stdcall async_get_status_private(agt_async_t async, agt_u64_t* pResult);
   agt_status_t AGT_stdcall async_get_status_shared(agt_async_t async, agt_u64_t* pResult);
   agt_status_t AGT_stdcall async_wait_native_unit_private(agt_async_t async, agt_u64_t* pResult, agt_timeout_t timeout);

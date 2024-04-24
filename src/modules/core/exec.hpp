@@ -60,8 +60,8 @@ namespace agt {
 
   struct executor_vtable {
     agt_status_t (* AGT_stdcall start)(agt_executor_t exec, bool startOnCurrentThread);
-    agt_status_t (* AGT_stdcall bindAgent)(agt_executor_t exec, agt_self_t agent);
-    agt_status_t (* AGT_stdcall unbindAgent)(agt_executor_t exec, agt_self_t agent);
+    agt_status_t (* AGT_stdcall bindAgent)(agt_executor_t exec, agt_agent_instance_t agent);
+    agt_status_t (* AGT_stdcall unbindAgent)(agt_executor_t exec, agt_agent_instance_t agent);
     agt_status_t (* AGT_stdcall acquireMessage)(agt_executor_t exec, const acquire_message_info& msgInfo, agt_message_t& msg);
     void         (* AGT_stdcall releaseMessage)(agt_executor_t exec, agt_message_t msg);
     agt_status_t (* AGT_stdcall commitMessage)(agt_executor_t exec, agt_message_t msg);
@@ -93,16 +93,6 @@ namespace agt {
   AGT_forceinline static agt_status_t acquire_basic_executor_msg() noexcept {}
 
   AGT_forceinline static agt_status_t acquire_signal_executor_msg() noexcept {}
-
-
-
-
-
-
-
-
-
-
 
 
   class executor {
@@ -270,9 +260,6 @@ namespace agt {
   agt_status_t create_local_busy_executor(agt_ctx_t ctx, executor& executor) noexcept;
 
   agt_status_t create_local_event_executor(agt_ctx_t ctx, const event_executor_create_info& createInfo, executor& exec) noexcept;
-
-
-  void destroy(local_event_executor* exec);
 }
 
 #endif //AGATE_CORE_EXEC_HPP

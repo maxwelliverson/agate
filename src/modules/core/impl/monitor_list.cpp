@@ -27,9 +27,9 @@ namespace {
   }
 
   // MAKE SURE the return value isn't copied.
-  inline agt::impl::spinlock_t& lock(agt::impl::monitor_list& list, uint64_t hash) noexcept {
+  inline agt::impl::spinlock_t& lock(agt_ctx_t ctx, agt::impl::monitor_list& list, uint64_t hash) noexcept {
     auto& lck = list.segmentLocks[hash & list.segmentMask];
-    lock(lck);
+    lock(ctx, lck);
     return lck;
   }
 
@@ -103,7 +103,7 @@ void agt::impl::init_monitor(agt_ctx_t ctx, monitor_waiter& waiter, size_t dataS
 
 void agt::impl::attach_monitor(agt_ctx_t ctx, monitor_list& list, const void* addr, monitor_waiter & exec) noexcept {
   const auto hash = hash_address(addr);
-  auto& seg = ::lock(list, hash);
+  auto& seg = ::lock(ctx, list, hash);
 
   const auto tableIndex = hash & list.tableMask;
   auto& tableEntry = list.table[tableIndex];
@@ -147,7 +147,7 @@ bool agt::impl::remove_monitor(agt_ctx_t ctx, monitor_waiter & exec) noexcept {
 
   auto& spinlock = *exec.address->segmentLock;
 
-  lock(spinlock);
+  lock(ctx, spinlock);
 
   // Check once more whether exec has already been unblocked.
   // Note that isEnqueued may only be set to false while the segment spinlock is held, so
@@ -219,7 +219,7 @@ namespace {
 
 void agt::impl::wake_one_on_monitored_address(agt_ctx_t ctx, monitor_list& list, const void* addr) noexcept {
   const auto hash = hash_address(addr);
-  auto& seg = ::lock(list, hash);
+  auto& seg = ::lock(ctx, list, hash);
 
   monitored_address* entryToBeReleased = nullptr;
 
@@ -243,7 +243,7 @@ void agt::impl::wake_one_on_monitored_address(agt_ctx_t ctx, monitor_list& list,
 
 void agt::impl::wake_all_on_monitored_address(agt_ctx_t ctx, monitor_list& list, const void* addr) noexcept {
   const auto hash = hash_address(addr);
-  auto& seg = ::lock(list, hash);
+  auto& seg = ::lock(ctx, list, hash);
 
   monitored_address* entryToBeReleased = nullptr;
 

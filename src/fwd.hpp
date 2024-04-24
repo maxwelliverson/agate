@@ -159,7 +159,6 @@ namespace agt {
   }
 
 
-  // If returns true, data should be dropped.
   using resolve_async_callback_t = agt_status_t(*)(void* obj, agt_u64_t* pResult, void* callbackData);
 
 

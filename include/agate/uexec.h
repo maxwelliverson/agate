@@ -50,7 +50,7 @@ typedef AGT_alignas(32) struct agt_uexec_vtable_t {
   // If the suspend times out, this should return AGT_TIMED_OUT, otherwise it should return AGT_SUCCESS.
   // Other values of agt_status_t may be returned, but (for now) the internal mechanisms of the library
   // will treat any other returned status values as a fatal error.
-  agt_status_t    (* suspend_for)(agt_ctx_t ctx, agt_ctxexec_t execCtxData, agt_timeout_t timeout);
+  agt_bool_t      (* suspend_for)(agt_ctx_t ctx, agt_ctxexec_t execCtxData, agt_timeout_t timeout);
 
   // Resumes the given task. prevCtxExec is the ctxexec that was passed to the prior call to suspend or
   // suspend_for, but should not be assumed to be the current ctxexec, as any thread may be responsible for

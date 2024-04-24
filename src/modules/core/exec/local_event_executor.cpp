@@ -9,10 +9,16 @@
 #include "agate/cast.hpp"
 #include "agate/vector.hpp"
 
+#include "core/time.hpp"
+
+
+#include "debug.hpp"
+
 #include <algorithm>
 
 
 enum self_state {
+  SELF_IS_IDLE, // This indicates that no agent is currently running, eg. during the executor event loop.
   SELF_IS_RUNNING,
   SELF_IS_BLOCKED,
   SELF_IS_TIMED_OUT,
@@ -37,6 +43,41 @@ AGT_object(local_event_eagent) {
 using deadline_queue     = agt::vector<local_event_self*, 0>;
 using deadline_queue_ref = agt::any_vector<local_event_self*>&;
 
+namespace {
+  struct ready_queue {
+    local_event_self*  head;
+    local_event_self** tail;
+  };
+
+  AGT_forceinline void init_ready_queue(ready_queue& list) noexcept {
+    list.head = nullptr;
+    list.tail = &list.head;
+    std::atomic_thread_fence(std::memory_order_release);
+  }
+
+
+  AGT_forceinline void push(ready_queue& queue, local_event_self* from, local_event_self* to) noexcept {
+    to->next = nullptr;
+    auto tail = atomic_exchange(queue.tail, &to->next);
+    atomic_store(*tail, from);
+  }
+
+  AGT_forceinline void push(ready_queue& queue, local_event_self* self) noexcept {
+    push(queue, self, self);
+  }
+
+  AGT_forceinline local_event_self* pop(ready_queue& queue) noexcept {
+    auto head = atomic_relaxed_load(queue.head);
+    if (!head)
+      return nullptr;
+    queue.head = atomic_relaxed_load(head->next);
+    atomic_try_replace(queue.tail, &head->next, &head);
+    return head;
+  }
+
+
+}
+
 
 AGT_object(local_event_executor, extends(agt_executor_st)) {
   local_event_self*          boundTask;
@@ -55,7 +96,7 @@ AGT_object(local_event_executor, extends(agt_executor_st)) {
   agt_fiber_t                mainFiber;          // Ideally, I want to phase out the notion of a "main" fiber in favor of there being a fiber context, that is exited when the fibers all exit, or when fctx_exit is called.
   agt_fiber_t                currentFiber;
   vector<agt_fiber_t, 0>     freeFibers;         // These are unbound, idle fibers. Maybe there should be a maximum number of idle fibers so as to keep excess memory use low?
-  flist<local_event_self>    readyAgents;        // This needs to be a *queue*, I think it only needs to be agt_fiber_t objects?
+  ready_queue                readyAgents;        // This needs to be a *queue*, I think it only needs to be agt_fiber_t objects?
   deadline_queue             timedBlockedAgents; // this should be a min heap, sorted by deadline
   // flist<local_event_eagent>  blockedAgents;      // this need only be a linked list. Does this even need to be here?
   agt_fiber_param_t          fiberExitResult;    // result of the fiber exiting...
@@ -83,14 +124,7 @@ namespace {
   inline constexpr fiber_action_t FiberActionFallthrough    = 5;
 
 
-local_event_self* get_ready_agent(local_event_executor* exec) noexcept {
-  // TODO: Implement some shit to check whether a blocked agent is ready
-  if (exec->readyAgents.empty())
-    return nullptr;
-  auto result = exec->readyAgents.front();
-  exec->readyAgents.pop_front();
-  return result;
-}
+
 
 agt_fiber_t get_free_fiber(local_event_executor* exec) noexcept {
   if (!exec->freeFibers.empty())
@@ -113,6 +147,7 @@ struct fiber_proc_state {
 
 
 
+/*
 
 void block_eagent(local_event_executor* exec, local_event_eagent* agent) noexcept {
 
@@ -145,6 +180,7 @@ void block_eagent(local_event_executor* exec, local_event_eagent* agent) noexcep
   agent->isBlocked = true;
   agent->timedOut = false;
 }
+*/
 
 
 // currentFiberIsBlocked should be true when messages are dispatched to from within a "block" loop
@@ -158,7 +194,7 @@ void execute_message(local_event_executor* exec, fiber_proc_state& state, agt_me
       state.shouldClose   = true;
       state.shouldCleanup = false;
     break;
-    case AGT_ECMD_AGENT_MESSAGE:
+    case AGT_ECMD_AGENT_MESSAGE: {
       if (blockedAgent != nullptr) {
         // If we can find some way to track whether or not an agent *may* block
         // If we can determine that an agent has no possibility of blocking, we don't have to switch fibers to execute.
@@ -169,20 +205,20 @@ void execute_message(local_event_executor* exec, fiber_proc_state& state, agt_me
       }
 
       auto receiveAgent = msg->agent;
-      ctx->task = receiveAgent;
-      ctx->currentMessage = (agt_message_t)agentMsg;
-      agentMsg->state = AGT_MSG_STATE_ACTIVE;
-      receiveAgent->proc((agt_self_t)receiveAgent,
-        receiveAgent->state,
-        reinterpret_cast<std::byte*>(agentMsg->buffer) + agentMsg->userDataOffset,
-        agentMsg->payloadSize);
-
-      if (agentMsg->state != AGT_MSG_STATE_PINNED) [[likely]] {
-        if (agentMsg->state != AGT_MSG_STATE_COMPLETE) [[likely]]
-          msg.complete<false>(ctx);
-        msg.release(ctx);
-      }
+      const auto task = exec->boundTask;
+      task->message = msg;
+      task->agent = msg->agent;
+      task->deadline = 0;
+      task->state = SELF_IS_RUNNING;
+      msg->state = AGT_MSG_STATE_ACTIVE;
+      receiveAgent->proc((agt_self_t) receiveAgent,
+                         receiveAgent->state,
+                         reinterpret_cast<std::byte *>(msg + 1) + msg->userDataOffset,
+                         msg->payloadSize);
+      task->state = SELF_IS_IDLE;
+      finalize_agent_message(ctx, msg, 0);
       break;
+    }
 
     default:
       abort();
@@ -331,10 +367,10 @@ inline void  deadline_queue_modify_entry(deadline_queue_ref queue, local_event_s
   const auto size = queue.size();
   AGT_assert( size > 0 );
 
-  if (size > 1) {
-    const auto oldDeadline = self->deadline;
-    self->deadline = deadline;
+  const auto oldDeadline = self->deadline;
+  self->deadline = deadline;
 
+  if (size > 1) {
     // if self->deadline is *NOT* zero, then it's still in the heap somewhere. This is *unlikely*, but possible.
     // It should be likely to be right near the start, so you shouldn't have to search through the whole array
     uint32_t pos = 0;
@@ -363,91 +399,44 @@ inline void  deadline_queue_modify_entry(deadline_queue_ref queue, local_event_s
 
 }
 
+inline void  push_to_timeout_queue(local_event_executor* exec, local_event_self* self, agt_timestamp_t deadline) noexcept {
+  auto& queue = exec->timedBlockedAgents;
 
-
-void         enqueue_timed_wait(local_event_executor* exec, local_event_self* self, agt_timestamp_t deadline) noexcept {
-  if (self->deadline != 0) {
-    // self's deadline always starts off as 0,
-    // we only set deadline when we enqueue self into the deadline_queue,
-    // and it is only set to 0 when it is dequeued.
-    // Therefore, if self's deadline field is set to a nonzero value,
-    // it is still enqueued. This is possible because when woken, to avoid
-    // having to synchronize access to the deadline_queue, the waker does *not*
-    // remove it from the deadline queue, and instead modifies self's state field,
-    // and adds it to the ready queue.
-    // In turn, when self is dequeued, it is essentially ignored if it had already been woken up.
-
-
-  }
-}
-
-
-void         dequeue_timed_waits(local_event_executor* exec, local_event_self* self, agt_timestamp_t deadline) noexcept {
-
-}
-
-
-
-inline void              deadline_queue_push(deadline_queue_ref queue, local_event_self* self, agt_timestamp_t deadline) noexcept {
-  self->deadline = deadline;
-  queue.push_back(self);
-  const auto size = queue.size();
-
-  if (1 < size) {
-    uint32_t nodeIndex = size - 1;
-    uint32_t parentIndex = (nodeIndex - 1) >> 1;
-    local_event_self* parent = queue[parentIndex];
-
-    while ( 0 < nodeIndex && parent->deadline < deadline ) {
-      queue[nodeIndex] = parent;
-      nodeIndex   = parentIndex;
-      parentIndex = (nodeIndex - 1) >> 1;
-      parent      = queue[parentIndex];
-    }
-
-    queue[nodeIndex] = self;
-  }
-}
-
-inline local_event_self* deadline_queue_try_pop(deadline_queue_ref queue, agt_timestamp_t deadline) noexcept {
-
-}
-
-inline void push_to_timeout_queue(local_event_executor* exec, local_event_self* self, agt_timestamp_t deadline) noexcept {
-  auto& blockedQueue = exec->timedBlockedAgents;
-
-  if (self->deadline == 0) {
-    blockedQueue.push_back(self);
-    const auto size = blockedQueue.size();
+  if (self->deadline == 0) [[likely]] {
+    self->deadline = deadline;
+    queue.push_back(self);
+    const auto size = queue.size();
 
     if (1 < size) {
       uint32_t nodeIndex = size - 1;
       uint32_t parentIndex = (nodeIndex - 1) >> 1;
-      local_event_self* parent = blockedQueue[parentIndex];
+      local_event_self* parent = queue[parentIndex];
 
       while ( 0 < nodeIndex && parent->deadline < deadline ) {
-        blockedQueue[nodeIndex] = parent;
+        queue[nodeIndex] = parent;
         nodeIndex   = parentIndex;
         parentIndex = (nodeIndex - 1) >> 1;
-        parent      = blockedQueue[parentIndex];
+        parent      = queue[parentIndex];
       }
 
-      blockedQueue[nodeIndex] = self;
+      queue[nodeIndex] = self;
     }
   }
-  else {
-
-
-
-  }
-
-
-
-
+  else
+    deadline_queue_modify_entry(queue, self, deadline);
 }
 
-inline bool try_pop_from_timeout_queue(local_event_executor* exec, agt_timestamp_t now) noexcept {
-
+inline local_event_self* try_pop_from_timeout_queue(local_event_executor* exec, agt_timestamp_t now) noexcept {
+  if (!exec->timedBlockedAgents.empty()) {
+    const auto front = exec->timedBlockedAgents.front();
+    if (front->deadline <= now) {
+      // Maybe set overshoot here??
+      front->deadline = 0;
+      deadline_queue_pop(exec->timedBlockedAgents);
+      return front;
+    }
+  }
+  return nullptr;
 }
 
 
@@ -458,34 +447,38 @@ bool time_out(self_state& state) noexcept {
   return atomic_try_replace(state, prev, SELF_IS_TIMED_OUT);
 }
 
-void make_timed_out_agents_ready(local_event_executor* exec) noexcept {
+AGT_noinline void make_timed_out_agents_ready(local_event_executor* exec) noexcept {
   if (!exec->timedBlockedAgents.empty()) {
-    const auto now = agt::now();
-    auto from = exec->timedBlockedAgents.front();
-    auto to = from;
-    auto pos = from;
-    uint32_t count = 0;
 
-    while (pos->deadline <= now) {
-      count += 1;
-      to = pos;
-      time_out(pos->state);
-      if (pos->next == nullptr)
-        break;
-      pos = pos->next;
+    const auto now = agt::now(exec->ctx);
+
+
+    local_event_self* head  = nullptr;
+    local_event_self* tail  = nullptr;
+
+    while (auto poppedEntry = try_pop_from_timeout_queue(exec, now)) {
+      if (!time_out(poppedEntry->state)) // these are to be queued by someone else!
+        continue;
+      if (tail == nullptr)
+        head = poppedEntry;
+      else
+        tail->next = poppedEntry;
+      tail = poppedEntry;
     }
 
     // This loop ensures that the range [from, to] consists of #count agents that have timed out.
 
-    if (count == 0)
-      return;
-
-    exec->timedBlockedAgents.pop_front(to, count);
-    exec->readyAgents.push_front(from, to, count);
+    if (head != nullptr)
+      push(exec->readyAgents, head, tail);
   }
 }
 
-
+local_event_self* get_ready_agent(local_event_executor* exec) noexcept {
+  if (auto readyAgent = pop(exec->readyAgents))
+    return readyAgent;
+  make_timed_out_agents_ready(exec);
+  return pop(exec->readyAgents);
+}
 
 
   void init_fibers(local_event_executor* exec) noexcept {
@@ -586,8 +579,6 @@ void make_timed_out_agents_ready(local_event_executor* exec) noexcept {
       }
 
       try_poll_message(exec, state); // may ignore return value?
-
-      make_timed_out_agents_ready(exec);
     } while(!state.shouldClose);
 
 
@@ -601,7 +592,8 @@ void make_timed_out_agents_ready(local_event_executor* exec) noexcept {
 
   void local_event_executor_proc(local_event_executor* exec) noexcept {
     auto ctx = exec->ctx;
-    ctx->executor = (agt_executor_t)exec;
+    ctx->uexec = nonnull_object_cast<agt_uexec_st>(exec);
+    // ctx->executor = (agt_executor_t)exec;
 
     agt_fctx_desc_t fctxDesc{
       .flags = 0,
@@ -633,234 +625,6 @@ void make_timed_out_agents_ready(local_event_executor* exec) noexcept {
 
 
 
-agt_status_t start(agt_executor_t exec_, bool startOnNewThread) noexcept {
-  const auto exec = static_cast<local_event_executor*>(exec_);
-  auto ctx = get_ctx();
-  if (!startOnNewThread) {
-    exec->ctx = ctx;
-    set_flags(exec->flags, executor_flags::hasStarted);
-    local_event_executor_proc(exec);
-  }
-  else {
-    // TODO: Generate description string, that'll use the executor's name unless it is anonymous.
-
-    agt_thread_desc_t threadDesc{
-      .flags = 0,
-      .stackSize = exec->fiberStackSize,
-      .priority = AGT_PRIORITY_NORMAL,
-      .description = {
-        .data = nullptr,
-        .length = 0,
-      },
-      .proc = [](agt_ctx_t ctx, void* userData) -> agt_u64_t {
-        const auto exec = static_cast<local_event_executor*>(userData);
-        exec->ctx = ctx; // bind the actual ctx now that it's started.
-        local_event_executor_proc(exec);
-        return exec->fiberExitResult;
-      },
-      .userData = exec
-    };
-
-    return AGT_ctx_api(new_thread, ctx)(ctx, nullptr, &threadDesc);
-  }
-
-  return AGT_SUCCESS;
-}
-
-agt_status_t bind_agent(agt_executor_t exec_, agent_self* agent) noexcept {
-  const auto exec = static_cast<local_event_executor*>(exec_);
-  assert( agent->executor == nullptr );
-  assert( exec->attachedAgents <= exec->maxAgentCount ); // attachedAgents should never be greater than maxAgentCount
-  if (exec->attachedAgents == exec->maxAgentCount)
-    return AGT_ERROR_AT_CAPACITY; // cannot attach another agent because the maximum number of agents has already been attached
-  auto [pos, isNew] = exec->agents.insert_as(agent);
-  assert( isNew );
-  ++exec->attachedAgents;
-  agent->executor = reinterpret_cast<agt_executor_t>(exec);
-  advance_agent_epoch(agent);
-  auto eagent = alloc<local_event_eagent>(exec->ctx);
-  eagent->setPos      = pos;
-  eagent->next        = nullptr;
-  eagent->self        = agent;
-  eagent->boundFiber  = nullptr;
-  eagent->isBlocked   = false;
-  eagent->isReady     = false;
-  eagent->deadline    = 0;
-  agent->execAgentTag = eagent;
-  return AGT_SUCCESS;
-}
-
-agt_status_t unbind_agent(agt_executor_t exec_, agent_self* agent) noexcept {
-  assert( exec_ != nullptr );
-  assert( agent != nullptr );
-  assert( agent->execAgentTag != nullptr );
-  auto exec = static_cast<local_event_executor*>(exec_);
-  auto eagent = static_cast<local_event_eagent*>(agent->execAgentTag);
-  assert( exec->agents.contains(agent) );
-  exec->agents.erase(eagent->setPos);
-  --exec->attachedAgents;
-  agent->executor = nullptr;
-  agent->execAgentTag = nullptr;
-  advance_agent_epoch(agent);
-  release(eagent);
-  return AGT_SUCCESS;
-}
-
-agt_status_t block(agt_executor_t exec_, agent_self* self, async_data_t asyncData, agt_timestamp_t deadline) noexcept {
-  const auto exec = static_cast<local_event_executor*>(exec_);
-  const auto ctx  = exec->ctx;
-  auto eagent = static_cast<local_event_eagent*>(self->execAgentTag);
-  const auto flags = eagent->fiberFlags;
-
-  struct data_t {
-    agent_self*         pSelf;
-    local_event_eagent* eagent;
-    agt::async*         pAsync;
-    agt_timestamp_t     deadline;
-  } data { self, eagent, &async, deadline };
-
-
-  const auto message = ctx->currentMessage;
-
-
-  auto [ sourceFiber, forkAction ] = AGT_ctx_api(fiber_fork, ctx)(
-    [](agt_fiber_t thisFiber, agt_fiber_param_t param, void* userData) -> agt_fiber_param_t {
-      const auto data = reinterpret_cast<const data_t*>(param);
-      const auto exec = static_cast<local_event_executor*>(userData);
-
-      const auto ctx  = exec->ctx;
-
-      auto& async = *data->pAsync;
-
-      fiber_proc_state state{};
-      state.receiveTimeout = exec->receiveTimeout;
-
-      auto eagent = data->eagent;
-
-      eagent->deadline   = data->deadline;
-      eagent->boundFiber = thisFiber;
-      eagent->isReady    = false;
-
-      do {
-        make_timed_out_agents_ready(exec);
-
-        if (auto readyAgent = get_ready_agent(exec)) {
-          if (readyAgent == eagent) { // This happens if the block's timeout has passed, in which case, return as though it timed out (cause it did lol)
-            return FiberActionResumeTimedOut;
-          }
-          block_eagent(exec, data->eagent);
-          continue_ready_agent(exec, readyAgent);
-        }
-
-        try_poll_message(exec, state, data->eagent);
-
-      } while (!async_is_complete(async));
-
-      return FiberActionFallthrough;
-
-    }, reinterpret_cast<agt_fiber_param_t>(&data), flags);
-
-
-  agt_status_t returnStatus = async.status;
-
-  switch (forkAction) {
-    case FiberActionResumeTimedOut:
-      returnStatus = AGT_TIMED_OUT;
-      [[fallthrough]];
-    case FiberActionResumeSuccess:
-      ctx->currentMessage = message;
-      ctx->boundAgent     = self;
-      eagent->isBlocked   = false;
-      eagent->boundFiber  = nullptr;
-      [[fallthrough]];
-    case FiberActionFallthrough:
-      break;
-    default:
-      std::unreachable();
-  }
-
-  return returnStatus;
-}
-
-
-void         yield(agt_executor_t exec_, agent_self* self) noexcept {
-  const auto exec = static_cast<local_event_executor*>(exec_);
-  const auto ctx = exec->ctx;
-  auto eagent = static_cast<local_event_eagent*>(self->execAgentTag);
-
-
-  make_timed_out_agents_ready(exec);
-
-  if (local_event_eagent* readyAgent = get_ready_agent(exec)) {
-    fiber_action_t action;
-    if (readyAgent->timedOut)
-      action = FiberActionResumeTimedOut;
-    else
-      action = FiberActionResumeSuccess;
-    exec->readyAgents.push_front(eagent);
-    eagent->boundFiber = agt::current_fiber();
-    const auto message = ctx->currentMessage; // Save current message, either on the stack, or in registers or smth. Full state will be restored, so it works either way :)
-    auto [ sourceFiber, switchParam ] = AGT_ctx_api(fiber_switch, ctx)(readyAgent->boundFiber, action, eagent->fiberFlags);
-    (void) sourceFiber;
-    (void) switchParam;
-    ctx->boundAgent = self;
-    ctx->currentMessage = message;
-  }
-  else {
-    if (auto msg = try_receive(&exec->receiver)) {
-      eagent->isReady = true;
-      struct data_t {
-        fiber_proc_state    state;
-        message             msg;
-        local_event_eagent* eagent;
-      } data{ { }, msg, eagent };
-
-      const auto message = ctx->currentMessage;
-
-      auto [forkSource, forkParam] = AGT_ctx_api(fiber_fork, ctx)([](agt_fiber_t thisFiber, agt_fiber_param_t param, void* userData) -> agt_fiber_param_t {
-
-        const auto exec = static_cast<local_event_executor*>(userData);
-        const auto data = reinterpret_cast<data_t*>(param);
-
-        data->eagent->boundFiber = thisFiber;
-
-        execute_message(exec, data->state, data->msg, data->eagent);
-        return FiberActionFallthrough;
-
-      }, reinterpret_cast<agt_fiber_param_t>(&data), eagent->fiberFlags);
-
-      if (forkParam == FiberActionResumeSuccess) {
-        // the fiber was actually jumped from in this case, and a little bit of state must be restored.
-        ctx->currentMessage = message;
-        ctx->boundAgent = self;
-
-      }
-
-      eagent->boundFiber = nullptr;
-    }
-  }
-}
-
-
-
-agt_status_t acquire_msg(agt_executor_t exec_, const acquire_message_info& msgInfo, message& msg) noexcept {
-  assert( exec_ != nullptr );
-  auto exec = static_cast<local_event_executor*>(exec_);
-  msg = acquire_message(exec->ctx, &exec->defaultPool, get_min_message_size(msgInfo));
-  return AGT_SUCCESS;
-}
-
-
-void         release_msg(basic_executor* exec, message msg) noexcept {
-
-}
-
-
-agt_status_t commit_msg(basic_executor* exec, message msg) noexcept {
-  return AGT_ERROR_NOT_YET_IMPLEMENTED;
-}
-
-
   /*inline constexpr alignas(64) executor_vtable local_event_executor_vtable {
     .start             = &start,
     .bindAgent         = &bind_agent,
@@ -878,7 +642,7 @@ inline bool try_block(self_state& state) noexcept {
   self_state cmpVal = SELF_IS_RUNNING;
   const auto result = atomic_try_replace(state, cmpVal, SELF_IS_BLOCKED);
   if (!result) {
-    AGT_invariant( cmpVal == SELF_IS_WOKEN_UP );
+    AGT_invariant( atomic_load(state) == SELF_IS_TIMED_OUT );
     atomic_relaxed_store(state, SELF_IS_RUNNING);
   }
   return result;
@@ -888,65 +652,57 @@ inline bool try_block(self_state& state) noexcept {
     agt_uexec_vtable_t   uexecVtable = {
         .yield       = [](agt_ctx_t ctx, agt_ctxexec_t ctxexec) -> agt_bool_t {
           const auto exec = unsafe_nonnull_object_cast<local_event_executor>(ctx->uexec);
-          auto eagent = static_cast<local_event_eagent*>(self->execAgentTag);
+          auto self = exec->boundTask;
+          (void)ctxexec;
 
+          if (auto readyAgent = get_ready_agent(exec)) {
 
-          make_timed_out_agents_ready(exec);
-
-          if (local_event_eagent* readyAgent = get_ready_agent(exec)) {
             fiber_action_t action;
-            if (readyAgent->timedOut)
+            if (readyAgent->state == SELF_IS_TIMED_OUT)
               action = FiberActionResumeTimedOut;
             else
               action = FiberActionResumeSuccess;
-            exec->readyAgents.push_front(eagent);
-            eagent->boundFiber = agt::current_fiber();
-            const auto message = ctx->currentMessage; // Save current message, either on the stack, or in registers or smth. Full state will be restored, so it works either way :)
-            auto [ sourceFiber, switchParam ] = AGT_ctx_api(fiber_switch, ctx)(readyAgent->boundFiber, action, eagent->fiberFlags);
+            self->boundFiber = exec->currentFiber;
+            push(exec->readyAgents, self);
+            auto [ sourceFiber, switchParam ] = AGT_ctx_api(fiber_switch, ctx)(readyAgent->boundFiber, action, self->fiberFlags);
             (void) sourceFiber;
             (void) switchParam;
-            ctx->boundAgent = self;
-            ctx->currentMessage = message;
+            exec->boundTask = self;
+            return AGT_TRUE;
           }
-          else {
-            if (auto msg = try_receive(&exec->receiver)) {
-              eagent->isReady = true;
-              struct data_t {
-                fiber_proc_state    state;
-                message             msg;
-                local_event_eagent* eagent;
-              } data{ { }, msg, eagent };
+          else if (auto msg = try_receive_local_mpsc(&exec->receiver)) {
+            struct data_t {
+              fiber_proc_state  state;
+              agt_message_t     msg;
+              local_event_self* self;
+            } data{ { }, msg, self };
 
-              const auto message = ctx->currentMessage;
+            auto [forkSource, forkParam] = AGT_ctx_api(fiber_fork, ctx)([](agt_fiber_t thisFiber, agt_fiber_param_t param, void* userData) -> agt_fiber_param_t {
 
-              auto [forkSource, forkParam] = AGT_ctx_api(fiber_fork, ctx)([](agt_fiber_t thisFiber, agt_fiber_param_t param, void* userData) -> agt_fiber_param_t {
+              const auto exec = static_cast<local_event_executor*>(userData);
+              const auto data = reinterpret_cast<data_t*>(param);
 
-                const auto exec = static_cast<local_event_executor*>(userData);
-                const auto data = reinterpret_cast<data_t*>(param);
+              data->self->boundFiber = thisFiber;
 
-                data->eagent->boundFiber = thisFiber;
+              execute_message(exec, data->state, data->msg, data->self);
+              return FiberActionFallthrough;
 
-                execute_message(exec, data->state, data->msg, data->eagent);
-                return FiberActionFallthrough;
+            }, reinterpret_cast<agt_fiber_param_t>(&data), self->fiberFlags);
 
-              }, reinterpret_cast<agt_fiber_param_t>(&data), eagent->fiberFlags);
-
-              if (forkParam == FiberActionResumeSuccess) {
-                // the fiber was actually jumped from in this case, and a little bit of state must be restored.
-                ctx->currentMessage = message;
-                ctx->boundAgent = self;
-
-              }
-
-              eagent->boundFiber = nullptr;
+            if (forkParam == FiberActionResumeSuccess) {
+              // the fiber was actually jumped from in this case, and a little bit of state must be restored.
+              exec->boundTask = self;
             }
-          }
-        },
 
+            return AGT_TRUE;
+          }
+
+          return AGT_FALSE;
+        },
         .suspend     = [](agt_ctx_t ctx, agt_ctxexec_t execCtxData){
           const auto ctxexec = static_cast<local_event_self**>(execCtxData);
-          const auto agent   = *ctxexec;
-          // const auto exec = member_to_struct_cast<&local_event_executor::boundTask>(ctxexec);
+          const auto self   = *ctxexec;
+          const auto exec = member_to_struct_cast<&local_event_executor::boundTask>(ctxexec);
 
           const auto flags = AGT_FIBER_SAVE_EXTENDED_STATE; // At some point, it might be worth trying to determine from the agent itself whether extended state *needs* to be saved?
 
@@ -976,22 +732,25 @@ inline bool try_block(self_state& state) noexcept {
                 // eagent->boundFiber = thisFiber;
                 // eagent->isReady    = false;
 
+                self_state agentState;
+
                 do {
                   make_timed_out_agents_ready(exec);
 
                   if (auto readyAgent = get_ready_agent(exec))
                     continue_ready_agent(exec, readyAgent);
 
-                  try_poll_message(exec, state, data->eagent);
+                  try_poll_message(exec, state, agent);
 
-                } while (!async_is_complete(async));
+                  agentState = atomic_relaxed_load(agent->state);
+
+                } while (agentState == SELF_IS_BLOCKED);
 
                 return FiberActionFallthrough;
 
-              }, reinterpret_cast<agt_fiber_param_t>(agent), flags);
-
-
-
+              }, reinterpret_cast<agt_fiber_param_t>(self), flags);
+          exec->boundTask = self;
+/*
           if (agent->deadline != 0) {
             auto pos = exec->timedBlockedAgents.front();
             if (!pos) [[likely]] {
@@ -1014,45 +773,186 @@ inline bool try_block(self_state& state) noexcept {
             exec->blockedAgents.push_back(agent);
           }
           agent->isBlocked = true;
-          agent->timedOut = false;
+          agent->timedOut = false;*/
         },
-        .suspend_for = [](agt_ctx_t ctx, agt_ctxexec_t execCtxData, agt_timeout_t timeout) -> agt_status_t {
+        .suspend_for = [](agt_ctx_t ctx, agt_ctxexec_t execCtxData, agt_timeout_t timeout) -> agt_bool_t {
           const auto ctxexec = static_cast<local_event_self**>(execCtxData);
-          const auto agent   = *ctxexec;
-          const auto exec = member_to_struct_cast<&local_event_executor::boundTask>(ctxexec);
+          const auto self   = *ctxexec;
 
-          if (agent->deadline != 0) {
-            auto pos = exec->timedBlockedAgents.front();
-            if (!pos) [[likely]] {
-              exec->timedBlockedAgents.push_back(agent);
-            }
-            else if (agent->deadline < pos->deadline) {
-              exec->timedBlockedAgents.push_front(agent);
-            }
-            else {
-              local_event_eagent* prev;
-              // walk down the list until we reach either the end of the list, or a blocked agent that has a later deadline. insert right before that point.
-              do {
-                prev = std::exchange(pos, pos->next);
-              } while(pos && pos->deadline < agent->deadline);
+          const auto flags = AGT_FIBER_SAVE_EXTENDED_STATE; // At some point, it might be worth trying to determine from the agent itself whether extended state *needs* to be saved?
 
-              exec->timedBlockedAgents.insert(prev, agent);
-            }
-          }
+          struct data_t {
+            local_event_executor* exec;
+            local_event_self*     self;
+            // agt::hwtime           deadline;
+            agt_timestamp_t       deadline;
+          } data{
+              nullptr,
+              self,
+              agt::now(ctx) + timeout
+              // add_duration(ctx, hwnow(), timeout)
+          };
 
 
-          if (readyAgent == agent) // This happens if the block's timeout has passed, in which case, return as though it timed out (cause it did lol)
-            return FiberActionResumeTimedOut;
+          auto [ sourceFiber, forkAction ] = AGT_ctx_api(fiber_fork, ctx)(
+              [](agt_fiber_t thisFiber, agt_fiber_param_t param, void* userData) -> agt_fiber_param_t {
+                const auto data = reinterpret_cast<data_t*>(param);
+                auto&& [
+                    exec,
+                    suspendedSelf,
+                    deadline
+                ] = *data;
 
+                exec = static_cast<local_event_executor*>(userData);
+
+                const auto ctx  = exec->ctx;
+
+                if (!try_block(suspendedSelf->state)) {
+                  // For now, resume immediately.
+                  // In the future, we may wish to treat this as a 'yield' of sorts,
+                  // where instead of resuming immediately, if there are any ready agents,
+                  // self is queued in the ready list and another ready task is run.
+                  return FiberActionResumeSuccess;
+                }
+
+                push_to_timeout_queue(exec, suspendedSelf, deadline);
+
+                fiber_proc_state state{};
+                state.receiveTimeout = exec->receiveTimeout;
+
+                suspendedSelf->boundFiber = thisFiber;
+
+                self_state agentState;
+
+                do {
+                  if (auto readyAgent = get_ready_agent(exec)) {
+                    if (readyAgent == suspendedSelf) {
+                      agentState = atomic_exchange(readyAgent->state, SELF_IS_RUNNING);
+                      break;
+                    }
+                    continue_ready_agent(exec, readyAgent);
+                  }
+
+
+                  try_poll_message(exec, state, suspendedSelf);
+
+                  agentState = atomic_relaxed_load(suspendedSelf->state);
+
+                } while (agentState == SELF_IS_BLOCKED);
+
+                if (agentState == SELF_IS_WOKEN_UP)
+                  return FiberActionResumeSuccess;
+                AGT_invariant( agentState == SELF_IS_TIMED_OUT );
+                return FiberActionResumeTimedOut;
+
+              }, reinterpret_cast<agt_fiber_param_t>(self), flags);
+
+          auto exec = data.exec;
+          exec->boundTask  = self;
+          self->boundFiber = nullptr;
+          // auto eagent = static_cast<local_event_eagent*>(self->agent->eagent);
+          if (forkAction == FiberActionResumeSuccess)
+            return AGT_TRUE;
+          AGT_invariant( forkAction == FiberActionResumeTimedOut );
+          return AGT_FALSE;
         },
         .resume      = [](agt_ctx_t ctx, agt_ctxexec_t prevCtxExec, agt_utask_t task){
           const auto ctxexec = static_cast<local_event_self**>(prevCtxExec);
           const auto agent   = static_cast<local_event_self*>(task);
           const auto exec = member_to_struct_cast<&local_event_executor::boundTask>(ctxexec);
+
+          if (atomic_try_replace(agent->state, SELF_IS_BLOCKED, SELF_IS_WOKEN_UP)) {
+
+          }
         }
     };
     agt::executor_vtable executorVtable = {
+        .start = [](agt_executor_t exec_, bool startOnNewThread) -> agt_status_t {
+          const auto exec = static_cast<local_event_executor*>(exec_);
+          auto ctx = get_ctx();
+          if (!startOnNewThread) {
+            exec->ctx = ctx;
+            set_flags(exec->flags, executor_flags::hasStarted);
+            local_event_executor_proc(exec);
+          }
+          else {
+            // TODO: Generate description string, that'll use the executor's name unless it is anonymous.
 
+            agt_thread_desc_t threadDesc{
+                .flags = 0,
+                .stackSize = exec->fiberStackSize,
+                .priority = AGT_PRIORITY_NORMAL,
+                .description = {
+                    .data = nullptr,
+                    .length = 0,
+                },
+                .proc = [](agt_ctx_t ctx, void* userData) -> agt_u64_t {
+                  const auto exec = static_cast<local_event_executor*>(userData);
+                  exec->ctx = ctx; // bind the actual ctx now that it's started.
+                  local_event_executor_proc(exec);
+                  return exec->fiberExitResult;
+                },
+                .userData = exec
+            };
+
+            return AGT_ctx_api(new_thread, ctx)(ctx, nullptr, &threadDesc);
+          }
+
+          return AGT_SUCCESS;
+        },
+        .bindAgent = [](agt_executor_t exec_, agt_agent_instance_t agent) -> agt_status_t {
+          const auto exec = static_cast<local_event_executor*>(exec_);
+          AGT_invariant( agent->executor == nullptr );
+          assert( exec->attachedAgents <= exec->maxAgentCount ); // attachedAgents should never be greater than maxAgentCount
+          if (exec->attachedAgents == exec->maxAgentCount)
+            return AGT_ERROR_AT_CAPACITY; // cannot attach another agent because the maximum number of agents has already been attached
+          auto [pos, isNew] = exec->agents.insert_as(agent);
+          AGT_invariant( isNew );
+          ++exec->attachedAgents;
+          agent->executor = reinterpret_cast<agt_executor_t>(exec);
+          // advance_agent_epoch(agent);
+          auto eagent = alloc<local_event_eagent>(exec->ctx);
+          eagent->setPos      = pos;
+          agent->eagent = eagent;
+          // eagent->next        = nullptr;
+          // eagent->self        = agent;
+          // eagent->boundFiber  = nullptr;
+          // eagent->isBlocked   = false;
+          // eagent->isReady     = false;
+          // eagent->deadline    = 0;
+          // agent->execAgentTag = eagent;
+          return AGT_SUCCESS;
+        },
+        .unbindAgent = [](agt_executor_t exec_, agt_agent_instance_t agent) -> agt_status_t {
+          AGT_invariant( exec_ != nullptr );
+          AGT_invariant( agent != nullptr );
+          AGT_invariant( agent->eagent != nullptr );
+          auto exec = static_cast<local_event_executor*>(exec_);
+          auto eagent = static_cast<local_event_eagent*>(agent->eagent);
+          AGT_invariant( exec->agents.contains(agent) );
+          exec->agents.erase(eagent->setPos);
+          --exec->attachedAgents;
+          agent->executor = nullptr;
+          agent->eagent = nullptr;
+          // advance_agent_epoch(agent);
+          release(eagent);
+          return AGT_SUCCESS;
+        },
+        .acquireMessage = [](agt_executor_t exec_, const acquire_message_info& msgInfo, agt_message_t& msg) -> agt_status_t {
+          AGT_invariant( exec_ != nullptr );
+          auto exec = static_cast<local_event_executor*>(exec_);
+          msg = acquire_message(exec->ctx, &exec->defaultPool, get_min_message_size(msgInfo));
+          msg->cmd = msgInfo.cmd;
+          msg->layout = msgInfo.layout;
+          msg->state = AGT_MSG_STATE_INITIAL;
+          return AGT_SUCCESS;
+        },
+        .releaseMessage = [](agt_executor_t exec, agt_message_t msg){
+          AGT_not_implemented();
+        },
+        .commitMessage = [](agt_executor_t exec, agt_message_t msg) -> agt_status_t {
+          AGT_return_not_implemented();
+        }
     };
   } local_event_uexec_vtable;
 }
@@ -1080,7 +980,8 @@ agt_status_t agt::create_local_event_executor(agt_ctx_t ctx, const event_executo
   }
 
   exec->flags = { };
-  exec->vptr  = &local_event_executor_vtable;
+  exec->vtable = &local_event_uexec_vtable.uexecVtable;
+  exec->vptr   = &local_event_uexec_vtable.executorVtable;
   exec->timeout = createInfo.timeout;
   // exec->linkedExecutors = {};
   exec->maxAgentCount = createInfo.maxAgentCount;
@@ -1097,6 +998,8 @@ agt_status_t agt::create_local_event_executor(agt_ctx_t ctx, const event_executo
   exec->currentFiber = nullptr;
 
   exec->fiberExitResult = 0;
+
+  init_ready_queue(exec->readyAgents);
 
 
   // local_mpsc_receiver        receiver;           // Primary receiver from which new messages are obtained.

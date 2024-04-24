@@ -20,7 +20,6 @@ namespace agt {
 
   void unbind_default_uexec(agt_ctx_t ctx) noexcept;
 
-
 }
 
 #endif//AGATE_INTERNAL_CORE_UEXEC_HPP

@@ -164,6 +164,8 @@ namespace agt {
     task_queue_vec,
     local_channel_async_info,
 
+    spsc_signal_waiter_vec,
+
     monitored_address,
 
     default_uexec_timeout_data,

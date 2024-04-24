@@ -133,7 +133,8 @@ namespace {
       lockValue = 0;
       if (agt::atomic_try_replace(cb->initializingLock, lockValue, 1))
         break;
-      agt::atomicWait(cb->initializingLock, lockValue);
+      // Use system futex capabilities here
+      // agt::atomicWait(cb->initializingLock, lockValue);
     } while (true);
 
     if (!cb->initialized) {
@@ -142,7 +143,7 @@ namespace {
     }
 
     agt::atomic_store(cb->initializingLock, 0);
-    agt::atomicNotifyOne(cb->initializingLock);
+    // agt::atomicNotifyOne(cb->initializingLock);
   }
 
   agt_status_t initSharedAllocationLookupTable(agt::shared_ctx* ctx) noexcept {

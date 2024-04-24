@@ -894,6 +894,7 @@ extern "C" AGT_export void agatelib_get_exports(agt::init::module_exports& modul
       AGT_add_public_export(wait, agt::async_wait_native_unit_private);
     else
       AGT_add_public_export(wait, agt::async_wait_foreign_unit_private);
+    AGT_add_public_export(destroy_async, agt::destroy_async_local);
   }
 
 

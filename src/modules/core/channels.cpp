@@ -178,9 +178,10 @@ namespace agt {
   }
 
 
-  agt_status_t AGT_stdcall send_msg_local(agt_sender_t sender, void* msgBuffer, size_t size, agt_async_t async) AGT_noexcept {
-    agt_ctx_t                ctx       = nullptr;
-    local_async_data*        asyncData = nullptr;
+  agt_status_t AGT_stdcall send_msg_local(agt_sender_t sender, void* msgBuffer, size_t size, agt_async_t async_) AGT_noexcept {
+    agt::async async;
+    agt::async* pAsync = nullptr;
+    bool shouldSynchronize = false;
 
     auto msg = get_message(msgBuffer);
     if (msg->extraData > size)
@@ -189,27 +190,51 @@ namespace agt {
     msg->extraData = static_cast<agt_u32_t>(size);
 
 
-    if (async != AGT_FORGET) {
-      if (async == AGT_SYNCHRONIZE) {
-        ctx = get_ctx();
-        asyncData = alloc_local_async_data(ctx, 1); // allocate new async data
+    if (async_ != AGT_FORGET) {
+      if (async_ == AGT_SYNCHRONIZE) {
+        async = {};
+        async.ctx = AGT_CURRENT_CTX;
+        async.structSize = AGT_ASYNC_STRUCT_SIZE;
+        shouldSynchronize = true;
+        pAsync = &async;
       }
       else {
-        asyncData = local_async_bind(*static_cast<agt::async*>(async), 1);
+        pAsync = static_cast<agt::async*>(async_);
       }
+
+      AGT_try_resolve_ctx(pAsync->ctx);
+
+
+
+      local_async_data* asyncData = local_async_bind(*pAsync, 1);
 
       msg->asyncData = to_handle(asyncData);
       msg->asyncKey  = get_local_async_key(asyncData);
+
+      pAsync->resolveCallback = [](void* obj, agt_u64_t* pResult, void* callbackData) -> agt_status_t {
+        (void)callbackData;
+
+        AGT_invariant( obj != nullptr );
+        auto& info = *static_cast<local_channel_async_info*>(obj);
+        if (atomic_load(info.complete) == AGT_TRUE) {
+          if (pResult)
+            *pResult = info.value;
+          return AGT_SUCCESS;
+        }
+
+        return AGT_NOT_READY;
+      };
+      pAsync->resolveCallbackData = nullptr;
     }
 
     auto status = agt::send(sender, reinterpret_cast<agt_message_t>(msg));
 
-    if (async == AGT_SYNCHRONIZE) {
-      AGT_invariant( ctx != nullptr );
-      AGT_invariant( asyncData != nullptr );
+    if (shouldSynchronize) {
+      AGT_invariant( pAsync != nullptr );
+      AGT_invariant( pAsync == &async );
       if (status == AGT_SUCCESS) [[likely]]
-        status = wait_for_local_async(ctx, nullptr, to_handle(asyncData), 0, resolve_channel_callback, nullptr);
-      drop_local_async_data(to_handle(asyncData), true);
+        status = local_async_wait(*pAsync, nullptr);
+      local_async_destroy(*pAsync);
     }
 
     return status;
@@ -232,21 +257,20 @@ namespace agt {
   void         AGT_stdcall retire_msg_local(agt_receiver_t receiver, void* msgBuffer, agt_u64_t response) AGT_noexcept {
     auto msg = get_message(msgBuffer);
 
-    if (async_data_is_attached(msg->asyncData)) {
-
-      if (auto obj = try_acquire_local_async(msg->asyncData, msg->asyncKey)) {
-        auto& data = *static_cast<local_channel_async_info*>(obj);
-        data.value = response;
-        atomic_store(data.complete, AGT_TRUE);
-        wake_local_async(msg->asyncData, &data.complete);
-        release_local_async(msg->asyncData, false);
-      }
-    }
-
     if (is_basic_receiver(receiver)) {
+      if (async_data_is_attached(msg->asyncData))
+        try_notify_local_async(msg->asyncData, msg->asyncKey, [=](local_async_data* data) -> bool{
+          auto& info = *reinterpret_cast<local_channel_async_info*>(&data->userData[0]);
+          info.value = response;
+          atomic_store(info.complete, AGT_TRUE);
+          wake_all_local_async(AGT_CURRENT_CTX, to_handle(data));
+          return false;
+        });
+
       release_msg(get_msg_pool(receiver), msg);
     }
     else {
+      AGT_assert( false );
       // TODO: Implement retire op for non-basic receivers (ring queues and broadcast queues, etc)
     }
   }

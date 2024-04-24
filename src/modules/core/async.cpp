@@ -308,7 +308,6 @@ namespace {
 
 namespace {
 
-
   void try_release_async_data(agt::async& async, agt_status_t status) noexcept {
     if (status != AGT_NOT_READY) {
       if (!(status == AGT_SUCCESS && test(async.flags, eAsyncRetainsDataOnSuccess))) {
@@ -331,6 +330,8 @@ agt::local_async_data* agt::alloc_local_async_data(agt_ctx_t ctx, agt_u32_t weak
   auto data = alloc<local_async_data>(ctx);
   _init(data->rc, weakRefs);
   data->scData = 0;
+  task_queue_init(data->blockedQueue);
+  std::memset(&data->userData[0], 0, sizeof data->userData);
   // data->callbackData = nullptr;
   // data->callback = callback;
   // data->callbackData = callbackData;
@@ -432,6 +433,12 @@ void agt::local_async_destroy(async& async) noexcept {
   if (test(async.flags, eAsyncMemoryIsOwned)) {
     release(&async);
   }
+}
+
+void AGT_stdcall  agt::destroy_async_local(agt_async_t async) noexcept {
+  if (!async)
+    return;
+  local_async_destroy(*static_cast<agt::async*>(async));
 }
 
 
@@ -724,6 +731,80 @@ void         AGT_stdcall agt::copy_async_private(const async* from, async* to) {
 void         AGT_stdcall agt::copy_async_shared(const async* from, async* to) {}
 
 
+agt_status_t agt::local_async_wait(async& async, agt_u64_t* pResult) noexcept {
+  const auto ctx = async.ctx;
+
+  if (!test(async.flags, eAsyncHasOwnershipOfData))
+    return AGT_ERROR_NOT_BOUND;
+  AGT_assert( async_data_is_attached(async.data) );
+  const auto data = unsafe_handle_cast<local_async_data>(async.data);
+
+  blocked_task blockedTask;
+
+  auto resolveFunc = async.resolveCallback;
+  auto resolveData = async.resolveCallbackData;
+
+  auto asyncUserData = get_local_async_user_data(data);
+
+  auto status = resolveFunc(asyncUserData, pResult, resolveData);
+
+  if (status == AGT_NOT_READY) {
+    blocked_task_init(ctx, blockedTask);
+    insert(ctx, data->blockedQueue, blockedTask);
+    status = resolveFunc(asyncUserData, pResult, resolveData);
+    if (status == AGT_NOT_READY) {
+      suspend(ctx);
+      status = resolveFunc(asyncUserData, pResult, resolveData);
+      AGT_assert( status != AGT_NOT_READY );
+    }
+    else
+      remove(data->blockedQueue, blockedTask);
+  }
+
+  try_release_async_data(async, status);
+
+  return status;
+}
+
+agt_status_t agt::local_async_wait_for(async& async, agt_u64_t* pResult, agt_timeout_t timeout) noexcept {
+  const auto ctx = async.ctx;
+
+  if (!test(async.flags, eAsyncHasOwnershipOfData))
+    return AGT_ERROR_NOT_BOUND;
+  AGT_assert( async_data_is_attached(async.data) );
+  const auto data = unsafe_handle_cast<local_async_data>(async.data);
+
+  blocked_task blockedTask;
+
+  auto resolveFunc = async.resolveCallback;
+  auto resolveData = async.resolveCallbackData;
+
+  auto asyncUserData = get_local_async_user_data(data);
+
+  auto status = resolveFunc(asyncUserData, pResult, resolveData);
+
+  if (status == AGT_NOT_READY) {
+    blocked_task_init(ctx, blockedTask);
+    insert(ctx, data->blockedQueue, blockedTask);
+    status = resolveFunc(asyncUserData, pResult, resolveData);
+    if (status == AGT_NOT_READY) {
+      if (suspend_for(ctx, timeout))
+        status = AGT_SUCCESS;
+      else if (remove(data->blockedQueue, blockedTask)) [[likely]]
+        status = AGT_TIMED_OUT;
+      else
+        status = resolveFunc(asyncUserData, pResult, resolveData);
+      AGT_assert( status != AGT_NOT_READY );
+    }
+    else
+      remove(data->blockedQueue, blockedTask);
+  }
+
+  if (status != AGT_TIMED_OUT)
+    try_release_async_data(async, status);
+
+  return status;
+}
 
 
 
@@ -751,24 +832,15 @@ namespace agt {
 
     const auto async = static_cast<agt::async*>(async_);
 
-    if (timeout == AGT_DO_NOT_WAIT)
-      return local_async_status(*async, pResult);
-
     if (!test(async->flags, eAsyncHasOwnershipOfData))
       return AGT_ERROR_NOT_BOUND;
 
-    const auto data = unsafe_handle_cast<local_async_data>(async->data);
-
-    agt_timestamp_t deadline;
-
-    if (timeout == AGT_WAIT)
-      deadline = 0;
+    if (timeout == AGT_DO_NOT_WAIT)
+      return local_async_status(*async, pResult);
+    else if (timeout == AGT_WAIT)
+      return local_async_wait(*async, pResult);
     else
-      deadline = now() + timeout;
-
-    agt_status_t status = wait_for_local_async(async->ctx, pResult, async->data, deadline, async->resolveCallback, async->resolveCallbackData);
-
-    return AGT_ERROR_NOT_YET_IMPLEMENTED;
+      return local_async_wait_for(*async, pResult, timeout);
   }
   agt_status_t AGT_stdcall async_wait_foreign_unit_private(agt_async_t async, agt_u64_t* pResult, agt_timeout_t timeout) {
     return AGT_ERROR_NOT_YET_IMPLEMENTED;

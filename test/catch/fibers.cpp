@@ -210,7 +210,8 @@ TEST_CASE("Fibers in the same fctx can be switched between", "[fibers]") {
     REQUIRE( secondFiber != nullptr );
     REQUIRE( firstFiber != secondFiber );
 
-    while (switchCount < totalSwitchCount) {
+    const auto finalSwitchCount = initialParam + totalSwitchCount;
+    while (switchCount < finalSwitchCount) {
       auto [ switchSource, nextSwitchCount ] = fiber_switch(secondFiber, switchCount);
 
       REQUIRE( this_fiber() == firstFiber );
@@ -227,6 +228,10 @@ TEST_CASE("Fibers in the same fctx can be switched between", "[fibers]") {
     return sum;
   });
 
+  // INFO("initialParam ------ " << initialParam);
+  // INFO("totalSwitchCount -- " << totalSwitchCount);
+  // INFO("result ------------ " << result);
+  // INFO("expectedSumResult - " << expectedSumResult << "\n");
   REQUIRE( result == expectedSumResult );
 
   agt_finalize(ctx);

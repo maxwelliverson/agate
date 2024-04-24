@@ -517,14 +517,10 @@ namespace {
 
     status = exec->vptr->commitMessage(exec, msg);
 
-    if (shouldSynchronize && status == AGT_SUCCESS) {
-
-      status = async_status(*async); // Try getting status before blocking, in case it is able to complete right away.
-
-      if (status == AGT_NOT_READY) [[likely]] {
-        status = block_executor(self->executor, self, *async, 0);
-        local_async_destroy(*async);
-      }
+    if ( shouldSynchronize ) {
+      if (status == AGT_SUCCESS)
+        status = local_async_wait(*async, nullptr);
+      local_async_destroy(*async);
     }
 
     return status;
@@ -589,6 +585,8 @@ namespace agt {
     msg->agent = recipient->instance;
     const auto exec = recipient->executor;
 
+    agt_status_t status;
+
     // If exec is unable to support externally sourced messages,
     if ( test(exec->flags, agt::eExecutorHasIntegratedMsgQueue) ) {
       acquire_message_info msgInfo{
@@ -598,10 +596,10 @@ namespace agt {
           .bufferSize = 0
       };
       agt_message_t indirectMsg;
-      auto status = acquire_executor_msg(exec, msgInfo, indirectMsg);
+      status = acquire_executor_msg(exec, msgInfo, indirectMsg);
 
       if (status != AGT_SUCCESS) {
-        self->errorCode = status;
+        raise(status, nullptr);
         return;
       }
 
@@ -612,7 +610,10 @@ namespace agt {
       msg = indirectMsg;
     }
 
-    self->errorCode = send_executor_msg(exec, msg);
+    status = send_executor_msg(exec, msg);
+
+    if (status != AGT_SUCCESS)
+      raise(status, nullptr);
   }
 
   void AGT_stdcall agent_return_local(agt_self_t self, agt_u64_t value) noexcept {

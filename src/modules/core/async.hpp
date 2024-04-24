@@ -353,27 +353,55 @@ namespace agt {
   }
 
 
+  // FUNCTION RETURNS TRUE IF ASYNC DATA IS STILL VALID
   template <typename Fn> requires std::is_invocable_r_v<bool, Fn, local_async_data*>
-  inline static void try_notify_local_async(agt_ctx_t ctx, async_data_t asyncData, async_key_t key, Fn&& func) noexcept {
+  inline static bool try_notify_local_async(async_data_t asyncData, async_key_t key, Fn&& func) noexcept {
+    bool discarded = true;
     if (auto data = try_acquire_local_async(asyncData, key)) {
-      std::invoke(func, );
+      bool shouldRetain = std::invoke_r<bool>(func, data);
+      discarded = release_local_async(data, shouldRetain);
     }
+    return !discarded;
+  }
+
+  template <typename Fn> requires std::is_invocable_r_v<bool, Fn, agt_ctx_t, local_async_data*>
+  inline static bool try_notify_local_async(agt_ctx_t ctx, async_data_t asyncData, async_key_t key, Fn&& func) noexcept {
+    bool discarded = true;
+    if (auto data = try_acquire_local_async(asyncData, key)) {
+      bool shouldRetain = std::invoke_r<bool>(func, ctx, data);
+      discarded = release_local_async(data, shouldRetain);
+    }
+    return !discarded;
   }
 
 
-  AGT_forceinline static void wake_all_local_async(async_data_t asyncData) noexcept {
+  AGT_forceinline static void wake_all_local_async(agt_ctx_t ctx, async_data_t asyncData) noexcept {
     const auto localData = unsafe_handle_cast<local_async_data>(asyncData);
-
-    blocked_queue_resolve(localData->blockedQueue, &localData->userData[0]);
+    AGT_resolve_ctx(ctx);
+    wake_all(ctx, localData->blockedQueue);
   }
 
-  AGT_forceinline static void wake_one_local_async(async_data_t asyncData) noexcept {
+  AGT_forceinline static void wake_one_local_async(agt_ctx_t ctx, async_data_t asyncData) noexcept {
     const auto localData = unsafe_handle_cast<local_async_data>(asyncData);
-
-    blocked_queue_resolve(localData->blockedQueue, &localData->userData[0]);
+    wake_one(ctx, localData->blockedQueue);
   }
 
+  AGT_forceinline static void wake_all_local_async(agt_ctx_t ctx, async_data_t asyncData, task_queue_predicate_t predicate) noexcept {
+    const auto localData = unsafe_handle_cast<local_async_data>(asyncData);
+    wake_all(ctx, localData->blockedQueue, predicate, &localData->userData[0]);
+  }
 
+  AGT_forceinline static void wake_one_local_async(agt_ctx_t ctx, async_data_t asyncData, task_queue_predicate_t predicate) noexcept {
+    const auto localData = unsafe_handle_cast<local_async_data>(asyncData);
+    wake_one(ctx, localData->blockedQueue, predicate, &localData->userData[0]);
+  }
+
+  agt_status_t local_async_wait(async& async, agt_u64_t* pResult) noexcept;
+
+  agt_status_t local_async_wait_for(async& async, agt_u64_t* pResult, agt_timeout_t timeout) noexcept;
+
+
+  /*
   AGT_forceinline static agt_status_t wait_for_local_async(agt_ctx_t ctx, agt_u64_t* pResult, async_data_t asyncData, agt_timestamp_t deadline, resolve_async_callback_t resolveCallback, void* callbackData) noexcept {
     return block_executor(ctx->executor, ctx->boundAgent, asyncData, deadline, pResult, resolveCallback, callbackData);
   }
@@ -386,7 +414,7 @@ namespace agt {
   AGT_forceinline static agt_status_t wait_for_local_async_until(const async& async, agt_u64_t* pResult, agt_timestamp_t deadline) noexcept {
     const auto ctx = async.ctx;
     return block_executor(ctx->executor, ctx->boundAgent, async.data, deadline, pResult, async.resolveCallback, async.resolveCallbackData);
-  }
+  }*/
 
   /*AGT_forceinline static agt_status_t wait_for_local_async(async& async, agt_u64_t* pResult, ) noexcept {
 
@@ -401,8 +429,10 @@ namespace agt {
 
   agt_status_t      local_async_status(async& async, agt_u64_t* pResult) noexcept;
 
+  void AGT_stdcall  destroy_async_local(agt_async_t async) noexcept;
 
-  void*        get_local_async_user_data(agt::local_async_data* data) noexcept {
+
+  AGT_forceinline void*        get_local_async_user_data(agt::local_async_data* data) noexcept {
     return &data->userData[0];
   }
 

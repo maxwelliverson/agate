@@ -7,6 +7,8 @@
 #include "message.hpp"
 #include "modules/core/instance.hpp"
 
+#include "debug.hpp"
+
 #include <bit>
 #include <new>
 
@@ -199,14 +201,65 @@ namespace {
   }
 }
 
+/// Will return null if pool is a fixed size pool, and the fixed size is less than the requested messageSize.
+agt_message_t agt::acquire_msg(agt_msg_pool_t pool, size_t messageSize) noexcept {
+  auto mem = ::malloc(messageSize);
+  std::memset(mem, 0, messageSize);
+  return static_cast<agt_message_t>(mem); // TODO: Implement message pools lmao
+  // AGT_not_implemented();
+}
+
+agt_status_t  agt::acquire_msg(agt_msg_pool_t pool, size_t msgSize, agt_message_t& msg) noexcept {
+  AGT_return_not_implemented();
+}
+
+/// Will return null if pool is not a fixed size pool
+agt_message_t agt::acquire_sized_msg(agt_msg_pool_t pool) noexcept {
+  AGT_not_implemented();
+}
+
+agt_status_t  agt::acquire_sized_msg(agt_msg_pool_t pool, agt_message_t& msg) noexcept {
+  AGT_return_not_implemented();
+}
+
+/// Will implode if message was not acquired from pool
+void          agt::release_msg(agt_msg_pool_t pool, agt_message_t message) noexcept {
+  ::free(message);
+  // AGT_not_implemented();
+}
+
+/// Decrements the reference count of pool, and if this was the last reference, destroys pool.
+void          agt::release_msg_pool(agt_msg_pool_t pool) noexcept {
+  AGT_not_implemented();
+}
+
 
 agt_status_t agt::createInstance(local_spmc_message_pool& poolRef,       agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept {
-  return AGT_ERROR_NOT_YET_IMPLEMENTED;
+  AGT_return_not_implemented();
 }
 
 agt_status_t agt::createInstance(private_sized_message_pool& poolRef,       agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept {
-  return AGT_ERROR_NOT_YET_IMPLEMENTED;
+  AGT_return_not_implemented();
 }
+
+
+agt_message_t agt::acquire_message(agt_ctx_t ctx, private_sized_message_pool* pool) noexcept {
+  AGT_not_implemented();
+}
+void          agt::release_message(agt_ctx_t ctx, private_sized_message_pool* pool, agt_message_t message) noexcept {
+  AGT_not_implemented();
+}
+void          agt::release_message_pool(agt_ctx_t ctx, private_sized_message_pool* pool) noexcept {
+  AGT_not_implemented();
+}
+
+agt_message_t agt::acquire_message(agt_ctx_t ctx, local_spmc_message_pool* pool, size_t size) noexcept {
+  AGT_not_implemented();
+}
+void          agt::release_message(agt_ctx_t ctx, local_spmc_message_pool* pool, size_t size, agt_message_t message) noexcept {
+  AGT_not_implemented();
+}
+
 
 /*
 agt_status_t agt::createInstance(private_sized_message_pool *&poolRef, agt_ctx_t ctx, size_t messageSize, size_t countPerBlock) noexcept {

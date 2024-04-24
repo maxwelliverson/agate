@@ -63,10 +63,10 @@ namespace {
   inline constexpr static agt_timeout_t MininumLongTimeout = 20000; // 20 ms
 
 
-  void yield_uexec(agt_ctx_t ctx, agt_ctxexec_t userCtxExec) noexcept {
+  agt_bool_t yield_uexec(agt_ctx_t ctx, agt_ctxexec_t userCtxExec) noexcept {
     (void)ctx;
     (void)userCtxExec;
-    SwitchToThread();
+    return SwitchToThread();
   }
 
   void suspend_uexec(agt_ctx_t ctx, agt_ctxexec_t userCtxExec) noexcept {
@@ -115,7 +115,7 @@ namespace {
 }
 }
 */
-  agt_status_t high_precision_suspend_for_uexec(agt_ctx_t ctx, agt_ctxexec_t userCtxExec, agt_timeout_t timeout) noexcept {
+  agt_bool_t high_precision_suspend_for_uexec(agt_ctx_t ctx, agt_ctxexec_t userCtxExec, agt_timeout_t timeout) noexcept {
     (void)ctx;
     const auto pTask = static_cast<agt_utask_t*>(userCtxExec);
     auto& task = *unsafe_nonnull_object_cast<default_uexec_task>(*pTask);

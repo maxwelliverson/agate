@@ -305,14 +305,14 @@ namespace agt {
   void* try_message_get_async_local(agt_message_t message) noexcept;
 
   // Should only be called if try_message_get_async_local was called and returned a nonnull value.
-  void  message_release_async_local(agt_message_t message, bool shouldWakeWaiters) noexcept;
+  void  message_release_async_local(agt_ctx_t ctx, agt_message_t message, bool shouldWakeWaiters) noexcept;
 
   // NOTE: This does NOT signal the async object, if bound.
   void free_message(agt_message_t message) noexcept;
 
-  void complete_agent_message(agt_message_t message, agt_status_t status, agt_u64_t value) noexcept;
+  void complete_agent_message(agt_ctx_t ctx, agt_message_t message, agt_status_t status, agt_u64_t value) noexcept;
 
-  void finalize_agent_message(agt_message_t message, agt_u64_t value) noexcept;
+  void finalize_agent_message(agt_ctx_t ctx, agt_message_t message, agt_u64_t value) noexcept;
 
   AGT_forceinline static void pin_message(agt_message_t message) noexcept {
     set_flags(message->flags, message_flags::isPinned);

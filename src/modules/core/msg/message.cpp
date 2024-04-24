@@ -34,10 +34,11 @@ void* agt::try_message_get_async_local(agt_message_t message) noexcept {
   return nullptr;
 }
 
-void  agt::message_release_async_local(agt_message_t message, bool shouldWakeWaiters) noexcept {
+void  agt::message_release_async_local(agt_ctx_t ctx, agt_message_t message, bool shouldWakeWaiters) noexcept {
   AGT_invariant( test(message->flags, message_flags::asyncIsBound) );
-  if (shouldWakeWaiters)
-    wake_local_async(message->asyncData);
+  if (shouldWakeWaiters) {
+    wake_all_local_async(ctx, message->asyncData);
+  }
   release_local_async(message->asyncData, false);
   reset(message->flags, message_flags::asyncIsBound);
 }
@@ -50,7 +51,7 @@ void  agt::free_message(agt_message_t message) noexcept {
 }
 
 
-void agt::complete_agent_message(agt_message_t message, agt_status_t status, agt_u64_t value) noexcept {
+void agt::complete_agent_message(agt_ctx_t ctx, agt_message_t message, agt_status_t status, agt_u64_t value) noexcept {
   AGT_invariant( message->layout == AGT_MSG_LAYOUT_AGENT_CMD );
   AGT_invariant( !test(message->flags, message_flags::isComplete) );
   // TODO: Implement indirect message stuff, but for now, just assert that it's direct.
@@ -60,20 +61,20 @@ void agt::complete_agent_message(agt_message_t message, agt_status_t status, agt
     agentData->responseValue = value;
     agentData->status = status;
     atomic_store(agentData->isComplete, AGT_TRUE);
-    message_release_async_local(message, true);
+    message_release_async_local(ctx, message, true);
   }
 
   set_flags(message->flags, message_flags::isComplete);
   reset(message->flags, message_flags::isPinned);
 }
 
-void agt::finalize_agent_message(agt_message_t message, agt_u64_t value) noexcept {
+void agt::finalize_agent_message(agt_ctx_t ctx, agt_message_t message, agt_u64_t value) noexcept {
 
   AGT_invariant( message->layout == AGT_MSG_LAYOUT_AGENT_CMD );
 
   if ( !test(message->flags, message_flags::isPinned)) [[likely]] {
     if ( !test(message->flags, message_flags::isComplete) )
-      complete_agent_message(message, AGT_SUCCESS, value);
+      complete_agent_message(ctx, message, AGT_SUCCESS, value);
     // TODO: free message here
     free_message(message);
   }

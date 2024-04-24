@@ -648,8 +648,8 @@ AGT_core_api agt_status_t AGT_stdcall agt_open_channel(agt_ctx_t ctx, agt_sender
   return g_lib._pfn_open_channel(ctx, pSender, pReceiver, pChannelDesc);
 }
 
-AGT_core_api agt_status_t AGT_stdcall agt_acquire_msg(agt_sender_t sender, size_t desiredMessageSize, void** ppMsgBuffer, agt_timeout_t timeout) AGT_noexcept {
-  return g_lib._pfn_acquire_msg(sender, desiredMessageSize, ppMsgBuffer, timeout);
+AGT_core_api agt_status_t AGT_stdcall agt_acquire_msg(agt_sender_t sender, size_t desiredMessageSize, void** ppMsgBuffer) AGT_noexcept {
+  return g_lib._pfn_acquire_msg(sender, desiredMessageSize, ppMsgBuffer);
 }
 
 AGT_core_api agt_status_t AGT_stdcall agt_send_msg(agt_sender_t sender, void* msgBuffer, size_t size, agt_async_t async) AGT_noexcept {

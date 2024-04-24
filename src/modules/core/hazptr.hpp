@@ -7,6 +7,7 @@
 
 #include "config.hpp"
 #include "impl/hazptr_def.hpp"
+#include "agate/cast.hpp"
 
 namespace agt {
 
@@ -35,14 +36,23 @@ namespace agt {
 
   void         drop_hazptrs(agt_ctx_t ctx, std::span<const agt_hazptr_t> hazptrs) noexcept;
 
+  AGT_forceinline static void set_hazptr(agt_hazptr_t hazptr, const void* ptr) noexcept {
+    atomic_store(hazptr->ptr, ptr);
+  }
+
+  AGT_forceinline static void reset_hazptr(agt_hazptr_t hazptr) noexcept {
+    set_hazptr(hazptr, nullptr);
+  }
+
   template <std::derived_from<hazard_obj> T>
   inline static bool try_protect(agt_hazptr_t hazptr, T*& value, T* const & hazard) noexcept {
     T* prev = value;
+    set_hazptr(hazptr, prev);
     atomic_store(hazptr->ptr, prev);
     std::atomic_thread_fence(std::memory_order_seq_cst);
     value = atomic_load(hazard);
     if (prev == value) [[unlikely]] {
-      atomic_store(hazptr->ptr, nullptr);
+      reset_hazptr(hazptr);
       return false;
     }
     return true;
@@ -55,9 +65,7 @@ namespace agt {
     return value;
   }
 
-  inline static void reset_hazptr(agt_hazptr_t hazptr) noexcept {
-    atomic_store(hazptr->ptr, nullptr);
-  }
+
 
 
   template <std::derived_from<hazard_obj> ObjectType>
@@ -68,6 +76,42 @@ namespace agt {
     obj->domainTag = 0;
     impl::do_retire_hazard(ctx, obj);
   }
+
+
+  // Used on the stack for automatic cleanup/reuse
+  class hazard_pointer {
+    agt_ctx_t ctx;
+    agt_hazptr_t hazptr = nullptr;
+  public:
+    explicit hazard_pointer(agt_ctx_t ctx) noexcept : ctx(ctx), hazptr(nullptr) {}
+
+    ~hazard_pointer() {
+      drop_hazptr(ctx, hazptr);
+    }
+
+    void init() noexcept {
+      if (!hazptr)
+        hazptr = make_hazptr(ctx);
+    }
+
+    void set(const void* ptr) noexcept {
+      set_hazptr(hazptr, ptr);
+    }
+
+    void reset() noexcept {
+      reset_hazptr(hazptr);
+    }
+
+    template <std::derived_from<hazard_obj> T>
+    bool try_protect(T*& value, T* const & hazard) noexcept {
+      return agt::try_protect(hazptr, value, hazard);
+    }
+
+    template <std::derived_from<hazard_obj> T>
+    T* protect(T* const & hazard) noexcept {
+      return agt::protect(hazptr, hazard);
+    }
+  };
 
 
   // This should only be used on the stack, eg. to accumulate entries for retiring while enumerating over a list

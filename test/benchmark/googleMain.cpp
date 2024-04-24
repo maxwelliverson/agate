@@ -8,6 +8,8 @@
 #include "agate/fiber.h"
 #include "agate/init.h"
 
+#include "agate/integer_division.hpp"
+
 
 #include <benchmark/benchmark.h>
 #include <chrono>
@@ -15,6 +17,7 @@
 #include <semaphore>
 #include <mutex>
 #include <condition_variable>
+#include <random>
 
 
 #define NOMINMAX
@@ -44,19 +47,101 @@ static void BM_nop_op(benchmark::State& state) {
 #define BENCHMARK_LOOP(state_) for (auto _ : *static_cast<benchmark::State*>(state_))
 
 
+namespace {
+  uint64_t get_tsc_hz() noexcept {
+    DWORD data;
+    DWORD dataSize = sizeof(DWORD);
+    if (RegGetValue(HKEY_LOCAL_MACHINE,
+                    "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
+                    "~MHz", RRF_RT_DWORD, nullptr, &data, &dataSize) == ERROR_SUCCESS) {
+      return static_cast<uint64_t>(data) * 1000000;
+    }
+    return 0;
+  }
+
+  AGT_forceinline uint64_t get_100ns_timestamp() noexcept {
+    LARGE_INTEGER lrgInt;
+    QueryPerformanceCounter(&lrgInt);
+    return lrgInt.QuadPart;
+  }
+
+  template <typename T>
+  [[msvc::noinline, clang::noinline]] void do_not_optimize(T&&) noexcept { }
+
+  std::pair<uint32_t, uint32_t> get_tsc_to_ns_ratio() noexcept {
+    if (auto tscHz = get_tsc_hz()) {
+      auto billion = 1000000000ull;
+      const auto gcd = agt::impl::calculate_gcd(tscHz, billion);
+      if (gcd != 1) {
+        tscHz /= gcd;
+        billion /= gcd;
+      }
+      if (tscHz > UINT_MAX) {
+        std::terminate(); // :(
+      }
+
+      return { static_cast<uint32_t>(billion), static_cast<uint32_t>(tscHz) };
+    }
+
+
+    constexpr static uint64_t EstimateTimeout_ms = 500;
+
+
+    const auto start100ns = get_100ns_timestamp();
+    const auto start      = __rdtsc();
+
+
+    const uint64_t   target100ns = start100ns + (EstimateTimeout_ms * 10000);
+
+
+    std::minstd_rand rng{};
+    uint64_t state = 0;
+    uint64_t curr100ns = get_100ns_timestamp();
+
+    while (curr100ns < target100ns) {
+      constexpr static auto BatchSize = 10000;
+      rng.discard(BatchSize);
+      state += rng();
+      curr100ns = get_100ns_timestamp();
+    }
+
+    do_not_optimize(state);
+
+    const auto end100ns = get_100ns_timestamp();
+    const auto end = __rdtsc();
+
+    return { static_cast<uint32_t>((end100ns - start100ns) * 100), static_cast<uint32_t>(end - start) };
+  }
+}
+
+
+const static agt::ratio_multiplier g_tscToNsRatio = []{
+  agt::ratio_multiplier ratio;
+  auto [num, den] = get_tsc_to_ns_ratio();
+  agt::precompile_ratio(ratio, num, den);
+  return ratio;
+}();
+
+
+
 __forceinline agt_fiber_param_t now() noexcept {
-  const auto time = std::chrono::high_resolution_clock::now();
-  return reinterpret_cast<const agt_fiber_param_t&>(time);
+  return __rdtsc();
+  // const auto time = std::chrono::high_resolution_clock::now();
+  // return reinterpret_cast<const agt_fiber_param_t&>(time);
 }
 
 void setManualTime(void* state_, agt_fiber_param_t start, agt_fiber_param_t end) noexcept {
-  const static long long PerfFrequency = []{
+  auto& state = *static_cast<benchmark::State*>(state_);
+  const auto count = end - start;
+  const auto nsCount = agt::multiply(count, g_tscToNsRatio);
+  state.SetIterationTime(static_cast<double>(nsCount) / 1000000000.0);
+  /*const static long long PerfFrequency = []{
     LARGE_INTEGER freq;
     QueryPerformanceFrequency(&freq);
     return freq.QuadPart;
   }();
-  auto& state = *static_cast<benchmark::State*>(state_);
-  const auto count = end - start;
+
+
 
   using std::chrono::duration, std::chrono::duration_cast;
 
@@ -67,7 +152,9 @@ void setManualTime(void* state_, agt_fiber_param_t start, agt_fiber_param_t end)
   }
   else {
     iterationDuration =
-  }
+  }*/
+
+
 
 
 

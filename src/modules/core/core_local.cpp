@@ -26,15 +26,15 @@ namespace agt {
   void AGT_stdcall close_local(agt_object_t obj_) noexcept {
     const auto obj = static_cast<agt::object*>(obj_);
     switch (obj->type) {
-      case object_type::agent_self: return agt::release(static_cast<agent_self*>(obj_));
+      // case object_type::agent_self: return agt::release(static_cast<agent_self*>(obj_));
 
-    	case object_type::local_agent: return agt::release(static_cast<local_agent*>(obj_));
-    	case object_type::proxy_agent: return agt::release(static_cast<proxy_agent*>(obj_));
+    	// case object_type::local_agent: return agt::release(static_cast<local_agent*>(obj_));
+    	// case object_type::proxy_agent: return agt::release(static_cast<proxy_agent*>(obj_));
     	// case object_type::shared_agent: return agt::release(static_cast<shared_agent*>(obj_));
-    	case object_type::imported_agent: return agt::release(static_cast<imported_agent*>(obj_));
+    	// case object_type::imported_agent: return agt::release(static_cast<imported_agent*>(obj_));
 
     	// case object_type::local_busy_executor: return agt::release(static_cast<local_busy_executor*>(obj_));
-    	case object_type::local_event_executor: return agt::release(static_cast<local_event_executor*>(obj_));
+    	// case object_type::local_event_executor: return agt::release(static_cast<local_event_executor*>(obj_));
     	// case object_type::local_user_executor: return agt::release(static_cast<local_user_executor*>(obj_));
     	// case object_type::local_parallel_executor: return agt::release(static_cast<local_parallel_executor*>(obj_));
     	// case object_type::local_proxy_executor: return agt::release(static_cast<local_proxy_executor*>(obj_));

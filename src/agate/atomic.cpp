@@ -349,14 +349,14 @@ inline void      agt::atomic_add(agt_u64_t& value, agt_u64_t newValue) noexcept 
 
 inline agt_u8_t  agt::atomic_exchange_sub(agt_u8_t& value, agt_u8_t newValue) noexcept {
 #if AGT_system_windows
-  return (agt_u8_t)_InterlockedExchangeAdd8((char*)&value, -(char)newValue);
+  return (agt_u8_t)_InterlockedExchangeAdd8((char*)&value, (char)-newValue);
 #else
   return __atomic_fetch_add(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
 }
 inline agt_u16_t agt::atomic_exchange_sub(agt_u16_t& value, agt_u16_t newValue) noexcept {
 #if AGT_system_windows
-  return (agt_u16_t)_InterlockedExchangeAdd16((agt_i16_t*)&value, -(agt_i16_t)newValue);
+  return (agt_u16_t)_InterlockedExchangeAdd16((agt_i16_t*)&value, (agt_i16_t)-newValue);
 #else
   return __atomic_fetch_add(&value, newValue, __ATOMIC_SEQ_CST);
 #endif
@@ -370,7 +370,8 @@ inline agt_u32_t agt::atomic_exchange_sub(agt_u32_t& value, agt_u32_t newValue) 
 }
 inline agt_u64_t agt::atomic_exchange_sub(agt_u64_t& value, agt_u64_t newValue) noexcept {
 #if AGT_system_windows
-  return _InterlockedExchangeSub64(reinterpret_cast<LONGLONG*>(&value), std::bit_cast<agt_i64_t>(newValue));
+  // return _InterlockedExchangeSub64(reinterpret_cast<LONGLONG*>(&value), std::bit_cast<agt_i64_t>(newValue));
+  return _InterlockedExchangeAdd64((agt_i64_t*)&value, (agt_i64_t)-newValue);
 
 #else
   return __atomic_fetch_add(&value, newValue, __ATOMIC_SEQ_CST);

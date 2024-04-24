@@ -26,7 +26,7 @@ namespace agt {
   }
 
   [[nodiscard]] AGT_forceinline agt_timestamp_t now(agt_ctx_t ctx) noexcept {
-    return now(ctx->instance);
+    return now(get_instance(ctx));
   }
 
 
@@ -36,7 +36,7 @@ namespace agt {
   }
 
   [[nodiscard]] AGT_forceinline hwtime         add_duration(agt_ctx_t ctx, hwtime time, agt_duration_t duration) noexcept {
-    return add_duration(ctx->instance, time, duration);
+    return add_duration(get_instance(ctx), time, duration);
   }
 
   [[nodiscard]] AGT_forceinline hwtime         minus_duration(agt_instance_t instance, hwtime time, agt_duration_t duration) noexcept {
@@ -44,7 +44,7 @@ namespace agt {
   }
 
   [[nodiscard]] AGT_forceinline hwtime         minus_duration(agt_ctx_t ctx, hwtime time, agt_duration_t duration) noexcept {
-    return minus_duration(ctx->instance, time, duration);
+    return minus_duration(get_instance(ctx), time, duration);
   }
 
 
@@ -54,7 +54,7 @@ namespace agt {
   }
 
   [[nodiscard]] AGT_forceinline agt_duration_t duration_between(agt_ctx_t ctx, hwtime start, hwtime end) noexcept {
-    return duration_between(ctx->instance, start, end);
+    return duration_between(get_instance(ctx), start, end);
   }
 }
 

@@ -8,65 +8,65 @@
 
 
 agt_status_t agt::send_local_spsc(sender_t sender, agt_message_t message) noexcept {
+  AGT_invariant( message != nullptr );
+
   auto s = static_cast<local_spsc_sender*>(sender);
   AGT_assert_is_a(s, local_spsc_sender);
   // AGT_assert( AGT_queue_kind(queue) == local_spsc_queue_kind );
 
-
   std::atomic_thread_fence(std::memory_order_acquire);
 
-  auto& msg = *reinterpret_cast<agt::message*>(&message);
+  message->next = nullptr;
 
-  msg.next() = nullptr;
+
 
   auto tail = s->tail;
-  s->tail = &msg.next();
+  s->tail = &message->next;
   std::atomic_thread_fence(std::memory_order_acq_rel);
-  atomic_store(tail->c_ref(), message);
+  atomic_store(*tail, message);
 
   return AGT_SUCCESS;
 }
+
+
+namespace {
+  AGT_noinline void close_mpsc_sender_and_receiver(local_mpsc_sender* s) noexcept {
+    s->receiver.reset();
+    release(s); // for now, simply close sender
+  }
+}
+
+
+
+
 agt_status_t agt::send_local_mpsc(sender_t sender,  agt_message_t message) noexcept {
   auto s = static_cast<local_mpsc_sender*>(sender);
   AGT_assert_is_a(s, local_mpsc_sender);
 
-  agt::message msg = message;
-  msg.next() = nullptr;
+  message->next = nullptr;
 
-  if (auto queue = s->receiver.actualize(s->receiverEpoch)) [[likely]] {
-    // While seemingly overly simplistic, this actually works fine.
-    // Doing the updates in this order ensures consistency, because the receiver never cares about the value of queue->tail.
-    auto tail = atomic_exchange(queue->tail, &msg.next());
-    atomic_store(tail->c_ref(), message);
-
-    return AGT_SUCCESS;
+  if (atomic_load(s->receiver->isAlive) == AGT_FALSE) [[unlikely]] {
+    close_mpsc_sender_and_receiver(s);
+    return AGT_ERROR_NO_RECEIVERS;
   }
 
-  // uh oh, no more receiver :(
+  auto tail = atomic_exchange(s->receiver->tail, &message->next);
+  atomic_store(*tail, message);
 
-  return AGT_ERROR_NO_RECEIVERS;
-
-  // message->next = nullptr;
-
-  // basic_message** expectedTail = &q->head;
-  // while (!atomic_try_replace(q->tail, expectedTail, &message->next));
-  // atomic_store(*expectedTail, message);
-
-
+  return AGT_SUCCESS;
 }
-agt_status_t agt::send_local_spmc(sender_t sender,  agt_message_t message) noexcept {
+agt_status_t agt::send_local_spmc(sender_t sender,  agt_message_t msg) noexcept {
   auto s = static_cast<local_spmc_sender*>(sender);
   AGT_assert_is_a(s, local_spmc_sender);
 
-  agt::message msg = message;
-  msg.next() = nullptr;
+  msg->next = nullptr;
 
   if (atomic_relaxed_load(s->receiverCount) == 0)
     return AGT_ERROR_NO_RECEIVERS;
 
   // This can probably be optimized
-  auto tail = atomic_exchange(s->tail, &msg.next());
-  atomic_store(tail->c_ref(), message);
+  auto tail = atomic_exchange(s->tail, &msg->next);
+  atomic_store(*tail, msg);
 
   return AGT_SUCCESS;
 }
@@ -87,19 +87,17 @@ agt_status_t agt::send_shared_mpmc(sender_t sender, agt_message_t message) noexc
 }
 
 
-agt_status_t agt::send_private_queue(sender_t sender, agt_message_t message) noexcept {
+agt_status_t agt::send_private_queue(sender_t sender, agt_message_t msg) noexcept {
   auto s = static_cast<agt::private_sender*>(sender);
   AGT_assert_is_a( s, private_sender );
 
   if (!s->receiver)
     return AGT_ERROR_NO_RECEIVERS;
 
-  agt::message msg = message;
-
-  msg.next() = nullptr;
+  msg->next = nullptr;
 
   *s->tail = msg;
-  s->tail = &msg.next();
+  s->tail = &msg->next;
 
   return AGT_SUCCESS;
 }

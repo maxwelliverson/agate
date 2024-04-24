@@ -179,12 +179,12 @@ namespace agt {
 
 
 
-  message acquire_message(agt_ctx_t ctx, private_sized_message_pool* pool) noexcept;
-  void    release_message(agt_ctx_t ctx, private_sized_message_pool* pool, message message) noexcept;
-  void    release_message_pool(agt_ctx_t ctx, private_sized_message_pool* pool) noexcept;
+  agt_message_t acquire_message(agt_ctx_t ctx, private_sized_message_pool* pool) noexcept;
+  void          release_message(agt_ctx_t ctx, private_sized_message_pool* pool, agt_message_t message) noexcept;
+  void          release_message_pool(agt_ctx_t ctx, private_sized_message_pool* pool) noexcept;
 
-  message acquire_message(agt_ctx_t ctx, local_spmc_message_pool* pool, size_t size) noexcept;
-  void    release_message(agt_ctx_t ctx, local_spmc_message_pool* pool, size_t size, message message) noexcept;
+  agt_message_t acquire_message(agt_ctx_t ctx, local_spmc_message_pool* pool, size_t size) noexcept;
+  void          release_message(agt_ctx_t ctx, local_spmc_message_pool* pool, size_t size, agt_message_t message) noexcept;
 
 
 }
