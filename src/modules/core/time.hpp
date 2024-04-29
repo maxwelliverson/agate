@@ -56,6 +56,15 @@ namespace agt {
   [[nodiscard]] AGT_forceinline agt_duration_t duration_between(agt_ctx_t ctx, hwtime start, hwtime end) noexcept {
     return duration_between(get_instance(ctx), start, end);
   }
+
+
+  [[nodiscard]] AGT_forceinline hwtime          hwdeadline(agt_instance_t instance, agt_timeout_t timeout) noexcept {
+    return add_duration(instance, hwnow(), timeout);
+  }
+
+  [[nodiscard]] AGT_forceinline hwtime          hwdeadline(agt_ctx_t ctx, agt_timeout_t timeout) noexcept {
+    return hwdeadline(get_instance(ctx), timeout);
+  }
 }
 
 #endif//AGATE_INTERNAL_CORE_TIME_HPP

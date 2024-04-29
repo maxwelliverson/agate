@@ -31,6 +31,7 @@ struct agt_instance_st {
   size_t                     attrCount;
   ratio_multiplier           clockToNsRatio;
   ratio_multiplier           nsToClockRatio;
+  agt_i64_t                  nsToSysTimeOffset;
   agt::impl::hazptr_manager  hazptrManager;
   agt_error_handler_t        errorHandler;
   void*                      errorHandlerUserData;

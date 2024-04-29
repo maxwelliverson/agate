@@ -10,7 +10,7 @@
 #include <bit>
 #include <limits>
 
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER)
 #include <immintrin.h>
 #endif
 
@@ -95,7 +95,7 @@ namespace agt {
     rat.offset       = d;
   }
 
-  AGT_forceinline static uint64_t multiply(uint64_t value, const ratio_multiplier& rat) noexcept {
+  AGT_forceinline static uint32_t multiply(uint32_t value, const ratio_multiplier& rat) noexcept {
     /*if (rat.flags & eRatioIsTrivial)
     return value * rat.mult;
   if (rat.flags & eRatioShouldAddOne)
@@ -104,6 +104,33 @@ namespace agt {
   _umul128(value, rat.mult, &hi);
   return hi >> rat.shift;*/
     return ((value * rat.mult) + rat.offset) >> rat.shift;
+  }
+
+  AGT_forceinline static uint64_t multiply(uint64_t value, const ratio_multiplier& rat) noexcept {
+    /*if (rat.flags & eRatioIsTrivial)
+    return value * rat.mult;
+  if (rat.flags & eRatioShouldAddOne)
+    ++value;
+  uint64_t hi;
+  _umul128(value, rat.mult, &hi);
+  return hi >> rat.shift;*/
+    // Unfortunately, we have to take a slightly longer approach with 64 bit integers, given that
+    // the multiplication very well might overflow. Alas.
+#if AGT_system_windows
+    agt_u64_t hi, lo = _umul128(value, rat.mult, &hi);
+    hi += _addcarry_u64(0, lo, rat.offset, &lo);
+    return __shiftright128(lo, hi, static_cast<agt_u8_t>(rat.shift));
+#elif AGT_compiler_gcc
+    unsigned __int128 tmp = value;
+    tmp *= rat.mult;
+    tmp += rat.offset;
+    tmp >>= rat.shift;
+    return static_cast<agt_u64_t>(tmp);
+#else
+#error ratio_multiplier has no implmentation for the current compiler/target
+#endif
+    // __shiftright128();
+    // return ((value * rat.mult) + rat.offset) >> rat.shift;
   }
 }
 

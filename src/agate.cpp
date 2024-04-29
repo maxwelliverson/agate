@@ -290,34 +290,54 @@ AGT_static_api agt_error_handler_t AGT_stdcall agt_set_error_handler(agt_instanc
 
 AGT_core_api agt_timestamp_t AGT_stdcall agt_now(agt_ctx_t ctx) AGT_noexcept {
   // This is implemented inline for efficiency, and because its implementation shouldn't change depending on configuration (or should it?)
-  LARGE_INTEGER lrgInt;
-  QueryPerformanceCounter(&lrgInt);
-  return lrgInt.QuadPart;
+  // LARGE_INTEGER lrgInt;
+  // QueryPerformanceCounter(&lrgInt);
+  // return lrgInt.QuadPart;
+  return static_cast<agt_timestamp_t>(agt::hwnow());
 }
 
 
 AGT_core_api void            AGT_stdcall agt_get_timespec(agt_ctx_t ctx, agt_timestamp_t timestamp, struct timespec* ts) AGT_noexcept {
+  const auto& clockToNsRatio = g_lib.instance->clockToNsRatio;
+
   if (!ts)
     return;
 
   FILETIME filetime;
-  LARGE_INTEGER qpc;
   GetSystemTimePreciseAsFileTime(&filetime);
-  QueryPerformanceCounter(&qpc);
-  LARGE_INTEGER systime;
-  systime.LowPart = filetime.dwLowDateTime;
-  systime.HighPart = filetime.dwHighDateTime;
-  // qpc.QuadPart /= 100;
+  const auto now = static_cast<agt_timestamp_t>(agt::hwnow());
+  const auto systime = (static_cast<agt_i64_t>(filetime.dwHighDateTime) << 32) | static_cast<agt_i64_t>(filetime.dwLowDateTime);
+
   auto signedTimestamp = static_cast<int64_t>(timestamp)/* / 100*/;
-  const auto offset = qpc.QuadPart - signedTimestamp;
+
+  const auto offset = agt::multiply(now - timestamp, clockToNsRatio);
+  const auto sysOffset = static_cast<agt_i64_t>(offset / 100);
+  const auto sysRemainder = offset % 100;
   // int64_t timestampOffset = systime.QuadPart - qpc.QuadPart;
   // int64_t result = signedTimestamp + timestampOffset;
-  const auto result = systime.QuadPart - offset;
+  const auto result = systime - sysOffset;
   int64_t seconds = result / 10000000LL;
   int64_t nsec = (result - (seconds * 10000000LL)) * 100;
+  if (nsec < sysRemainder) [[unlikely]] { // chances are next to none, but just in case!!!
+    nsec += 1000000000;
+    seconds -= 1;
+  }
+  nsec -= sysRemainder;
   seconds -= 11644473600LL; // difference in seconds between windows and unix epoch.... BLECH
   ts->tv_sec = seconds;
   ts->tv_nsec = static_cast<long>(nsec);
+}
+
+AGT_core_api agt_timestamp_t AGT_stdcall agt_add_duration(agt_ctx_t ctx, agt_timestamp_t timestamp, agt_duration_t duration) AGT_noexcept {
+  return timestamp + agt::multiply(duration, g_lib.instance->nsToClockRatio);
+}
+
+AGT_core_api agt_timestamp_t AGT_stdcall agt_subtract_duration(agt_ctx_t ctx, agt_timestamp_t timestamp, agt_duration_t duration) AGT_noexcept {
+  return timestamp - agt::multiply(duration, g_lib.instance->nsToClockRatio);
+}
+
+AGT_core_api agt_duration_t  AGT_stdcall agt_duration_between(agt_ctx_t ctx, agt_timestamp_t from, agt_timestamp_t until) AGT_noexcept {
+  return agt::multiply(until - from, g_lib.instance->clockToNsRatio);
 }
 
 

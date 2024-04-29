@@ -590,6 +590,7 @@ target_include_directories(gbenchmarks PRIVATE src)
 add_executable(scratch test/scratch.cpp)
 target_link_libraries(scratch PRIVATE agate)
 target_include_directories(scratch PRIVATE include )
+add_dependencies(scratch agate.core)
 
 
 

@@ -9,7 +9,7 @@
 
 #include "config.hpp"
 #include "agate/flags.hpp"
-#include "agate/time.hpp"
+#include "core/time.hpp"
 // #include "core/async.hpp"
 #include "core/ctx.hpp"
 
@@ -281,10 +281,6 @@ namespace agt {
     message->asyncData = asyncData;
     message->asyncKey  = key;
     message->flags    |= message_flags::asyncIsBound;
-  }
-
-  inline static void message_write_send_time(agt_message_t message) noexcept {
-    message->sendTime = now();
   }
 
 

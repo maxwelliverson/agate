@@ -662,6 +662,8 @@ typedef enum agt_status_t {
   AGT_ERROR_INTERNAL_OVERFLOW,            ///< Indicates an internal overflow error that was caught and corrected but that caused the requested operation to fail.
   AGT_ERROR_OBJECT_IS_BUSY,               ///< Indicates that the requested operation failed because the receiving object is doing something else at the moment.
 
+  AGT_ERROR_NO_OWNERSHIP,
+
   AGT_ERROR_ALREADY_COMPLETED,
 
   AGT_ERROR_UNKNOWN_ATTRIBUTE,
@@ -1025,6 +1027,12 @@ AGT_core_api agt_timestamp_t AGT_stdcall agt_now(agt_ctx_t ctx) AGT_noexcept;
  * To either interpret timestamps, or convert to a persistent value, clients should call agt_get_timespec.
  * */
 AGT_core_api void            AGT_stdcall agt_get_timespec(agt_ctx_t ctx, agt_timestamp_t timestamp, struct timespec* ts) AGT_noexcept;
+
+AGT_core_api agt_timestamp_t AGT_stdcall agt_add_duration(agt_ctx_t ctx, agt_timestamp_t timestamp, agt_duration_t duration) AGT_noexcept;
+
+AGT_core_api agt_timestamp_t AGT_stdcall agt_subtract_duration(agt_ctx_t ctx, agt_timestamp_t timestamp, agt_duration_t duration) AGT_noexcept;
+
+AGT_core_api agt_duration_t  AGT_stdcall agt_duration_between(agt_ctx_t ctx, agt_timestamp_t from, agt_timestamp_t until) AGT_noexcept;
 
 // TODO: Add a similar function for converting durations? Like agt_get_duration_timespec(ctx, fromTimestamp, toTimestamp, *ts)
 

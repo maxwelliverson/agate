@@ -509,7 +509,7 @@ namespace {
     msg->sender = sender;
     msg->agent  = recipient->instance;
 
-    msg->sendTime = now();
+    msg->sendTime = static_cast<agt_timestamp_t>(agt::hwnow());
 
     init_direct_message_async(msg, async);
 

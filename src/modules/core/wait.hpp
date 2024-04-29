@@ -7,7 +7,7 @@
 
 #include "config.hpp"
 #include "agate/atomic.hpp"
-#include "agate/time.hpp"
+#include "core/time.hpp"
 
 #include <concepts>
 #include <bit>
@@ -44,6 +44,8 @@ namespace agt {
   template <impl::atomic_capable T>
   inline static agt_status_t wait_on_local_for(agt_ctx_t ctx, const T& addr, std::type_identity_t<T> cmpValue, agt_timeout_t timeout, T* pOut = nullptr) noexcept {
 
+    const auto deadline = hwdeadline(ctx, timeout);
+
     if (timeout == AGT_WAIT) {
       auto value = wait_on_local(ctx, addr, cmpValue);
       if (pOut)
@@ -60,7 +62,6 @@ namespace agt {
         return AGT_NOT_READY;
 
       agt_timeout_t remainingTimeout = timeout;
-      const auto deadline = now() + timeout;
 
       do {
         status = impl::wait_on_local_address_nocheck(ctx, &addr, remainingTimeout, std::bit_cast<impl::atomic_type_t<T>>(cmpValue), sizeof(T));
@@ -69,10 +70,10 @@ namespace agt {
         value = atomic_relaxed_load(addr);
         if (value != cmpValue)
           break;
-        const auto currentTime = now();
+        const auto currentTime = hwnow();
         if (deadline <= currentTime)
           return AGT_TIMED_OUT;
-        remainingTimeout = deadline - currentTime;
+        remainingTimeout = duration_between(ctx, currentTime, deadline);
       } while(true);
     }
 
@@ -119,6 +120,8 @@ namespace agt {
   template <impl::atomic_capable T, std::predicate<T> Fn>
   inline static agt_status_t wait_on_local_for(agt_ctx_t ctx, const T& addr, agt_timeout_t timeout, Fn&& predicate, T* pOut = nullptr) noexcept {
 
+    const auto deadline = hwdeadline(ctx, timeout);
+
     if (timeout == AGT_WAIT) {
       auto value = wait_on_local(ctx, addr, std::forward<Fn>(predicate));
       if (pOut)
@@ -135,7 +138,6 @@ namespace agt {
         return AGT_NOT_READY;
 
       agt_timeout_t remainingTimeout = timeout;
-      const auto deadline = now() + timeout;
 
       do {
         status = impl::wait_on_local_address_nocheck(ctx, std::addressof(addr), remainingTimeout, [](agt_ctx_t ctx, const void* addr, void* userData) -> bool {
@@ -147,10 +149,10 @@ namespace agt {
         value = atomic_relaxed_load(addr);
         if (std::invoke(predicate, value))
           break;
-        const auto currentTime = now();
+        const auto currentTime = hwnow();
         if (deadline <= currentTime)
           return AGT_TIMED_OUT;
-        remainingTimeout = deadline - currentTime;
+        remainingTimeout = duration_between(ctx, currentTime, deadline);
       } while(true);
     }
 
@@ -163,6 +165,8 @@ namespace agt {
   // Overload if the predicate function needs access to the context.
   template <impl::atomic_capable T, std::predicate<agt_ctx_t, T> Fn>
   inline static agt_status_t wait_on_local_for(agt_ctx_t ctx, const T& addr, agt_timeout_t timeout, Fn&& predicate, T* pOut = nullptr) noexcept {
+
+    const auto deadline = hwdeadline(ctx, timeout);
 
     if (timeout == AGT_WAIT) {
       auto value = wait_on_local(ctx, addr, std::forward<Fn>(predicate));
@@ -180,7 +184,6 @@ namespace agt {
         return AGT_NOT_READY;
 
       agt_timeout_t remainingTimeout = timeout;
-      const auto deadline = now() + timeout;
 
       do {
         status = impl::wait_on_local_address_nocheck(ctx, std::addressof(addr), remainingTimeout, [](agt_ctx_t ctx, const void* addr, void* userData) -> bool {
@@ -192,10 +195,10 @@ namespace agt {
         value = atomic_relaxed_load(addr);
         if (std::invoke(predicate, ctx, value))
           break;
-        const auto currentTime = now();
+        const auto currentTime = hwnow();
         if (deadline <= currentTime)
           return AGT_TIMED_OUT;
-        remainingTimeout = deadline - currentTime;
+        remainingTimeout = duration_between(ctx, currentTime, deadline);
       } while(true);
     }
 

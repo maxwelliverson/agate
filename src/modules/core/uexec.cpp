@@ -5,7 +5,7 @@
 #include "uexec.hpp"
 
 #include "agate/cast.hpp"
-#include "agate/time.hpp"
+#include "core/time.hpp"
 
 
 #define NOMINMAX
@@ -149,10 +149,10 @@ namespace {
 
       uint32_t backoff = 0;
 
-      const auto deadline = agt::now() + (timeout * 10); // worry about this maybe?
+      const auto deadline = hwdeadline(ctx, timeout);
 
       while (task.state == UEXEC_STATE_WAITING) {
-        const auto currentTime = agt::get_stable_timestamp() + (timeout * 10);
+        const auto currentTime = hwnow();
         if (deadline <= currentTime) {
           task.state = UEXEC_STATE_TIMED_OUT;
           break;

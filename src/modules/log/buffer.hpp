@@ -7,7 +7,7 @@
 
 #include "config.hpp"
 
-#include "agate/time.hpp"
+#include "core/time.hpp"
 
 namespace agt {
 
