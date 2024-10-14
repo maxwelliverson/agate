@@ -25,12 +25,11 @@
 #include <agate/naming.h>
 #include <agate/network.h>
 #include <agate/pool.h>
+#include <agate/sched.h>
 #include <agate/shmem.h>
 #include <agate/signal.h>
-#include <agate/task.h>
 #include <agate/thread.h>
 #include <agate/timer.h>
-#include <agate/uexec.h>
 
 #if defined(_MSC_VER)
 #pragma warning(pop)

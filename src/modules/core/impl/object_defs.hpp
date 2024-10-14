@@ -22,7 +22,12 @@ namespace agt {
     shared_agent,
     imported_agent,
 
-    uexec,
+    sched_entity,
+    single_thread_sched,
+    multi_thread_sched,
+
+
+
     local_busy_executor,
     local_event_executor,
     local_user_executor,
@@ -180,6 +185,9 @@ namespace agt {
 
     executor_begin = local_busy_executor,
     executor_end   = shared_proxy_executor,
+
+    sched_instance_begin = single_thread_sched,
+    sched_instance_end   = multi_thread_sched,
 
     uexec_begin = uexec,
     uexec_end   = executor_end,

@@ -99,7 +99,7 @@ namespace agt {
 
   struct agent_instance;
 
-
+  struct sched_instance;
 
   struct private_channel_sender;
   struct private_channel_receiver;

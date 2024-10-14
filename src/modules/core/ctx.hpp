@@ -61,13 +61,10 @@ extern "C" {
 struct agt_ctx_st {
   agt_u32_t                      refCount;
   agt_flags32_t                  flags;
-  agt_uexec_t                    uexec;
-  const agt_uexec_vtable_t*      uexecVPtr;
-  agt_ctxexec_t                  ctxexec;
-  agt_utask_t                    task; // used by default uexec or by agent executors. Not used by user defined uexecs.
-  // agt_executor_t                 executor;
-  // agt_self_t                     boundAgent;
-  // agt_message_t                  currentMessage;
+  agt_sched_t                    sched;
+  const agt_sched_vtable_t*      schedVPtr;
+  void*                          schedUserData;
+  agt_task_t                     task;
   agt::fctx*                     fctx; // null if this thread isn't using fibers
   agt_instance_t                 instance;
   uintptr_t                      threadId;
@@ -129,19 +126,25 @@ namespace agt {
   }
 
 
-  inline static bool         yield(agt_ctx_t ctx) noexcept {
-    const auto yield = ctx->uexecVPtr->yield;
-    if (!yield)
-      return false;
-    return yield(ctx, ctx->ctxexec);
+  inline static bool yield(agt_ctx_t ctx) noexcept {
+    if (auto yield = ctx->schedVPtr->yield)
+      return yield(ctx, ctx->schedUserData);
+    return false;
   }
 
-  inline static void         suspend(agt_ctx_t ctx) noexcept {
-    ctx->uexecVPtr->suspend(ctx, ctx->ctxexec);
+  inline static void suspend(agt_ctx_t ctx, agt_bound_task_t boundTask) noexcept {
+    ctx->schedVPtr->suspend(ctx, boundTask, ctx->schedUserData);
   }
 
-  inline static bool         suspend_for(agt_ctx_t ctx, agt_timeout_t timeout) noexcept {
-    return ctx->uexecVPtr->suspend_for(ctx, ctx->ctxexec, timeout);
+  inline static bool suspend_until(agt_ctx_t ctx, agt_bound_task_t boundTask, agt_timestamp_t deadline) noexcept {
+    return ctx->schedVPtr->suspend_until(ctx, boundTask, deadline, ctx->schedUserData);
+  }
+
+  inline static bool precise_suspend_until(agt_ctx_t ctx, agt_bound_task_t boundTask, agt_timestamp_t deadline) noexcept {
+    auto suspendUntil = ctx->schedVPtr->precise_suspend_until;
+    if (!suspendUntil)
+      suspendUntil = ctx->schedVPtr->suspend_until;
+    return suspendUntil(ctx, boundTask, deadline, ctx->schedUserData);
   }
 }
 

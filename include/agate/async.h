@@ -13,6 +13,16 @@ AGT_begin_c_namespace
 #define AGT_ASYNC_SET_MAX_SIZE 31
 
 
+/**
+ * =================== [ Async ] ======================
+ *
+ * A generic handle that abstracts asynchronous operations.
+ *
+ *
+ *
+ *
+ * */
+
 // TIMEOUTS SHOULD ALL BE IN MICROSECONDS.
 
 
@@ -102,9 +112,12 @@ AGT_async_api void         AGT_stdcall agt_copy_async(agt_async_t from, agt_asyn
  * */
 AGT_async_api void         AGT_stdcall agt_move_async(agt_async_t from, agt_async_t to) AGT_noexcept;
 
+
 AGT_async_api void         AGT_stdcall agt_clear_async(agt_async_t async) AGT_noexcept;
 
+
 AGT_async_api void         AGT_stdcall agt_destroy_async(agt_async_t async) AGT_noexcept;
+
 
 /**
  * Optimized equivalent to
@@ -114,6 +127,7 @@ AGT_async_api void         AGT_stdcall agt_destroy_async(agt_async_t async) AGT_
  * */
 AGT_async_api agt_status_t AGT_stdcall agt_async_status(agt_async_t async, agt_u64_t* pResult) AGT_noexcept;
 // AGT_async_api agt_status_t AGT_stdcall agt_async_status_all(const agt_async_t* pAsyncs, agt_size_t asyncCount, agt_status_t* pStatuses, agt_u64_t* pResults) AGT_noexcept;
+
 
 AGT_async_api agt_status_t AGT_stdcall agt_wait(agt_async_t async, agt_u64_t* pResult, agt_timeout_t timeout) AGT_noexcept;
 

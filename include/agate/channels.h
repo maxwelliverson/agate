@@ -101,8 +101,10 @@ AGT_core_api agt_status_t AGT_stdcall agt_open_receivers(agt_ctx_t ctx, agt_send
  *
  * These two approaches have different pros and cons, largely dependent on the type of queue that sender is bound to.
  *
- * By and large, the former approach is more efficient, and allows for errors to be detected prior to
- * (potentially expensive) message buffer writing.
+ * By and large, the former approach is more efficient (especially for larger messages),
+ * and allows for errors to be detected prior to (potentially expensive) message writing.
+ * The main con is that it's more verbose, and the benefits afforded by the split calls
+ * are not necessary for most use cases. As such, the more direct alternative is provided.
  *
  * If a message is acquired with agt_acquire_msg successfully, the subsequent operation to agt_send_msg is guaranteed to
  * be successful; the return value does not need to be checked in this case.

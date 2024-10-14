@@ -118,7 +118,7 @@ namespace {
   }
 
 
-  inline constexpr static agt_timeout_t HighPrecisionTimerResolution = 500000; // 500 us
+  inline constexpr agt_timeout_t HighPrecisionTimerResolution = 500000; // 500 us
 
   std::mutex g_busyExecutorMutex;
 

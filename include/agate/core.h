@@ -613,6 +613,7 @@ typedef enum agt_status_t {
   AGT_DEFERRED  /** < An operation has been deferred, and code that requires the completion of the operation must wait on the async handle provided */,
   AGT_CANCELLED /** < An asynchronous operation has been cancelled. This will only be returned if an operation is cancelled before it is complete*/,
   AGT_TIMED_OUT /** < A wait operation exceeded the specified timeout duration */,
+  AGT_WOKEN_UP, /** < This call was responsible for waking up the task in question. */
   AGT_INCOMPLETE_MESSAGE,
   AGT_ERROR_UNKNOWN,
   AGT_ERROR_ALREADY_EXISTS,

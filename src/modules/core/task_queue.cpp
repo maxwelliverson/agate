@@ -91,13 +91,13 @@ namespace {
 
 
 
-
-void agt::blocked_task_init(agt_ctx_t ctx, blocked_task& task) noexcept {
+void agt::bound_task_init(agt_ctx_t ctx, agt_bound_task_st& boundTask) noexcept {
   AGT_invariant( ctx != nullptr );
-  task.next = nullptr;
-  task.execCtxData   = ctx->ctxexec;
-  task.task          = static_cast<agt_ctxexec_header_t*>(ctx->ctxexec)->activeTask;
-  task.pfnResumeTask = ctx->uexecVPtr->resume;
+  boundTask.next                   = nullptr;
+  boundTask.suspendedTask.lastCtx  = ctx;
+  boundTask.suspendedTask.task     = ctx->task;
+  boundTask.suspendedTask.userData = ctx->schedUserData;
+  boundTask.pfnResumeTask          = ctx->schedVPtr->resume;
 }
 
 
@@ -707,6 +707,15 @@ namespace {
   inline void wake(agt_ctx_t ctx, const signal_waiter* waiter) noexcept {
     waiter->resume(ctx, waiter->ctxexec, waiter->task);
   }
+}
+
+
+void agt::impl::queue_traits<spsc_signal_queue>::insert(agt_ctx_t ctx, agt_bound_task_t boundTask, void *queue) noexcept {
+
+}
+
+agt_bool_t agt::impl::queue_traits<spsc_signal_queue>::remove(agt_ctx_t ctx, agt_bound_task_t boundTask, void *queue) noexcept {
+
 }
 
 

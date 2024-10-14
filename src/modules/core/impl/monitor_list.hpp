@@ -28,7 +28,7 @@ namespace agt {
         eHasPredicateCallback = 0x1
     };
 
-    inline constexpr static monitor_flags eMonitoredAddressIsShared    = monitor_flags::eIsShared;
+    inline constexpr static monitor_flags        eMonitoredAddressIsShared          = monitor_flags::eIsShared;
     inline constexpr static monitor_waiter_flags eMonitorWaiterHasPredicateCallback = monitor_waiter_flags::eHasPredicateCallback;
 
 
@@ -87,10 +87,13 @@ namespace agt {
 
     void attach_monitor(agt_ctx_t ctx, monitor_list& list, const void* addr, monitor_waiter & exec) noexcept;
 
-    // This should only be called by the caller than originally blocked exec with attach_monitor.
+    // This should only be called by the caller that originally blocked exec with attach_monitor.
     // Intended to allow the caller to implement a timed out wait.
     // Returns true if *prior* to this call, exec was still blocked.
-    // This allows the caller to ensure any subsequent actions are taken if and only if this call was responsible for unblocking exec. (if false is returned, we still know that exec is unblocked, but that some other caller was responsible, and thus the required actions should already have been taken).
+    // This allows the caller to ensure any subsequent actions are taken if and only if this call
+    // was responsible for unblocking exec. (if false is returned, we still know that exec is unblocked,
+    // but that some other caller was responsible, and thus the required actions should already have
+    // been taken).
     /// @post exec is unblocked
     bool remove_monitor(agt_ctx_t ctx, monitor_waiter & exec) noexcept;
 

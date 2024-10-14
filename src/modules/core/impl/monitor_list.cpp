@@ -19,7 +19,7 @@ namespace {
   // The question is whether or not this gives an even-ish distribution modulo
   // the number of segments. I've done some very basic tests that show that this
   // *should* work (assuming most addresses monitored will be aligned to 8 or 16
-  // bytes), but it hasn't been tested with actual addresses produces in realistic
+  // bytes), but it hasn't been tested with actual addresses produced in realistic
   // usage scenarios.
   inline uint64_t hash_address(const void* addr) noexcept {
     // Assume there will be very little variation between addresses in the low 3-4 bits (due to alignment)
@@ -109,24 +109,28 @@ void agt::impl::attach_monitor(agt_ctx_t ctx, monitor_list& list, const void* ad
   auto& tableEntry = list.table[tableIndex];
   monitored_address* entry;
 
+  bool found_entry = false;
+
   for (entry = tableEntry; entry != nullptr; entry = entry->next) {
       assert( !test(entry->flags, eMonitoredAddressIsShared) && "Shared address monitoring is not yet implemented.");
-      if (entry->address == addr)
-        goto add_to_list;
+      if (entry->address == addr) {
+        found_entry = true;
+        break;
+      }
   }
 
-  entry = alloc<monitored_address>(ctx);
-  entry->next = tableEntry;
-  entry->prevNext = &tableEntry;
-  tableEntry = entry;
-  entry->address = addr;
-  entry->segmentLock = &seg;
-  entry->activeRefCount = 1;
-  task_queue_init(entry->waiterQueue);
+  if (!found_entry) {
+    entry = alloc<monitored_address>(ctx);
+    entry->next = tableEntry;
+    entry->prevNext = &tableEntry;
+    tableEntry = entry;
+    entry->address = addr;
+    entry->segmentLock = &seg;
+    entry->activeRefCount = 1;
+    task_queue_init(entry->waiterQueue);
 
-  std::atomic_signal_fence(std::memory_order_release);
-
-add_to_list:
+    std::atomic_signal_fence(std::memory_order_release);
+  }
 
   exec.address = entry;
   exec.isEnqueued = AGT_TRUE;

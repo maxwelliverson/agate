@@ -9,8 +9,9 @@
 
 #include "core/impl/spinlock.hpp"
 
-namespace agt {
 
+
+namespace agt {
 
   struct task_queue;
   struct locked_task_queue;
@@ -18,18 +19,32 @@ namespace agt {
 
   inline static bool yield(agt_ctx_t ctx) noexcept;
 
-  inline static void suspend(agt_ctx_t ctx) noexcept;
+  inline static void suspend(agt_ctx_t ctx, agt_bound_task_t boundTask) noexcept;
 
-  inline static bool suspend_for(agt_ctx_t ctx, agt_timeout_t timeout) noexcept;
+  inline static bool suspend_until(agt_ctx_t ctx, agt_bound_task_t boundTask, agt_timestamp_t deadline) noexcept;
+
+  inline static bool precise_suspend_until(agt_ctx_t ctx, agt_bound_task_t boundTask, agt_timestamp_t deadline) noexcept;
+}
+
+extern "C" {
+
+struct AGT_cache_aligned agt_bound_task_st {
+  agt_bound_task_t     next;
+  agt_suspended_task_t suspendedTask;
+  agt_bool_t        (* pfnResumeTask)(agt_ctx_t ctx, const agt_suspended_task_t* pSuspendedTask);
+  void              (* pfnQueueInsert)(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue);
+  agt_bool_t        (* pfnQueueRemove)(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue);
+  void*                queue;
+};
+
+}
 
 
 
-  struct blocked_task {
-    blocked_task*  next;
-    void        (* pfnResumeTask)(agt_ctx_t ctx, agt_ctxexec_t prevCtxExec, agt_utask_t task);
-    agt_ctxexec_t  execCtxData;
-    agt_utask_t    task;
-  };
+namespace agt {
+
+
+
 
 
 
@@ -54,6 +69,8 @@ namespace agt {
    *
    *  The following queue types are made available, and their semantics are
    *  described as such
+   *
+   *
    *
    * task_queue:
    *  - thread-safe
@@ -85,7 +102,7 @@ namespace agt {
 
   // If returns true, task has been unblocked
   // otherwise, task remains blocked.
-  using task_queue_predicate_t = bool(*)(agt_ctx_t ctx, blocked_task* task, void* userData);
+  using task_queue_predicate_t = bool(*)(agt_ctx_t ctx, agt_bound_task_t task, void* userData);
 
 
 
@@ -96,10 +113,10 @@ namespace agt {
   };
 
   struct AGT_alignas(16) task_queue {
-    agt_u16_t     activeRefCount; // needed to be able to
-    agt_u16_t     epoch;
-    agt_i32_t     size;
-    blocked_task* task;
+    agt_u16_t        activeRefCount; // needed to be able to
+    agt_u16_t        epoch;
+    agt_i32_t        size;
+    agt_bound_task_t task;
   };
 
   struct AGT_alignas(16) locked_task_queue : unsafe_task_queue { };
@@ -107,20 +124,20 @@ namespace agt {
   struct unsafe_signal_task_queue : unsafe_task_queue { };
 
   struct signal_task_queue {
-    agt_u32_t      index;
-    agt_i32_t      size;
-    blocked_task*  head;
-    blocked_task** tail;
+    agt_u32_t         index;
+    agt_i32_t         size;
+    agt_bound_task_t  head;
+    agt_bound_task_t* tail;
   };
 
   struct AGT_alignas(16) locked_signal_task_queue : unsafe_signal_task_queue { };
 
 
-  struct signal_waiter {
+  /*struct signal_waiter {
     void              (* resume)(agt_ctx_t ctx, agt_ctxexec_t prevCtxExec, agt_utask_t task);
     agt_ctxexec_t        ctxexec;
     agt_utask_t          task;
-  };
+  };*/
 
   struct spsc_signal_queue {
     uintptr_t value;
@@ -139,10 +156,57 @@ namespace agt {
 
 
   namespace impl {
-    void task_queue_insert(agt_ctx_t ctx, unsafe_task_queue& queue, blocked_task& task) noexcept;
+    void task_queue_insert(agt_ctx_t ctx, unsafe_task_queue& queue, agt_bound_task_st& task) noexcept;
 
-    bool task_queue_contains(const unsafe_task_queue& queue, const blocked_task& task) noexcept;
+    bool task_queue_contains(const unsafe_task_queue& queue, const agt_bound_task_st& task) noexcept;
+
+    template <typename Q>
+    struct queue_traits;
+
+    template <>
+    struct queue_traits<unsafe_task_queue> {
+      static void       insert(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
+      static agt_bool_t remove(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
+    };
+
+    template <>
+    struct queue_traits<task_queue> {
+      static void       insert(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
+      static agt_bool_t remove(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
+    };
+
+    template <>
+    struct queue_traits<locked_task_queue> {
+      static void       insert(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
+      static agt_bool_t remove(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
+    };
+
+    template <>
+    struct queue_traits<unsafe_signal_task_queue> {
+      static void       insert(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
+      static agt_bool_t remove(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
+    };
+
+    template <>
+    struct queue_traits<signal_task_queue> {
+      static void       insert(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
+      static agt_bool_t remove(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
+    };
+
+    template <>
+    struct queue_traits<locked_signal_task_queue> {
+      static void       insert(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
+      static agt_bool_t remove(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
+    };
+
+    template <>
+    struct queue_traits<spsc_signal_queue> {
+      static void       insert(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
+      static agt_bool_t remove(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
+    };
   }
+
+
 
 
   AGT_forceinline static void task_queue_init(unsafe_task_queue& queue) noexcept {
@@ -163,7 +227,71 @@ namespace agt {
     queue.value   = 0;
   }
 
-  void blocked_task_init(agt_ctx_t ctx, blocked_task& task) noexcept;
+  void bound_task_init(agt_ctx_t ctx, agt_bound_task_st& boundTask) noexcept;
+
+  template <typename Queue>
+  inline static void bound_task_init(agt_ctx_t ctx, agt_bound_task_st& boundTask, Queue& queue) noexcept {
+    bound_task_init(ctx, boundTask);
+    boundTask.pfnQueueInsert = &impl::queue_traits<Queue>::insert;
+    boundTask.pfnQueueRemove = &impl::queue_traits<Queue>::remove;
+    boundTask.queue          = &queue;
+  }
+
+  template <typename Queue>
+  inline static void wait(agt_ctx_t ctx, agt_bound_task_st& boundTask, Queue& queue) noexcept {
+    bound_task_init(ctx, boundTask, queue);
+    suspend(ctx, &boundTask);
+  }
+
+  template <typename Queue>
+  inline static void wait(agt_ctx_t ctx, Queue& queue) noexcept {
+    agt_bound_task_st task{};
+    wait(ctx, task, queue);
+  }
+
+  template <typename Queue>
+  inline static bool wait_until(agt_ctx_t ctx, agt_bound_task_st& boundTask, Queue& queue, agt_timestamp_t deadline) noexcept {
+    bound_task_init(ctx, boundTask, queue);
+    return suspend_until(ctx, &boundTask, deadline);
+  }
+
+  template <typename Queue>
+  inline static bool wait_until(agt_ctx_t ctx, Queue& queue, agt_timestamp_t deadline) noexcept {
+    agt_bound_task_st task{};
+    return wait_until(ctx, task, queue, deadline);
+  }
+
+  template <typename Queue>
+  inline static bool precise_wait_until(agt_ctx_t ctx, agt_bound_task_st& boundTask, Queue& queue, agt_timestamp_t deadline) noexcept {
+    bound_task_init(ctx, boundTask, queue);
+    return precise_suspend_until(ctx, &boundTask, deadline);
+  }
+
+  template <typename Queue>
+  inline static bool precise_wait_until(agt_ctx_t ctx, Queue& queue, agt_timestamp_t deadline) noexcept {
+    agt_bound_task_st task{};
+    return precise_wait_until(ctx, task, queue, deadline);
+  }
+
+
+
+
+
+  inline static bool wait(agt_ctx_t ctx, spsc_signal_queue& queue) noexcept {
+    auto queueSize = atomic_relaxed_load(queue.size);
+    while ( queueSize < 0 ) {
+      atomic_relaxed_increment(queue.size);
+      return true;
+    }
+
+    agt_bound_task_st task{};
+
+  }
+
+
+
+
+
 
 
 
@@ -173,6 +301,9 @@ namespace agt {
   }
 
   bool remove(unsafe_task_queue& queue, blocked_task& task) noexcept;
+
+
+
 
   void wake_one(agt_ctx_t ctx, unsafe_task_queue& queue) noexcept;
 
@@ -329,6 +460,9 @@ namespace agt {
   void signal(agt_ctx_t ctx, spsc_signal_queue& queue, int32_t n) noexcept;
 
   bool wait(agt_ctx_t ctx, spsc_signal_queue& queue, agt_timeout_t timeout) noexcept;
+
+
+
 
 
 }

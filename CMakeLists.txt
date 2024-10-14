@@ -353,6 +353,7 @@ add_agate_module(
                 msg/message_pool.cpp
                 msg/ring_queue.cpp
                 random.cpp
+                scheduler.cpp
                 segment.cpp
                 shared.cpp
                 # rcpool.cpp
@@ -612,17 +613,19 @@ target_sources(agate PUBLIC FILE_SET HEADERS BASE_DIRS include
         include/agate/async.h
         include/agate/channels.h
         include/agate/core.h
-        include/agate/uexec.h
+        include/agate/sched.h
         include/agate/executor.h
         include/agate/fiber.h
+        include/agate/futex.h
+        include/agate/hazptr.h
         include/agate/init.h
         include/agate/log.h
         include/agate/naming.h
         include/agate/network.h
         include/agate/pool.h
+        include/agate/sched.h
         include/agate/shmem.h
         include/agate/signal.h
-        include/agate/task.h
         include/agate/thread.h
         include/agate/timer.h
 )
