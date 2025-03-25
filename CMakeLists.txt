@@ -359,6 +359,7 @@ add_agate_module(
                 # rcpool.cpp
                 # rcmem.cpp
                 # rcweak.cpp
+                task.cpp
                 task_queue.cpp
                 uexec.cpp
                 wait.cpp

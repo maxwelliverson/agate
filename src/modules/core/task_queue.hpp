@@ -31,9 +31,7 @@ extern "C" {
 struct AGT_cache_aligned agt_bound_task_st {
   agt_bound_task_t     next;
   agt_suspended_task_t suspendedTask;
-  agt_bool_t        (* pfnResumeTask)(agt_ctx_t ctx, const agt_suspended_task_t* pSuspendedTask);
   void              (* pfnQueueInsert)(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue);
-  agt_bool_t        (* pfnQueueRemove)(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue);
   void*                queue;
 };
 
@@ -43,7 +41,14 @@ struct AGT_cache_aligned agt_bound_task_st {
 
 namespace agt {
 
+  struct task_waker;
 
+  struct task_queue_entry {
+    task_queue_entry* next;
+    agt_bool_t        enqueued;
+    agt_flags32_t     flags;
+    task_waker*       waker;
+  };
 
 
 
@@ -165,42 +170,63 @@ namespace agt {
 
     template <>
     struct queue_traits<unsafe_task_queue> {
+
+      inline constexpr static bool is_signal_queue = false;
+
       static void       insert(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
       static agt_bool_t remove(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
     };
 
     template <>
     struct queue_traits<task_queue> {
+
+      inline constexpr static bool is_signal_queue = false;
+
       static void       insert(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
       static agt_bool_t remove(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
     };
 
     template <>
     struct queue_traits<locked_task_queue> {
+
+      inline constexpr static bool is_signal_queue = false;
+
       static void       insert(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
       static agt_bool_t remove(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
     };
 
     template <>
     struct queue_traits<unsafe_signal_task_queue> {
+
+      inline constexpr static bool is_signal_queue = true;
+
       static void       insert(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
       static agt_bool_t remove(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
     };
 
     template <>
     struct queue_traits<signal_task_queue> {
+
+      inline constexpr static bool is_signal_queue = true;
+
       static void       insert(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
       static agt_bool_t remove(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
     };
 
     template <>
     struct queue_traits<locked_signal_task_queue> {
+
+      inline constexpr static bool is_signal_queue = true;
+
       static void       insert(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
       static agt_bool_t remove(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
     };
 
     template <>
     struct queue_traits<spsc_signal_queue> {
+
+      inline constexpr static bool is_signal_queue = true;
+
       static void       insert(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
       static agt_bool_t remove(agt_ctx_t ctx, agt_bound_task_t boundTask, void* queue) noexcept;
     };
@@ -272,24 +298,6 @@ namespace agt {
     agt_bound_task_st task{};
     return precise_wait_until(ctx, task, queue, deadline);
   }
-
-
-
-
-
-  inline static bool wait(agt_ctx_t ctx, spsc_signal_queue& queue) noexcept {
-    auto queueSize = atomic_relaxed_load(queue.size);
-    while ( queueSize < 0 ) {
-      atomic_relaxed_increment(queue.size);
-      return true;
-    }
-
-    agt_bound_task_st task{};
-
-  }
-
-
-
 
 
 
@@ -459,7 +467,11 @@ namespace agt {
 
   void signal(agt_ctx_t ctx, spsc_signal_queue& queue, int32_t n) noexcept;
 
-  bool wait(agt_ctx_t ctx, spsc_signal_queue& queue, agt_timeout_t timeout) noexcept;
+  void wait(agt_ctx_t ctx, spsc_signal_queue& queue) noexcept;
+
+  bool try_wait(agt_ctx_t ctx, spsc_signal_queue& queue) noexcept;
+
+  bool wait_until(agt_ctx_t ctx, spsc_signal_queue& queue, agt_timestamp_t deadline) noexcept;
 
 
 

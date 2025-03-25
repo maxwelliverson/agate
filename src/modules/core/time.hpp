@@ -65,6 +65,23 @@ namespace agt {
   [[nodiscard]] AGT_forceinline hwtime          hwdeadline(agt_ctx_t ctx, agt_timeout_t timeout) noexcept {
     return hwdeadline(get_instance(ctx), timeout);
   }
+
+
+  [[nodiscard]] AGT_forceinline hwtime          to_hwtime(agt_instance_t instance, agt_timestamp_t timestamp) noexcept {
+    return static_cast<hwtime>(multiply(timestamp, instance->nsToClockRatio));
+  }
+
+  [[nodiscard]] AGT_forceinline hwtime          to_hwtime(agt_ctx_t ctx, agt_timestamp_t timestamp) noexcept {
+    return to_hwtime(get_instance(ctx), timestamp);
+  }
+
+  [[nodiscard]] AGT_forceinline agt_timestamp_t to_timestamp(agt_instance_t instance, hwtime time) noexcept {
+    return multiply(std::to_underlying(time), instance->clockToNsRatio);
+  }
+
+  [[nodiscard]] AGT_forceinline agt_timestamp_t to_timestamp(agt_ctx_t ctx, hwtime time) noexcept {
+    return to_timestamp(get_instance(ctx), time);
+  }
 }
 
 #endif//AGATE_INTERNAL_CORE_TIME_HPP

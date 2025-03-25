@@ -61,9 +61,9 @@ extern "C" {
 struct agt_ctx_st {
   agt_u32_t                      refCount;
   agt_flags32_t                  flags;
-  agt_sched_t                    sched;
+  sched_instance*                sched;
   const agt_sched_vtable_t*      schedVPtr;
-  void*                          schedUserData;
+  void*                          schedUserData; // UserData if bound sched is a user scheduler; otherwise this is the executor.
   agt_task_t                     task;
   agt::fctx*                     fctx; // null if this thread isn't using fibers
   agt_instance_t                 instance;
@@ -72,6 +72,7 @@ struct agt_ctx_st {
   bool                           fibersAreLocked;
   agt_ctx_t*                     pLocalCtxAddress;
   const agt::export_table*       exports;
+  agt_ctx_t                      parentCtx;
   agt::reg_impl::registry_cache  registryCache;
   agt::alloc_impl::ctx_allocator allocator;
 };

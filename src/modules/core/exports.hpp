@@ -95,13 +95,13 @@ namespace agt {
   void         AGT_stdcall close_local(agt_object_t object) noexcept;
   void         AGT_stdcall close_shared(agt_object_t object) noexcept;
 
-
-  agt_status_t AGT_stdcall new_user_uexec(agt_ctx_t ctx, agt_uexec_t* pExec, const agt_uexec_desc_t* pExecDesc) noexcept;
-
-  void         AGT_stdcall destroy_user_uexec(agt_ctx_t ctx, agt_uexec_t exec) noexcept;
-
-  agt_status_t AGT_stdcall bind_uexec_to_ctx(agt_ctx_t ctx, agt_uexec_t exec, void* execCtxData) noexcept;
-
+  namespace api {
+    agt_status_t AGT_stdcall new_sched_local(agt_ctx_t ctx, agt_sched_t* pSched, const agt_sched_desc_t* pSchedDesc) noexcept;
+    void         AGT_stdcall close_sched_local(agt_ctx_t ctx, agt_sched_t sched) noexcept;
+    agt_status_t AGT_stdcall bind_sched_local(agt_ctx_t ctx, agt_sched_t sched) noexcept;
+    agt_bool_t   AGT_stdcall wake_task_local(agt_ctx_t ctx, agt_task_waker_t waker, agt_resume_reason_t reason) noexcept;
+    agt_bool_t   AGT_stdcall ctx_has_same_sched_local(agt_ctx_t ctx, agt_ctx_t otherCtx) noexcept;
+  }
 }
 
 #endif//AGATE_CORE_EXPORTS_HPP

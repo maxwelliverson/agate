@@ -51,6 +51,9 @@ namespace agt {
     shared_parallel_self,
     shared_proxy_self,
 
+    default_task,
+    user_task,
+
     local_busy_eagent,
     local_event_eagent,
     local_user_eagent,
@@ -179,6 +182,10 @@ namespace agt {
 
     default_uexec_task,
 
+    task_waker,
+    async_task_waker,
+
+
 
     agent_begin    = local_agent,
     agent_end      = imported_agent,
@@ -194,6 +201,9 @@ namespace agt {
 
     agent_self_begin = local_busy_self,
     agent_self_end   = shared_proxy_self,
+
+    task_begin     = default_task,
+    task_end       = shared_proxy_eagent,
 
     eagent_begin   = local_busy_eagent,
     eagent_end     = shared_proxy_eagent,
@@ -245,6 +255,9 @@ namespace agt {
 
     sized_pool_begin = ctx_sized_pool,
     sized_pool_end   = user_sized_pool,
+
+    task_waker_begin = task_waker,
+    task_waker_end   = async_task_waker,
   };
 
   struct object {

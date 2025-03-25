@@ -22,7 +22,7 @@
 
 
 
-AGT_abstract_api_object(agt_executor_st, executor, extends(agt_uexec_st)) {
+AGT_abstract_api_object(agt_executor_st, executor) {
   executor_flags      flags;
   executor_vptr_t     vptr;
   agt_timeout_t       timeout;
@@ -113,7 +113,7 @@ namespace agt {
     }
 
     [[nodiscard]] bool is_bound_to(agt_ctx_t ctx) const noexcept {
-      return exec == ctx->uexec;
+      return static_cast<void*>(exec) == ctx->schedUserData;
     }
 
     [[nodiscard]] bool may_execute_direct(agt_ctx_t currentCtx = get_ctx()) const noexcept {

@@ -8,13 +8,13 @@
 #include "config.hpp"
 #include "atomic.hpp"
 
+#include <type_traits>
+
 namespace agt {
 
-  template <typename To, typename From>
-  struct horizontal_casting /*{
-      inline static bool      isa(const From& from) noexcept;
-      inline static const To* cast(const From* from) noexcept;
-    }*/;
+
+
+#define AGT_enable_casting(from_, to_) template <> struct ::agt::cast_impl::horizontal_castable<to_, from_> : std::true_type { }
 
   template <typename To, typename From>
   struct handle_casting /*{
@@ -23,13 +23,9 @@ namespace agt {
   }*/;
 
   namespace cast_impl {
+
     template <typename To, typename From>
-    concept horizontal_castable_from =
-        requires(const From& ref, const From* ptr){
-          sizeof(horizontal_casting<To, From>);
-          { horizontal_casting<To, From>::isa(ref) } -> std::convertible_to<bool>;
-          { horizontal_casting<To, From>::cast(ptr) } -> std::same_as<const To*>;
-        };
+    struct horizontal_castable : std::false_type { };
 
     template <typename To, typename From>
     struct error_incompatible_types {
@@ -60,6 +56,13 @@ namespace agt {
                       };
 
     template <typename To, typename From>
+    concept horizontal_castable_from =
+        horizontal_castable<To, From>::value &&
+        std::derived_from<From, object> &&
+        std::derived_from<To, object> &&
+        (has_object_type_id<To> || has_object_type_range<To>);
+
+    template <typename To, typename From>
     concept static_castable_from =
         requires(const From* from) {
           static_cast<const To*>(from);
@@ -79,7 +82,7 @@ namespace agt {
     template <typename To, typename From>
     AGT_forceinline static const To* do_object_cast(const From* from) noexcept {
       if constexpr (horizontal_castable_from<To, From>)
-        return horizontal_casting<To, From>::cast(from);
+        return reinterpret_cast<const To*>(reinterpret_cast<uintptr_t>(from));
       else if constexpr (static_castable_from<To, From>)
         return static_cast<const To*>(from);
       else
@@ -95,7 +98,7 @@ namespace agt {
 
     if constexpr (std::derived_from<Src, Type>)
       return true;
-    else if constexpr (std::derived_from<Type, Src>) {
+    else if constexpr (std::derived_from<Type, Src> || horizontal_castable_from<Type, Src>) {
       if constexpr (has_object_type_id<Type>) {
         return AGT_type_id_of(Type) == src.type;
       }
@@ -107,9 +110,6 @@ namespace agt {
         static_assert(std::derived_from<Type, object>, "Type is not derived from object");
         static_assert(error_unregistered_type<Type>::value, "Type was defined without using the appropriate AGT_*_object_type macro.");
       }
-    }
-    else if constexpr (horizontal_castable_from<Type, Src>) {
-      return horizontal_casting<Type, Src>::isa(src);
     }
     else {
       static_assert(error_incompatible_types<Type, Src>::value, "No casting procedure exists for these two types.");

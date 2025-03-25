@@ -814,6 +814,11 @@ void agt::signal(agt_ctx_t ctx, spsc_signal_queue& queue, int32_t n) noexcept {
 
 bool agt::wait(agt_ctx_t ctx, spsc_signal_queue& queue, agt_timeout_t timeout) noexcept {
 
+
+}
+
+
+bool agt::wait_until(agt_ctx_t ctx, spsc_signal_queue& queue, agt_timestamp_t deadline) noexcept {
   auto queueSize = atomic_relaxed_load(queue.size);
   if ( queueSize < 0 ) {
     atomic_relaxed_increment(queue.size);

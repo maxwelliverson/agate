@@ -47,7 +47,7 @@ AGT_object(local_busy_executor, extends(agt_executor_st)) {
   HANDLE     threadHandle;
   HANDLE     timer;
   local_busy_self self; // given there can only be one self at any given point, simply store it inline.
-  agt_ctxexec_t ctxexec;
+  // agt_ctxexec_t ctxexec;
   agt_bool_t shouldWake;
   local_busy_executor_cbdata* pTimeoutData;
   local_busy_executor_cbdata* pWakeData;
@@ -123,11 +123,11 @@ namespace {
   std::mutex g_busyExecutorMutex;
 
   struct {
-    agt_uexec_vtable_t uexecVTable = {
-        .yield       = nullptr,
-        .suspend     = nullptr,
-        .suspend_for = nullptr,
-        .resume      = nullptr
+    agt_sched_vtable_t schedVTable = {
+        .yield         = nullptr,
+        .suspend       = nullptr,
+        .suspend_until = nullptr,
+        .resume        = nullptr
     };
 
     pfn_queue_user_apc_t queueUserAPC2 = nullptr;
@@ -135,16 +135,18 @@ namespace {
   } g_busyExecutorVTables;
 
 
-  agt_bool_t yield_busy_executor(agt_ctx_t ctx, agt_ctxexec_t ctxexec) noexcept {
+  agt_bool_t yield_busy_executor(agt_ctx_t ctx, void* userData) noexcept {
     // auto& exec = *unsafe_nonnull_object_cast<local_busy_executor>(ctxexec);
+    (void)ctx;
+    (void)userData;
     return SwitchToThread();
   }
 
-  void suspend_busy_executor_with_special_apc(agt_ctx_t ctx, agt_ctxexec_t ctxexec) noexcept {
-    auto& exec = *member_to_struct_cast<&local_busy_executor::stateEpoch>(static_cast<agt_u32_t*>(ctxexec));
+  void suspend_busy_executor_with_special_apc(agt_ctx_t ctx, const agt_suspend_info_t* pSuspendInfo, void* userData) noexcept {
+    auto& exec = *object_cast<local_busy_executor>(userData);
 
     // Do this as an atomic operation, even though no other thread should modify this,
-    // so that there can be no interuption between checking and setting
+    // so that there can be no OS interuption between checking and setting
     if (atomic_try_replace(exec.state, AGT_BUSY_STATE_RUNNING, AGT_BUSY_STATE_WAITING)) [[likely]] {
       do {
         auto result = WaitForSingleObjectEx(exec.wakeEvent, INFINITE, TRUE);
@@ -160,8 +162,8 @@ namespace {
     std::atomic_signal_fence(std::memory_order_release);
   }
 
-  void suspend_busy_executor_default(agt_ctx_t ctx, agt_ctxexec_t ctxexec) noexcept {
-    auto& exec = *unsafe_nonnull_object_cast<local_busy_executor>(ctxexec);
+  void suspend_busy_executor_default(agt_ctx_t ctx, const agt_suspend_info_t* pSuspendInfo, void* userData) noexcept {
+    auto& exec = *object_cast<local_busy_executor>(userData);
 
     exec.state = AGT_BUSY_STATE_WAITING;
     std::atomic_signal_fence(std::memory_order_release);
@@ -179,9 +181,10 @@ namespace {
   }
 
 
-  agt_bool_t suspend_busy_executor_with_special_apc_until(agt_ctx_t ctx, agt_ctxexec_t ctxexec, agt_timeout_t timeout) noexcept {
-    AGT_assert( timeout != AGT_WAIT && timeout != AGT_DO_NOT_WAIT);
-    auto& exec = *member_to_struct_cast<&local_busy_executor::stateEpoch>(static_cast<agt_u32_t*>(ctxexec));
+  agt_bool_t suspend_busy_executor_with_special_apc_until(agt_ctx_t ctx, const agt_suspend_until_info_t* pSuspendInfo, void* userData) noexcept {
+    AGT_assert( pSuspendInfo != nullptr );
+    const auto deadline = hwtime{pSuspendInfo->deadline};
+    auto& exec = *object_cast<local_busy_executor>(userData);
 
     constexpr static DWORD TimerTimedOut = WAIT_OBJECT_0;
     constexpr static DWORD WakeEventIsSet = WAIT_OBJECT_0 + 1;
@@ -192,7 +195,7 @@ namespace {
     };
 
     const auto startTime = hwnow();
-    const auto deadline = add_duration(ctx, startTime, timeout);
+    const auto timeout = duration_between(ctx, startTime, deadline);
     const auto systemStartTime = []{
       LARGE_INTEGER lrgInt;
       FILETIME filetime;
@@ -270,12 +273,17 @@ namespace {
     return returnValue;
   }
 
-  agt_bool_t suspend_busy_executor_default_until(agt_ctx_t ctx, agt_ctxexec_t ctxexec, agt_timeout_t timeout) noexcept {
-    AGT_assert( timeout != AGT_WAIT && timeout != AGT_DO_NOT_WAIT);
-    auto& exec = *member_to_struct_cast<&local_busy_executor::stateEpoch>(static_cast<agt_u32_t*>(ctxexec));
+  agt_bool_t suspend_busy_executor_default_until(agt_ctx_t ctx, const agt_suspend_until_info_t* pSuspendInfo, void* userData) noexcept {
+    AGT_assert( pSuspendInfo != nullptr );
+    const auto deadline = hwtime{pSuspendInfo->deadline};
+    auto& exec = *object_cast<local_busy_executor>(userData);
+
 
     const auto startTime = hwnow();
-    const auto deadline = add_duration(ctx, startTime, timeout);
+    if (deadline <= startTime)
+      return AGT_FALSE;
+
+    const auto timeout = duration_between(ctx, startTime, deadline);
     const auto systemStartTime = []{
       LARGE_INTEGER lrgInt;
       FILETIME filetime;
@@ -334,8 +342,10 @@ namespace {
     return returnValue;
   }
 
-  void resume_busy_executor_with_special_apc(agt_ctx_t ctx, agt_ctxexec_t ctxexec, agt_utask_t task){
-    auto& exec = *member_to_struct_cast<&local_busy_executor::stateEpoch>(static_cast<agt_u32_t*>(ctxexec));
+  void resume_busy_executor_with_special_apc(agt_ctx_t ctx, const agt_suspended_task_t* pSuspendedTask, agt_resume_reason_t reason) {
+
+    auto& exec = *object_cast<local_busy_executor>(pSuspendedTask->userData);
+    auto& task = pSuspendedTask->task;
     auto epoch = std::bit_cast<state_t>(task).epoch;
 
     if (exec.stateEpoch == epoch) [[likely]] {
@@ -358,8 +368,9 @@ namespace {
     }
   }
 
-  void resume_busy_executor_default(agt_ctx_t ctx, agt_ctxexec_t ctxexec, agt_utask_t task){
-    auto& exec = *member_to_struct_cast<&local_busy_executor::stateEpoch>(static_cast<agt_u32_t*>(ctxexec));
+  void resume_busy_executor_default(agt_ctx_t ctx, const agt_suspended_task_t* pSuspendedTask, agt_resume_reason_t reason){
+    auto& exec = *object_cast<local_busy_executor>(pSuspendedTask->userData);
+    auto& task = pSuspendedTask->task;
     auto epoch = std::bit_cast<state_t>(task).epoch;
 
     if (exec.stateEpoch == epoch) [[likely]] {
@@ -378,7 +389,7 @@ namespace {
       const auto currentState = atomic_load(exec.state);
 
       if (currentState != AGT_BUSY_STATE_RUNNING) {
-        auto err = QueueUserAPC(wake_up_busy_executor, exec.threadHandle, reinterpret_cast<ULONG_PTR>(ctxexec));
+        auto err = QueueUserAPC(wake_up_busy_executor, exec.threadHandle, reinterpret_cast<ULONG_PTR>(data));
         AGT_assert( err == 0 );
         if (currentState == AGT_BUSY_STATE_TIMED_WAIT) {
           atomic_store(exec.shouldWake, AGT_TRUE);
@@ -394,7 +405,7 @@ namespace {
   [[msvc::noinline]] void init_vtable(agt_ctx_t ctx) noexcept {
     std::lock_guard lock{g_busyExecutorMutex};
     std::atomic_signal_fence(std::memory_order_seq_cst); // ensure we check the actual memory location again
-    if (g_busyExecutorVTables.uexecVTable.resume == nullptr) [[likely]] {
+    if (g_busyExecutorVTables.schedVTable.resume == nullptr) [[likely]] {
       auto kernelLib = GetModuleHandle("Kernel32");
       AGT_assert( kernelLib != nullptr );
       auto pQueueUserAPC2 = (pfn_queue_user_apc_t)GetProcAddress(kernelLib, "QueueUserAPC2");
@@ -410,26 +421,26 @@ namespace {
         if (!result || !flag.test())
           hasQUAPC2 = false;
       }
-      auto& table = g_busyExecutorVTables.uexecVTable;
+      auto& table = g_busyExecutorVTables.schedVTable;
       table.yield = yield_busy_executor;
 
       if (hasQUAPC2) {
         table.suspend = suspend_busy_executor_with_special_apc;
-        table.suspend_for = suspend_busy_executor_with_special_apc_until;
+        table.suspend_until = suspend_busy_executor_with_special_apc_until;
         table.resume = resume_busy_executor_with_special_apc;
       }
       else {
         table.suspend = suspend_busy_executor_default;
-        table.suspend_for = suspend_busy_executor_default_until;
+        table.suspend_until = suspend_busy_executor_default_until;
         table.resume = resume_busy_executor_default;
       }
     }
   }
 
-  const agt_uexec_vtable_t* get_vptr(agt_ctx_t ctx) noexcept {
-    if (g_busyExecutorVTables.uexecVTable.resume == nullptr) [[unlikely]]
+  const agt_sched_vtable_t* get_vptr(agt_ctx_t ctx) noexcept {
+    if (g_busyExecutorVTables.schedVTable.resume == nullptr) [[unlikely]]
       init_vtable(ctx);
-    return &g_busyExecutorVTables.uexecVTable;
+    return &g_busyExecutorVTables.schedVTable;
   }
 }
 

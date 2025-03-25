@@ -707,6 +707,11 @@ namespace agt {
     return obj;
   }
 
+  template <std::derived_from<rc_object> Obj>
+  AGT_forceinline Obj*        actualize_weak_ref(Obj* obj, agt_epoch_t key) noexcept {
+    return &object_cast<Obj>(*actualize_weak_ref(static_cast<rc_object*>(obj), key));
+  }
+
 }
 
 #endif //AGATE_CORE_IMPL_SIZED_POOL_HPP

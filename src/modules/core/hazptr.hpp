@@ -48,10 +48,9 @@ namespace agt {
   inline static bool try_protect(agt_hazptr_t hazptr, T*& value, T* const & hazard) noexcept {
     T* prev = value;
     set_hazptr(hazptr, prev);
-    atomic_store(hazptr->ptr, prev);
     std::atomic_thread_fence(std::memory_order_seq_cst);
     value = atomic_load(hazard);
-    if (prev == value) [[unlikely]] {
+    if (prev != value) [[unlikely]] { // Value of hazard has changed since last read.
       reset_hazptr(hazptr);
       return false;
     }
